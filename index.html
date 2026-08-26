@@ -57,7 +57,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:18px;color:#17456B;margin-bot
 .g-hora{font-size:12.5px;font-weight:700;color:#33424F;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
 .cel{min-height:50px;border-radius:12px;border:1.5px solid #D6E0E7;background:#FAFCFD;line-height:1;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 .cel .c-ico{font-size:15px;line-height:1}
-.cel .c-nom{font:700 8.5px 'Atkinson Hyperlegible';max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6E4E00}
+.cel .c-nom{font:800 10.5px 'Baloo 2';letter-spacing:.04em;max-width:100%;overflow:hidden;white-space:nowrap;color:#6E4E00}
 .cel.propi{background:#E3E9EE;border-color:#9AA8B2}
 .cel:active{transform:scale(.93)}
 .cel.cond{background:#DCF1E3;border-color:#7FBF98}
@@ -127,8 +127,8 @@ details.conf summary{font:700 13px 'Baloo 2';color:#17456B;cursor:pointer;paddin
 .t-ok{border-left:5px solid #2C7A4B}
 .r-det summary{list-style:none;cursor:pointer}
 .r-det summary::-webkit-details-marker{display:none}
-.r-fletxa{color:#8F2B1C;font-size:11px;flex:none;transition:transform .15s}
-.r-det[open] .r-fletxa{transform:rotate(180deg)}
+.r-fletxa{width:26px;height:26px;border-radius:50%;background:#F4F8FA;border:1.5px solid #C7D3DC;color:#17456B;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;flex:none;transition:transform .15s,background .15s}
+.r-det[open] .r-fletxa{transform:rotate(180deg);background:#E3ECF4;border-color:#17456B}
 .r-nens{padding:2px 0 9px 4px;font-size:13px;color:#46596A;line-height:1.6;border-bottom:1px solid #F0F4F7}
 </style>
 </head>
@@ -464,7 +464,8 @@ function pintaGraella(){
       else if (propi){ cls = "propi"; cont = "<span class='c-ico'>🚫</span>"; }
       else if (marcats.length){
         cls = "nec";
-        cont = "<span class='c-ico'>🙋</span><span class='c-nom'>" + marcats.map(n => esc(n.nom)).join(" · ") + "</span>";
+        const inicialsNen = x => x.nom.trim().split(/\s+/).map(p => p[0].toUpperCase()).slice(0, 2).join("");
+        cont = "<span class='c-ico'>🙋</span><span class='c-nom'>" + marcats.slice(0, 2).map(x => esc(inicialsNen(x))).join("·") + (marcats.length > 2 ? "+" : "") + "</span>";
       }
       h += "<button class='cel " + cls + "' onclick=\"pinta('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
