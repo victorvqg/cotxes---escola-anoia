@@ -125,12 +125,17 @@ details.conf summary{font:700 13px 'Baloo 2';color:#17456B;cursor:pointer;paddin
 .t-def{border-left:5px solid #BE3D2A}
 .t-just{border-left:5px solid #C99A00}
 .t-ok{border-left:5px solid #2C7A4B}
+.r-det summary{list-style:none;cursor:pointer}
+.r-det summary::-webkit-details-marker{display:none}
+.r-fletxa{color:#8F2B1C;font-size:11px;flex:none;transition:transform .15s}
+.r-det[open] .r-fletxa{transform:rotate(180deg)}
+.r-nens{padding:2px 0 9px 4px;font-size:13px;color:#46596A;line-height:1.6;border-bottom:1px solid #F0F4F7}
 </style>
 </head>
 <body>
 <div class="tel">
   <header class="banda">
-    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">Compartim el camí a l'escola</div></div>
+    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">Compartim el camí de Montbui poble a l'Escola Anoia</div></div>
     <div class="chip-estat" id="estat">—</div>
   </header>
   <div class="zebra"></div>
@@ -719,6 +724,17 @@ async function pintaResum(){
            "<span class='r-hora'>" + it.fr.hora + "</span><span class='r-txt'>" + txt + "</span>" +
            "<span class='mp " + cls + "'>" + pt + "</span></div>";
   };
+  const filaDef = (it) => {
+    const b = it.b;
+    const txt = b.places + " " + (b.places === 1 ? "plaça" : "places") + " per a " + b.nens.length + " " + (b.nens.length === 1 ? "nen" : "nens");
+    const perFam = {};
+    b.nens.forEach(n => { (perFam[n.fam] = perFam[n.fam] || []).push(n.nom); });
+    const noms = Object.keys(perFam).map(fn => esc(perFam[fn].join(" i ")) + " (" + esc(fn) + ")").join(" · ");
+    return "<details class='r-det'><summary class='r-fila'><span class='r-dia'>" + DIES_NOM[it.d] + "</span>" +
+           "<span class='r-hora'>" + it.fr.hora + "</span><span class='r-txt'>" + txt + "</span>" +
+           "<span class='mp def'>−" + (-b.diff) + "</span><span class='r-fletxa'>▾</span></summary>" +
+           "<div class='r-nens'>🙋 " + noms + " <button class='enllac' onclick=\"selDia('" + it.d + "')\">obre el dia →</button></div></details>";
+  };
   const nNens = doc.families.reduce((s,f) => s + (f.nens || []).length, 0);
   let h = "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
     "<div><b>" + doc.families.length + "</b><span>fam\u00edlies</span></div>" +
@@ -730,8 +746,8 @@ async function pintaResum(){
       : "<p class='lead' style='margin:10px 0 0;color:#1F5C3B'><b>\u2713 Totes les fam\u00edlies han omplert l'horari.</b></p>") +
     "</div>";
   h += defs.length
-    ? "<div class='targeta t-def'><h2 style='color:#8F2B1C'>\u2757 Falta cobrir</h2>" + defs.map(it => fila(it, "def")).join("") +
-      "<p class='hint' style='margin:8px 2px 0'>Toca una l\u00ednia per anar al dia i veure quins nens s\u00f3n.</p></div>"
+    ? "<div class='targeta t-def'><h2 style='color:#8F2B1C'>\u2757 Falta cobrir</h2>" + defs.map(filaDef).join("") +
+      "<p class='hint' style='margin:8px 2px 0'>Toca una l\u00ednia per veure els nens; \u00abobre el dia \u2192\u00bb per anar-hi.</p></div>"
     : "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>\ud83c\udf89 Tot cobert</h2><p class='lead' style='margin:0'>Cap nen sense pla\u00e7a en tota la setmana.</p></div>";
   if (justs.length) h += "<div class='targeta t-just'><h2 style='color:#6E4E00'>Va just (sense marge)</h2>" + justs.map(it => fila(it, "just")).join("") + "</div>";
   if (marges.length) h += "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>On sobren places</h2>" + marges.map(it => fila(it, "ok")).join("") + "</div>";
