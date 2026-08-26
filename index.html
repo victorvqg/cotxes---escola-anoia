@@ -94,6 +94,10 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:18px;color:#17456B;margin-bot
 .barra{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none}
 .barra-int{width:100%;max-width:460px;padding:10px 14px 14px;background:linear-gradient(transparent,#EDF2F5 30%);display:flex;gap:10px;align-items:center;pointer-events:auto}
 .barra-txt{flex:1;font-size:12.5px;font-weight:700;color:#46596A}
+.dir-fila{display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:13.5px;border-top:1px solid #F0F4F7}
+.dir-fila:first-child{border-top:0}
+.dir-fila b{color:#17456B;flex:none}
+.dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peu{font-size:11.5px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
 details.conf{margin-top:14px}
 details.conf summary{font:700 13px 'Baloo 2';color:#17456B;cursor:pointer;padding:6px 2px}
@@ -164,6 +168,7 @@ let token = lsGet("cx_token");
 let famId = lsGet("cx_fam");
 let doc = null, sha = null;
 let pinzell = "cotxe", dirty = false;
+let esAdmin = lsGet("cx_admin") === "1";
 let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
 let tabAct = "horari";
 let ultimToc = {k:"", t:0};
@@ -210,10 +215,12 @@ async function ghPut(missatge, intent){
     // Algú ha desat abans que tu: agafa la versió nova i torna a posar-hi NOMÉS la teva família
     const fresc = await ghGet();
     const meva = doc.families.find(f => f.id === famId) || null;
+    const pinLocal = doc.adminPin;
     const idx = fresc.doc.families.findIndex(f => f.id === famId);
     if (meva){ if (idx >= 0) fresc.doc.families[idx] = meva; else fresc.doc.families.push(meva); }
     else if (idx >= 0) fresc.doc.families.splice(idx, 1);
     doc = fresc.doc; sha = fresc.sha;
+    if (pinLocal && !doc.adminPin) doc.adminPin = pinLocal;
     return ghPut(missatge, intent + 1);
   }
   if (!r.ok) throw { tipus: "desar" };
@@ -294,21 +301,24 @@ async function provaClau(){
   const v = $("#inp-clau").value.trim();
   if (!v) return;
   token = v; estat("Comprovant…");
-  try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; lsSet("cx_token", token); estat("Connectat ✓"); avis(""); pantallaTria(); }
+  try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; lsSet("cx_token", token); estat("Connectat ✓"); avis(""); if (famId && lameva()) pantallaApp(); else { famId = ""; lsDel("cx_fam"); pantallaTria(); } }
   catch(e){ token = ""; pantallaClau(e.tipus === "clau" ? "Aquesta clau no obre el grup." : "No puc connectar. Torna-ho a provar."); }
 }
 
 /* ── Pantalla: tria o crea la família ── */
 function pantallaTria(){
   const fams = famOrd();
-  const fitxes = fams.map(f => {
+  const opcions = fams.map(f => {
     const noms = (f.nens || []).map(n => n.nom).join(", ");
-    return "<button class='fitxa' onclick=\"triaFam('" + f.id + "')\"><b>" + esc(f.nom) + "</b>" + esc(noms) + "</button>";
+    return "<option value='" + f.id + "'>" + esc(f.nom) + (noms ? " — " + esc(noms) : "") + "</option>";
   }).join("");
   $("#pantalla").innerHTML =
     "<div class='targeta'><h2>Qui sou?</h2>" +
-    (fams.length ? "<p class='lead'>Toca la teva família (hi surten els nens de cadascuna):</p><div class='fitxes'>" + fitxes + "</div>"
-                 : "<p class='lead'>Encara no hi ha cap família. Crea la primera!</p>") +
+    (fams.length
+      ? "<p class='lead'>Tria la teva família al desplegable (hi surten els nens de cadascuna):</p>" +
+        "<div class='fila'><select class='input' id='sel-fam'><option value=''>— Tria la família —</option>" + opcions + "</select>" +
+        "<button class='boto' onclick=\"entraSel()\">Entra</button></div>"
+      : "<p class='lead'>Encara no hi ha cap família. Crea la primera!</p>") +
     "</div>" +
     "<div class='targeta'><h2>Crea la teva família</h2>" +
     "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>com us coneixen al grup (ex: Família Vila)</span></span></div>" +
@@ -350,16 +360,21 @@ async function creaFam(){
   catch(e){ doc.families = doc.families.filter(f => f.id !== id); famId = ""; estat("Error", true); avis("No s'ha pogut crear la família. Torna-ho a provar."); }
 }
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
+function entraSel(){ const v = $("#sel-fam").value; if (v) triaFam(v); }
 
 /* ── Pantalla principal ── */
 function pantallaApp(){
   const f = lameva();
+  const dirHtml = famOrd().map(x =>
+    "<div class='dir-fila'><b>" + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span></div>"
+  ).join("");
   $("#pantalla").innerHTML =
-    "<div class='salut'><span>Hola, <b>" + esc(f.nom) + "</b></span><button class='enllac' onclick='canviaFam()'>canvia</button></div>" +
+    "<div class='salut'><span>Hola, <b>" + esc(f.nom) + "</b>" + (esAdmin ? " <span style='font-size:11px;color:#6B7D8A'>· admin</span>" : "") + "</span>" + (esAdmin ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
     "<div class='tabs'><button class='tab' id='tab-horari' onclick=\"triaTab('horari')\">Horari</button>" +
     "<button class='tab' id='tab-cal' onclick=\"triaTab('cal')\">Calendari</button>" +
     "<button class='tab' id='tab-resum' onclick=\"triaTab('resum')\">Resum</button></div>" +
-    "<div id='tab-cos'></div>";
+    "<div id='tab-cos'></div>" +
+    "<details class='conf'><summary>👥 Les famílies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>";
   triaTab(tabAct);
 }
 function triaTab(t){
@@ -372,6 +387,7 @@ function triaTab(t){
   else pintaResum();
 }
 function canviaFam(){
+  if (!esAdmin) return;
   if (dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
   dirty = false; pintaBarra(); famId = ""; lsDel("cx_fam"); pantallaTria();
 }
@@ -379,6 +395,20 @@ function canviaFam(){
 /* ── Pestanya: el nostre horari ── */
 function pintaHorariComplet(){
   const f = lameva();
+  let adminHtml;
+  if (!doc.adminPin){
+    adminHtml =
+      "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Codi d'administrador<span class='p-sub'>encara no n'hi ha — estableix-lo (només l'admin del grup)</span></span></div>" +
+      "<div class='fila'><input class='input' id='pin-nou' type='password' autocomplete='off' placeholder='Codi nou (mínim 4)'><button class='boto sec' onclick='estableixPin()'>Estableix</button></div>";
+  } else if (esAdmin){
+    adminHtml =
+      "<p class='hint' style='margin-top:10px'>🛡️ Mode administrador actiu: tens l'enllaç «canvia» de dalt per entrar a qualsevol família i corregir horaris.</p>" +
+      "<div style='text-align:center'><button class='enllac' onclick='surtAdmin()'>Desactiva el mode admin en aquest mòbil</button></div>";
+  } else {
+    adminHtml =
+      "<div class='fila' style='margin-top:10px'><input class='input' id='pin-admin' type='password' autocomplete='off' placeholder=\"Codi d'administrador\"><button class='boto sec' onclick='entraAdmin()'>Activa</button></div>" +
+      "<p class='hint'>Només per a l'administrador del grup: desbloqueja el canvi de família.</p>";
+  }
   const chipsNens = f.nens.map(n =>
     "<button class='pinzell nen " + (pinzell === n.id ? "actiu nen" : "") + "' onclick=\"triaPinzell('" + n.id + "')\">🙋 " + esc(n.nom) + "</button>").join("");
   $("#tab-cos").innerHTML =
@@ -396,6 +426,7 @@ function pintaHorariComplet(){
     "<span class='stepper'><button onclick='canviaPlaces(-1)'>−</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
     "<div class='nens-llista' id='nens-llista'></div>" +
     "<div class='fila' style='margin-top:8px'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20'><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
+    adminHtml +
     "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la família del grup</button><br>" +
     "<button class='enllac' onclick='canviaClau()'>Canvia la clau del grup en aquest mòbil</button></div>" +
     "</div></details>";
@@ -468,6 +499,21 @@ function treuNen(id){
   if (pinzell === id) pinzell = "cotxe";
   dirty = true; pintaBarra(); pintaHorariComplet();
 }
+async function estableixPin(){
+  const v = $("#pin-nou").value.trim();
+  if (v.length < 4){ avis("El codi d'administrador ha de tenir 4 caràcters o més."); return; }
+  avis(""); doc.adminPin = v;
+  estat("Desant…");
+  try { await ghPut("Codi d'administrador establert"); dirty = false; pintaBarra(); esAdmin = true; lsSet("cx_admin", "1"); estat("Desat ✓"); pantallaApp(); }
+  catch(e){ delete doc.adminPin; estat("Error", true); avis("No s'ha pogut desar el codi. Torna-ho a provar."); }
+}
+function entraAdmin(){
+  const v = $("#pin-admin").value.trim();
+  if (!doc.adminPin || v !== doc.adminPin){ avis("Codi d'administrador incorrecte."); return; }
+  avis(""); esAdmin = true; lsSet("cx_admin", "1"); pantallaApp();
+}
+function surtAdmin(){ esAdmin = false; lsDel("cx_admin"); pantallaApp(); }
+
 function renomFam(v){
   const f = lameva(); if (!f) return;
   const nom = v.trim();
