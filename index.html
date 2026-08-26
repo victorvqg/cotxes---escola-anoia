@@ -717,24 +717,22 @@ async function pintaResum(){
     const p = Object.keys(f.propi || {}).some(k => f.propi[k] && f.propi[k].length);
     return !c && !n && !p;
   });
-  const fila = (it, cls) => {
-    const b = it.b;
-    const txt = b.places + " " + (b.places === 1 ? "pla\u00e7a" : "places") + " per a " + b.nens.length + " " + (b.nens.length === 1 ? "nen" : "nens");
-    const pt = b.diff < 0 ? "\u2212" + (-b.diff) : b.diff === 0 ? "0" : "+" + b.diff;
-    return "<div class='r-fila' onclick=\"selDia('" + it.d + "')\"><span class='r-dia'>" + DIES_NOM[it.d] + "</span>" +
-           "<span class='r-hora'>" + it.fr.hora + "</span><span class='r-txt'>" + txt + "</span>" +
-           "<span class='mp " + cls + "'>" + pt + "</span></div>";
-  };
-  const filaDef = (it) => {
+  const filaDet = (it, cls) => {
     const b = it.b;
     const txt = b.places + " " + (b.places === 1 ? "plaça" : "places") + " per a " + b.nens.length + " " + (b.nens.length === 1 ? "nen" : "nens");
+    const pt = b.diff < 0 ? "−" + (-b.diff) : b.diff === 0 ? "0" : "+" + b.diff;
+    const conds = b.conds.map(f => esc(f.nom) + " (" + f.places + ")").join(" · ");
     const perFam = {};
     b.nens.forEach(n => { (perFam[n.fam] = perFam[n.fam] || []).push(n.nom); });
     const noms = Object.keys(perFam).map(fn => esc(perFam[fn].join(" i ")) + " (" + esc(fn) + ")").join(" · ");
+    let det = "";
+    if (conds) det += "<div>🚗 " + conds + "</div>";
+    if (noms) det += "<div>🙋 " + noms + "</div>";
+    det += "<button class='enllac' onclick=\"selDia('" + it.d + "')\">obre el dia →</button>";
     return "<details class='r-det'><summary class='r-fila'><span class='r-dia'>" + DIES_NOM[it.d] + "</span>" +
            "<span class='r-hora'>" + it.fr.hora + "</span><span class='r-txt'>" + txt + "</span>" +
-           "<span class='mp def'>−" + (-b.diff) + "</span><span class='r-fletxa'>▾</span></summary>" +
-           "<div class='r-nens'>🙋 " + noms + " <button class='enllac' onclick=\"selDia('" + it.d + "')\">obre el dia →</button></div></details>";
+           "<span class='mp " + cls + "'>" + pt + "</span><span class='r-fletxa'>▾</span></summary>" +
+           "<div class='r-nens'>" + det + "</div></details>";
   };
   const nNens = doc.families.reduce((s,f) => s + (f.nens || []).length, 0);
   let h = "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
@@ -747,11 +745,11 @@ async function pintaResum(){
       : "<p class='lead' style='margin:10px 0 0;color:#1F5C3B'><b>\u2713 Totes les fam\u00edlies han omplert l'horari.</b></p>") +
     "</div>";
   h += defs.length
-    ? "<div class='targeta t-def'><h2 style='color:#8F2B1C'>\u2757 Falta cobrir</h2>" + defs.map(filaDef).join("") +
+    ? "<div class='targeta t-def'><h2 style='color:#8F2B1C'>\u2757 Falta cobrir</h2>" + defs.map(it => filaDet(it, "def")).join("") +
       "<p class='hint' style='margin:8px 2px 0'>Toca una l\u00ednia per veure els nens; \u00abobre el dia \u2192\u00bb per anar-hi.</p></div>"
     : "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>\ud83c\udf89 Tot cobert</h2><p class='lead' style='margin:0'>Cap nen sense pla\u00e7a en tota la setmana.</p></div>";
-  if (justs.length) h += "<div class='targeta t-just'><h2 style='color:#6E4E00'>Va just (sense marge)</h2>" + justs.map(it => fila(it, "just")).join("") + "</div>";
-  if (marges.length) h += "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>On sobren places</h2>" + marges.map(it => fila(it, "ok")).join("") + "</div>";
+  if (justs.length) h += "<div class='targeta t-just'><h2 style='color:#6E4E00'>Va just (sense marge)</h2>" + justs.map(it => filaDet(it, "just")).join("") + "</div>";
+  if (marges.length) h += "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>On sobren places</h2>" + marges.map(it => filaDet(it, "ok")).join("") + "<p class='hint' style='margin:8px 2px 0'>Toca una línia per veure els cotxes i les seves places.</p></div>";
   if (buides) h += "<p class='hint' style='text-align:center'>" + buides + " franges sense ning\u00fa apuntat.</p>";
   h += "<button class='boto sec' style='width:100%' onclick='pintaResum()'>\u21bb Actualitza</button>";
   $("#tab-cos").innerHTML = h;
