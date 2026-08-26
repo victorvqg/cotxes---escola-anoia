@@ -139,10 +139,14 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
 .a-pend{color:#8F2B1C;font-weight:700}
 .cel.nec.cobert{background:#DCF1E3;border-color:#7FBF98}
 .cel.nec.cobert .c-nom{color:#1F5C3B}
-.m-cel.q{align-items:flex-start;justify-content:flex-start;text-align:left;padding:4px 3px;gap:2px;height:auto;min-height:52px;cursor:pointer}
-.q-cond{font:800 10px 'Baloo 2';color:#17456B;line-height:1.3;word-break:break-word}
-.q-cond b{color:#0E2A44}
-.q-pend{font:800 10px 'Baloo 2';color:#8F2B1C;line-height:1.3}
+.qd-cap{cursor:pointer}
+.qd-linia{display:flex;gap:9px;padding:6px 0;border-top:1px solid #F0F4F7;align-items:flex-start}
+.qd-linia:first-of-type{border-top:0}
+.qd-hora{font:800 15px 'Baloo 2';color:#17456B;width:54px;flex:none}
+.qd-cotxe{font-size:15.5px;color:#1F3B52;line-height:1.45;min-width:0}
+.qd-cotxe b{color:#0E2A44}
+.qd-sense{font-size:15.5px;color:#8F2B1C;line-height:1.45;background:#FBE9E5;border-radius:9px;padding:2px 9px}
+.qd-sense b{color:#8F2B1C}
 .subtabs .subtab{font-size:14px;padding:9px 4px}
 .r-nens{padding:2px 0 9px 4px;font-size:14.5px;color:#46596A;line-height:1.6;border-bottom:1px solid #F0F4F7}
 </style>
@@ -272,6 +276,14 @@ function elPorta(famId, nenId, slot, dia){
   return doc.families.find(fc => te(fc.cotxe, slot, dia) &&
     portaValids(fc, slot, dia).some(r => r.fam === famId && r.nen === nenId)) || null;
 }
+function nomConductor(f){
+  if (!f) return "";
+  const inis = f.nom.trim().split(/\s+/).map(p => p[0].toUpperCase()).slice(0, 2).join("");
+  if (f.conductor && f.conductor.trim()){
+    return f.conductor.trim().split(/\s+/)[0] + " " + inis;
+  }
+  return f.nom;
+}
 function balanc(slot, dia){
   const conds = doc.families.filter(f => te(f.cotxe, slot, dia));
   const propis = doc.families.filter(f => te(f.propi, slot, dia));
@@ -282,7 +294,7 @@ function balanc(slot, dia){
     (f.nens || []).forEach(n => {
       if (!te(n.marca, slot, dia)) return;
       const c = elPorta(f.id, n.id, slot, dia);
-      nens.push({ nom: n.nom, fam: f.nom, famId: f.id, nenId: n.id, portadaPer: c ? c.nom : null, portadaPerId: c ? c.id : null });
+      nens.push({ nom: n.nom, fam: f.nom, famId: f.id, nenId: n.id, portadaPer: c ? nomConductor(c) : null, portadaPerId: c ? c.id : null });
     });
   });
   return { conds, propis, places, nens, diff: places - nens.length };
@@ -739,18 +751,19 @@ function pintaDia(){
         (f.conductor ? " \u00b7 condueix " + esc(f.conductor) : "") +
         (seus ? " \u00b7 amb " + esc(seus) : "") +
         " \u00b7 <b>" + f.places + " " + (f.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</b></div>";
-      if (meva && f.id === meva.id && b.nens.length){
+      if (meva && f.id === meva.id){
         const refs = portaValids(f, fr.id, diaSel);
-        const estatN = refs.length > f.places ? "def" : refs.length === f.places ? "just" : "ok";
-        linia += "<div class='assigna'><div class='a-cap'>Qui puges al teu cotxe? <span class='mp " + estatN + "'>" + refs.length + "/" + f.places + "</span></div>" +
-          b.nens.map(n => {
-            const meu = refs.some(r => r.fam === n.famId && r.nen === n.nenId);
-            const altre = !meu && n.portadaPerId && n.portadaPerId !== f.id;
-            return "<label class='a-fila" + (altre ? " apagat" : "") + "'><input type='checkbox' " + (meu ? "checked " : "") + (altre ? "disabled " : "") +
-              "onchange=\"assigna('" + fr.id + "','" + diaSel + "','" + n.famId + "','" + n.nenId + "', this.checked)\"> " +
-              esc(n.nom) +
-              (altre ? " <span class='a-fam'>\u2192 amb " + esc(n.portadaPer) + "</span>" : "") + "</label>";
-          }).join("") + "</div>";
+        const cand = b.nens.filter(n => !n.portadaPerId || n.portadaPerId === f.id);
+        if (cand.length){
+          const estatN = refs.length > f.places ? "def" : refs.length === f.places ? "just" : "ok";
+          linia += "<div class='assigna'><div class='a-cap'>Qui puges al teu cotxe? <span class='mp " + estatN + "'>" + refs.length + "/" + f.places + "</span></div>" +
+            cand.map(n => {
+              const meu = refs.some(r => r.fam === n.famId && r.nen === n.nenId);
+              return "<label class='a-fila'><input type='checkbox' " + (meu ? "checked " : "") +
+                "onchange=\"assigna('" + fr.id + "','" + diaSel + "','" + n.famId + "','" + n.nenId + "', this.checked)\"> " +
+                esc(n.nom) + "</label>";
+            }).join("") + "</div>";
+        }
       }
       return linia;
     }).join("");
@@ -816,7 +829,7 @@ function pintaVistaNen(){
         if (te(fam.cotxe, fr.id, d)) txt = "\ud83d\ude97 hi va amb la seva fam\u00edlia" + (fam.conductor ? " (" + esc(fam.conductor) + ")" : "");
         else if (te(nen.marca, fr.id, d)){
           const c = elPorta(famId2, nenId2, fr.id, d);
-          txt = c ? "\ud83d\ude97 <b>el porta " + esc(c.nom) + "</b>" + (c.conductor ? " (" + esc(c.conductor) + ")" : "")
+          txt = c ? "\ud83d\ude97 <b>el porta " + esc(nomConductor(c)) + "</b>"
                   : "<span class='a-pend'>\u23f3 pendent d'assignar</span>";
         } else if (te(fam.propi, fr.id, d)) txt = "\ud83d\udeab pel seu compte";
         if (txt) linies += "<div class='f-linia'><b style='width:56px;display:inline-block'>" + fr.hora + "</b> " + txt + "</div>";
@@ -830,33 +843,40 @@ function pintaVistaNen(){
 function selNenCanvia(v){ nenSel = v; pintaVistaNen(); }
 
 function pintaQuadre(){
-  const iniQ = s => s.trim().split(/\s+/).map(p => p[0].toUpperCase()).slice(0, 2).join("");
-  let h = "<div class='mapa'><div></div>";
-  DIES.forEach(d => h += "<div class='m-dia'>" + d.toUpperCase() + "</div>");
-  FRANGES.forEach(fr => {
-    const t = fr.tipus === "Entrada" ? "e" : "r";
-    h += "<div class='m-fr'><span>" + fr.hora + "</span><span class='m-tip " + t + "'>" + fr.tipus + "</span></div>";
-    DIES.forEach(d => {
+  const pila = s => s.trim().split(/\s+/)[0];
+  const llista = arr => arr.map(esc).join(", ").replace(/, ([^,]*)$/, " i $1");
+  let h = "";
+  DIES.forEach(d => {
+    let linies = "";
+    let pendTot = 0;
+    let hiHa = false;
+    FRANGES.forEach(fr => {
       const b = balanc(fr.id, d);
       const pend = b.nens.filter(n => !n.portadaPer);
-      let cos2 = "";
       b.conds.forEach(c => {
-        const seves = (c.nens || []).map(n => iniQ(n.nom));
-        const puja = portaValids(c, fr.id, d).map(r => {
+        hiHa = true;
+        const noms = (c.nens || []).map(n => pila(n.nom));
+        portaValids(c, fr.id, d).forEach(r => {
           const ff = doc.families.find(x => x.id === r.fam);
           const nn = ff ? (ff.nens || []).find(x => x.id === r.nen) : null;
-          return nn ? iniQ(nn.nom) : "";
-        }).filter(Boolean);
-        const tots = seves.concat(puja);
-        const vis = tots.slice(0, 4).join("\u00b7") + (tots.length > 4 ? "+" : "");
-        cos2 += "<div class='q-cond'>\ud83d\ude97<b>" + esc(iniQ(c.nom)) + "</b>" + (vis ? " " + vis : "") + "</div>";
+          if (nn) noms.push(pila(nn.nom));
+        });
+        linies += "<div class='qd-linia'><span class='qd-hora'>" + fr.hora + "</span><span class='qd-cotxe'>\ud83d\ude97 <b>" + esc(nomConductor(c)) + "</b>" +
+          (noms.length ? " porta <b>" + llista(noms) + "</b>" : " \u00b7 encara ning\u00fa (" + c.places + " lliures)") + "</span></div>";
       });
-      if (pend.length) cos2 += "<div class='q-pend'>\ud83d\ude4b" + pend.slice(0, 4).map(n => iniQ(n.nom)).join("\u00b7") + (pend.length > 4 ? "+" : "") + "</div>";
-      const cls = !cos2 ? "cap" : (pend.length ? "def" : "ok");
-      h += "<div class='m-cel q " + cls + "' onclick=\"obreDiaDes('" + d + "')\">" + (cos2 || "<span class='m-buit'>\u00b7</span>") + "</div>";
+      if (pend.length){
+        hiHa = true; pendTot += pend.length;
+        linies += "<div class='qd-linia'><span class='qd-hora'>" + fr.hora + "</span><span class='qd-sense'>\u23f3 Sense cotxe: <b>" + llista(pend.map(n => pila(n.nom))) + "</b></span></div>";
+      }
     });
+    const chip = !hiHa ? "<span class='badge buit'>res marcat</span>"
+      : pendTot ? "<span class='badge mal'>\u26a0 " + pendTot + " sense cotxe</span>"
+      : "<span class='badge be'>\u2713 tot quadrat</span>";
+    h += "<div class='targeta dcard'><div class='d-cap qd-cap' onclick=\"obreDiaDes('" + d + "')\"><h3>" + DIES_NOM[d] + "</h3>" + chip + "</div>" +
+         (linies || "<p class='hint' style='margin:2px 0 4px'>Cap trajecte marcat.</p>") +
+         (hiHa ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"obreDiaDes('" + d + "')\">veure i assignar \u2192</button></div>" : "") +
+         "</div>";
   });
-  h += "</div><p class='hint' style='margin-top:10px'>\ud83d\ude97 = inicials de la fam\u00edlia que condueix, seguides dels nens que hi van (els seus + els assignats) \u00b7 \ud83d\ude4b vermell = nens sense cotxe encara. Toca una casella per obrir aquell dia.</p>";
   $("#cal-cos").innerHTML = h;
 }
 function obreDiaDes(d){ vistaCal = "dia"; diaSel = d; renderCal(); }
