@@ -2,7 +2,7 @@
 <html lang="ca">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17456B">
 <title>Cotxes · Escola Anoia</title>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
@@ -64,7 +64,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:18px;color:#17456B;margin-bot
 .cel.nec{background:#FCEBB8;border-color:#E0B93B;font:800 12.5px 'Baloo 2';color:#6E4E00}
 .nens-llista .p-fila span{font-size:14px}
 .mini-x{border:none;background:#F9E2DD;color:#97301F;font:700 12px 'Atkinson Hyperlegible';border-radius:999px;padding:5px 10px}
-.input.i-nen{flex:1;min-width:0;padding:9px 11px;font-size:14.5px}
+.input.i-nen{flex:1;min-width:0;padding:9px 11px;font-size:16px}
 .dies-sel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}
 .dia-b{border:1.5px solid #B9CBD7;background:#fff;color:#46596A;font:700 13.5px 'Baloo 2';padding:9px 0;border-radius:12px}
 .dia-b.actiu{background:#17456B;border-color:#17456B;color:#fff}
@@ -92,7 +92,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:18px;color:#17456B;margin-bot
 .badge.be{background:#DCF1E3;color:#1F5C3B}.badge.mal{background:#F6D2CC;color:#8F2B1C}.badge.buit{background:#E7EDF1;color:#5B6B78}
 .f-linia{font-size:13.5px;margin-top:8px;line-height:1.5}
 .barra{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none}
-.barra-int{width:100%;max-width:460px;padding:10px 14px 14px;background:linear-gradient(transparent,#EDF2F5 30%);display:flex;gap:10px;align-items:center;pointer-events:auto}
+.barra-int{width:100%;max-width:460px;padding:10px 14px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(transparent,#EDF2F5 30%);display:flex;gap:10px;align-items:center;pointer-events:auto}
 .barra-txt{flex:1;font-size:12.5px;font-weight:700;color:#46596A}
 .dir-fila{display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:13.5px;border-top:1px solid #F0F4F7}
 .dir-fila:first-child{border-top:0}
@@ -169,6 +169,7 @@ let famId = lsGet("cx_fam");
 let doc = null, sha = null;
 let pinzell = "cotxe", dirty = false;
 let esAdmin = lsGet("cx_admin") === "1";
+let confObert = false;
 let usuariId = lsGet("cx_usuari");
 if (!usuariId){ usuariId = Math.random().toString(36).slice(2, 10); lsSet("cx_usuari", usuariId); }
 let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
@@ -252,7 +253,12 @@ function balanc(slot, dia){
 
 /* ── Estat visual de la capçalera i la barra ── */
 function estat(txt, err){ const e = $("#estat"); e.textContent = txt; e.className = "chip-estat" + (err ? " err" : ""); }
-function avis(txt){ const a = $("#avis"); if (!txt){ a.style.display = "none"; return; } a.innerHTML = txt; a.style.display = "block"; }
+function avis(txt){
+  const a = $("#avis");
+  if (!txt){ a.style.display = "none"; return; }
+  a.innerHTML = txt; a.style.display = "block";
+  if (typeof a.scrollIntoView === "function"){ try { a.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(e){} }
+}
 function pintaBarra(){ $("#barra").classList.toggle("amaga", !dirty); }
 
 async function desa(){
@@ -297,7 +303,7 @@ function pantallaClau(err){
     "<div class='targeta'><h2>Clau del grup</h2>" +
     "<p class='lead'>Enganxa la clau que s'ha compartit al grup de famílies (comença per <b>github_pat_</b>). Aquest mòbil la recordarà.</p>" +
     (err ? "<p class='lead' style='color:#8F2B1C'><b>" + esc(err) + "</b></p>" : "") +
-    "<div class='fila'><input class='input' id='inp-clau' type='password' autocomplete='off' placeholder='github_pat_…'>" +
+    "<div class='fila'><input class='input' id='inp-clau' type='password' autocomplete='off' placeholder='github_pat_…' onkeydown=\"if(event.key==='Enter')provaClau()\">" +
     "<button class='boto' onclick='provaClau()'>Entra</button></div></div>";
 }
 async function provaClau(){
@@ -335,7 +341,8 @@ function pantallaTria(){
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
     "<div id='nf-nens'></div>" +
     "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
-    "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>";
+    "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>" +
+    "<p style='text-align:center;margin-top:2px'><button class='enllac' onclick='obreAdmin()'>🛡️ Accés administrador</button></p>";
   nfNens = [""]; nfPl = 3; pintaNfNens();
 }
 let nfNens = [""], nfPl = 3;
@@ -390,7 +397,8 @@ function pantallaApp(){
     "<button class='tab' id='tab-cal' onclick=\"triaTab('cal')\">Calendari</button>" +
     "<button class='tab' id='tab-resum' onclick=\"triaTab('resum')\">Resum</button></div>" +
     "<div id='tab-cos'></div>" +
-    "<details class='conf'><summary>👥 Les famílies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>";
+    "<details class='conf'><summary>👥 Les famílies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>" +
+    "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "🛡️ Administrador · gestiona" : "🛡️ Accés administrador") + "</button></p>";
   triaTab(tabAct);
 }
 function triaTab(t){
@@ -411,21 +419,6 @@ function canviaFam(){
 /* ── Pestanya: el nostre horari ── */
 function pintaHorariComplet(){
   const f = lameva();
-  let adminHtml;
-  if (!doc.adminPin){
-    adminHtml =
-      "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Codi d'administrador<span class='p-sub'>encara no n'hi ha — estableix-lo (només l'admin del grup)</span></span></div>" +
-      "<div class='fila'><input class='input' id='pin-nou' type='password' autocomplete='off' placeholder='Codi nou (mínim 4)'><button class='boto sec' onclick='estableixPin()'>Estableix</button></div>";
-  } else if (esAdmin){
-    adminHtml =
-      "<p class='hint' style='margin-top:10px'>🛡️ Mode administrador actiu: tens l'enllaç «canvia» de dalt per entrar a qualsevol família i corregir horaris.</p>" +
-      "<div class='fila' style='margin-top:8px'><input class='input' id='pin-canvi' type='password' autocomplete='off' placeholder='Nou codi (mínim 4)'><button class='boto sec' onclick='canviaPin()'>Canvia el codi</button></div>" +
-      "<div style='text-align:center;margin-top:6px'><button class='enllac' onclick='surtAdmin()'>Desactiva el mode admin en aquest mòbil</button></div>";
-  } else {
-    adminHtml =
-      "<div class='fila' style='margin-top:10px'><input class='input' id='pin-admin' type='password' autocomplete='off' placeholder=\"Codi d'administrador\"><button class='boto sec' onclick='entraAdmin()'>Activa</button></div>" +
-      "<p class='hint'>Només per a l'administrador del grup: desbloqueja el canvi de família.</p>";
-  }
   const chipsNens = f.nens.map(n =>
     "<button class='pinzell nen " + (pinzell === n.id ? "actiu nen" : "") + "' onclick=\"triaPinzell('" + n.id + "')\">🙋 " + esc(n.nom) + "</button>").join("");
   $("#tab-cos").innerHTML =
@@ -436,14 +429,13 @@ function pintaHorariComplet(){
     "<button class='pinzell esb " + (pinzell === "esborra" ? "actiu esb" : "") + "' onclick=\"triaPinzell('esborra')\">Esborra</button></div>" +
     "<p class='hint'>1. Tria què marques · 2. Toca les caselles. 🚗 conduïu i oferiu places · 🚫 aquell dia aneu pel vostre compte (sense places) · 🙋 nen que necessita plaça.</p>" +
     "<div class='targeta' style='padding:12px 10px'><div class='graella' id='graella'></div></div>" +
-    "<details class='conf'><summary>⚙️ La família i la configuració</summary><div class='targeta' style='margin-top:8px'>" +
+    "<details class='conf'" + (confObert ? " open" : "") + " ontoggle='confObert=this.open'><summary>⚙️ La família i la configuració</summary><div class='targeta' style='margin-top:8px'>" +
     "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>toca'l, canvia'l i després «Desa els canvis»</span></span></div>" +
     "<input class='input' value=\"" + esc(f.nom) + "\" maxlength='30' onchange=\"renomFam(this.value)\">" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies</span></span>" +
     "<span class='stepper'><button onclick='canviaPlaces(-1)'>−</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
     "<div class='nens-llista' id='nens-llista'></div>" +
-    "<div class='fila' style='margin-top:8px'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20'><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
-    adminHtml +
+    "<div class='fila' style='margin-top:8px'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la família del grup</button><br>" +
     "<button class='enllac' onclick='canviaClau()'>Canvia la clau del grup en aquest mòbil</button></div>" +
     "</div></details>";
@@ -516,13 +508,34 @@ function treuNen(id){
   if (pinzell === id) pinzell = "cotxe";
   dirty = true; pintaBarra(); pintaHorariComplet();
 }
+function obreAdmin(){ pantallaAdmin(); }
+function tancaAdmin(){ if (famId && lameva()) pantallaApp(); else pantallaTria(); }
+function pantallaAdmin(){
+  let cos;
+  if (!doc.adminPin){
+    cos = "<p class='lead'>Encara no hi ha cap codi d'administrador al grup. Si l'administrador ets tu, estableix-lo ara; la resta de famílies no heu de fer res aquí.</p>" +
+      "<div class='fila'><input class='input' id='pin-nou' type='password' autocomplete='off' placeholder='Codi nou (mínim 4)' onkeydown=\"if(event.key==='Enter')estableixPin()\"><button class='boto' onclick='estableixPin()'>Estableix</button></div>";
+  } else if (esAdmin){
+    cos = "<p class='lead'>🛡️ Mode administrador <b>actiu</b> en aquest mòbil: tens l'enllaç «canvia» per entrar a qualsevol família i pots crear-ne per a altres.</p>" +
+      "<div class='p-fila'><span class='p-lab'>Canviar el codi del grup</span></div>" +
+      "<div class='fila'><input class='input' id='pin-canvi' type='password' autocomplete='off' placeholder='Nou codi (mínim 4)' onkeydown=\"if(event.key==='Enter')canviaPin()\"><button class='boto sec' onclick='canviaPin()'>Canvia</button></div>" +
+      "<div style='text-align:center;margin-top:12px'><button class='enllac' onclick='surtAdmin()'>Desactiva el mode admin en aquest mòbil</button></div>";
+  } else {
+    cos = "<p class='lead'>Aquesta zona és només per a qui administra el grup. Les famílies no necessiteu res d'aquí.</p>" +
+      "<div class='fila'><input class='input' id='pin-admin' type='password' autocomplete='off' placeholder=\"Codi d'administrador\" onkeydown=\"if(event.key==='Enter')entraAdmin()\"><button class='boto' onclick='entraAdmin()'>Activa</button></div>";
+  }
+  $("#pantalla").innerHTML =
+    "<div class='salut'><span><b>🛡️ Accés d'administrador</b></span><button class='enllac' onclick='tancaAdmin()'>← torna</button></div>" +
+    "<div class='targeta'>" + cos + "</div>";
+}
+
 async function estableixPin(){
   const v = $("#pin-nou").value.trim();
   if (v.length < 4){ avis("El codi d'administrador ha de tenir 4 caràcters o més."); return; }
   avis(""); doc.adminPin = v;
   const fj = lameva(); if (fj) fj.rol = "admin";
   estat("Desant…");
-  try { await ghPut("Codi d'administrador establert"); dirty = false; pintaBarra(); esAdmin = true; lsSet("cx_admin", "1"); estat("Desat ✓"); pantallaApp(); }
+  try { await ghPut("Codi d'administrador establert"); dirty = false; pintaBarra(); esAdmin = true; lsSet("cx_admin", "1"); estat("Desat ✓"); tancaAdmin(); }
   catch(e){ delete doc.adminPin; estat("Error", true); avis("No s'ha pogut desar el codi. Torna-ho a provar."); }
 }
 async function canviaPin(){
@@ -530,7 +543,7 @@ async function canviaPin(){
   if (v.length < 4){ avis("El codi ha de tenir 4 caràcters o més."); return; }
   avis(""); const antic = doc.adminPin; doc.adminPin = v;
   estat("Desant…");
-  try { await ghPut("Codi d'administrador canviat"); dirty = false; pintaBarra(); estat("Desat ✓"); pantallaApp(); }
+  try { await ghPut("Codi d'administrador canviat"); dirty = false; pintaBarra(); estat("Desat ✓"); tancaAdmin(); }
   catch(e){ doc.adminPin = antic; estat("Error", true); avis("No s'ha pogut canviar el codi. Torna-ho a provar."); }
 }
 function entraAdmin(){
@@ -539,9 +552,9 @@ function entraAdmin(){
   avis("");
   const fj = lameva();
   if (fj && fj.rol !== "admin"){ fj.rol = "admin"; dirty = true; pintaBarra(); }
-  esAdmin = true; lsSet("cx_admin", "1"); pantallaApp();
+  esAdmin = true; lsSet("cx_admin", "1"); tancaAdmin();
 }
-function surtAdmin(){ esAdmin = false; lsDel("cx_admin"); pantallaApp(); }
+function surtAdmin(){ esAdmin = false; lsDel("cx_admin"); pantallaAdmin(); }
 
 function renomFam(v){
   const f = lameva(); if (!f) return;
