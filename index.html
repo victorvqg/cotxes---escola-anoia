@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17456B">
+<title>Cotxes · Escola Anoia</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation;user-select:none;-webkit-user-select:none;font-family:inherit;cursor:pointer}
+body{background:#E4EAEF;font-family:'Atkinson Hyperlegible',system-ui,sans-serif;color:#21313E;display:flex;justify-content:center}
+.tel{width:100%;max-width:460px;background:#EDF2F5;min-height:100vh;display:flex;flex-direction:column}
+.banda{background:#17456B;color:#fff;padding:16px 18px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+h1{font-family:'Baloo 2';font-weight:800;font-size:22px;line-height:1.05}
+.sub{font-size:12.5px;opacity:.85;margin-top:3px}
+.chip-estat{font:700 11.5px 'Atkinson Hyperlegible';padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.16);white-space:nowrap;margin-top:2px}
+.chip-estat.err{background:#BE3D2A}
+.zebra{height:10px;background:repeating-linear-gradient(90deg,#fff 0 18px,#17456B 18px 36px);border-top:3px solid #17456B}
+.cos{flex:1;padding:14px 14px 96px}
+.targeta{background:#fff;border:1.5px solid #D6E0E7;border-radius:16px;padding:14px;margin-bottom:12px}
+h2{font-family:'Baloo 2';font-weight:800;font-size:18px;color:#17456B;margin-bottom:8px}
+.lead{font-size:13px;color:#5B6E7C;margin-bottom:10px;line-height:1.5}
+.avis{background:#FDF1EF;border:1.5px solid #E6C7C0;border-left:5px solid #BE3D2A;border-radius:12px;padding:10px 12px;font-size:13px;color:#5B4640;margin-bottom:12px;display:none}
+.input{width:100%;border:1.5px solid #B9CBD7;border-radius:12px;padding:12px;font:400 16px 'Atkinson Hyperlegible';background:#fff;color:#21313E}
+.input:focus{outline:3px solid #F5B91E;outline-offset:1px;border-color:#17456B}
+.boto{border:none;background:#17456B;color:#fff;font:700 15px 'Baloo 2';padding:12px 18px;border-radius:12px}
+.boto:disabled{opacity:.45}
+.boto.sec{background:#fff;color:#17456B;border:1.5px solid #B9CBD7}
+.boto:active{transform:scale(.97)}
+.fila{display:flex;gap:8px;align-items:center}
+.enllac{border:none;background:none;color:#17456B;font-weight:700;font-size:13px;text-decoration:underline;padding:4px}
+.fitxes{display:flex;flex-wrap:wrap;gap:8px}
+.fitxa{border:1.5px solid #B9CBD7;background:#F4F8FA;color:#21313E;font-size:13.5px;padding:9px 13px;border-radius:14px;text-align:left}
+.fitxa b{font-family:'Baloo 2';color:#17456B;display:block;font-size:14.5px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#DDE6EC;padding:5px;border-radius:14px;margin-bottom:14px}
+.tab{border:none;background:transparent;color:#46596A;font:700 14px 'Baloo 2';padding:10px 6px;border-radius:10px}
+.tab.actiu{background:#fff;color:#17456B;box-shadow:0 1px 2px rgba(23,69,107,.15)}
+.salut{display:flex;align-items:baseline;justify-content:space-between;padding:0 2px;margin-bottom:10px;font-size:14.5px}
+.p-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0}
+.p-fila+.p-fila{border-top:1px solid #E8EEF2}
+.p-lab{font-size:14px;font-weight:700}
+.p-sub{font-size:11.5px;font-weight:400;color:#6B7D8A;display:block}
+.stepper{display:flex;align-items:center;gap:9px}
+.stepper button{width:36px;height:36px;border-radius:11px;border:1.5px solid #B9CBD7;background:#F4F8FA;font:700 19px 'Baloo 2';color:#17456B;line-height:1}
+.num{font:800 19px 'Baloo 2';color:#17456B;min-width:20px;text-align:center}
+.pinzells{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.pinzell{border:2px solid #C7D3DC;background:#fff;color:#46596A;font:700 13px 'Baloo 2';padding:10px 11px;border-radius:12px;line-height:1.2}
+.pinzell.actiu.cond{background:#DCF1E3;border-color:#2C7A4B;color:#1F5C3B}
+.pinzell.actiu.nen{background:#FCEBB8;border-color:#C99A00;color:#6E4E00}
+.pinzell.actiu.esb{background:#E7EDF1;border-color:#5B6B78;color:#33424F}
+.hint{font-size:12px;color:#5B6E7C;margin:0 2px 10px}
+.graella{display:grid;grid-template-columns:52px repeat(5,1fr);gap:6px}
+.g-dia{font:700 11.5px 'Baloo 2';text-align:center;color:#46596A;text-transform:uppercase;letter-spacing:.04em;padding:2px 0}
+.g-grup{grid-column:1/-1;font:700 11px 'Baloo 2';color:#17456B;text-transform:uppercase;letter-spacing:.06em;padding:7px 2px 1px}
+.g-hora{font-size:12.5px;font-weight:700;color:#33424F;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
+.cel{min-height:46px;border-radius:12px;border:1.5px solid #D6E0E7;background:#FAFCFD;font-size:18px;line-height:1;padding:2px}
+.cel:active{transform:scale(.93)}
+.cel.cond{background:#DCF1E3;border-color:#7FBF98}
+.cel.nec{background:#FCEBB8;border-color:#E0B93B;font:800 12.5px 'Baloo 2';color:#6E4E00}
+.nens-llista .p-fila span{font-size:14px}
+.mini-x{border:none;background:#F9E2DD;color:#97301F;font:700 12px 'Atkinson Hyperlegible';border-radius:999px;padding:5px 10px}
+.dies-sel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}
+.dia-b{border:1.5px solid #B9CBD7;background:#fff;color:#46596A;font:700 13.5px 'Baloo 2';padding:9px 0;border-radius:12px}
+.dia-b.actiu{background:#17456B;border-color:#17456B;color:#fff}
+.mapa{display:grid;grid-template-columns:56px repeat(5,1fr);gap:5px;background:#fff;border:1.5px solid #D6E0E7;border-radius:16px;padding:11px 9px;margin-bottom:12px}
+.m-cap{font:700 11px 'Baloo 2';text-align:center;color:#46596A;text-transform:uppercase;align-self:end;padding-bottom:2px}
+.m-fr{display:flex;flex-direction:column;gap:2px;justify-content:center}
+.m-hora{font:800 13px 'Baloo 2';color:#17456B}
+.m-tip{font:700 8px 'Atkinson Hyperlegible';letter-spacing:.08em;text-transform:uppercase;padding:2px 5px;border-radius:5px;width:fit-content}
+.m-tip.e{background:#E3ECF4;color:#17456B}.m-tip.r{background:#F4E9E0;color:#7A4A2B}
+.m-cel{border:none;border-radius:10px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:inherit}
+.m-cel .n1{font:800 15px 'Baloo 2';line-height:1.1}
+.m-cel .n2{font-size:8.5px;font-weight:700;opacity:.8}
+.m-cel.ok{background:#DCF1E3;color:#1F5C3B}
+.m-cel.just{background:#FCEBB8;color:#6E4E00}
+.m-cel.def{background:#F6D2CC;color:#8F2B1C;outline:2px solid #D77E6C;outline-offset:-2px}
+.m-cel.cap{background:#F1F5F7;color:#9AA8B2}
+.llegenda{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.lg{font:700 10.5px 'Atkinson Hyperlegible';padding:4px 8px;border-radius:999px}
+.lg.ok{background:#DCF1E3;color:#1F5C3B}.lg.just{background:#FCEBB8;color:#6E4E00}.lg.def{background:#F6D2CC;color:#8F2B1C}
+.franja{padding:12px 13px}
+.f-cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.f-hora{font:800 18px 'Baloo 2';color:#17456B}
+.f-tipus{font-size:11px;font-weight:700;color:#6B7D8A;text-transform:uppercase;letter-spacing:.05em}
+.badge{margin-left:auto;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.badge.be{background:#DCF1E3;color:#1F5C3B}.badge.mal{background:#F6D2CC;color:#8F2B1C}.badge.buit{background:#E7EDF1;color:#5B6B78}
+.f-linia{font-size:13.5px;margin-top:8px;line-height:1.5}
+.barra{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none}
+.barra-int{width:100%;max-width:460px;padding:10px 14px 14px;background:linear-gradient(transparent,#EDF2F5 30%);display:flex;gap:10px;align-items:center;pointer-events:auto}
+.barra-txt{flex:1;font-size:12.5px;font-weight:700;color:#46596A}
+.peu{font-size:11.5px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
+details.conf{margin-top:14px}
+details.conf summary{font:700 13px 'Baloo 2';color:#17456B;cursor:pointer;padding:6px 2px}
+.amaga{display:none}
+.subtabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#DDE6EC;padding:4px;border-radius:12px;margin-bottom:12px}
+.subtab{border:none;background:transparent;color:#46596A;font:700 12.5px 'Baloo 2';padding:8px 6px;border-radius:9px}
+.subtab.actiu{background:#fff;color:#17456B;box-shadow:0 1px 2px rgba(23,69,107,.15)}
+.dcard{background:#fff;border:1.5px solid #D6E0E7;border-radius:16px;padding:11px 12px;margin-bottom:10px;cursor:pointer}
+.dcard:active{transform:scale(.99)}
+.d-cap{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.d-nom{font:800 15px 'Baloo 2';color:#17456B;flex:1}
+.d-fila{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:12.5px;color:#46596A;border-top:1px solid #F0F4F7}
+.d-hora{font:800 12px 'Baloo 2';color:#17456B;width:38px;flex:none}
+.d-txt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp{font:800 11px 'Baloo 2';padding:2px 8px;border-radius:999px;flex:none}
+.mp.ok{background:#DCF1E3;color:#1F5C3B}.mp.just{background:#FCEBB8;color:#6E4E00}
+.mp.def{background:#F6D2CC;color:#8F2B1C}.mp.cap{background:#F1F5F7;color:#9AA8B2}
+.r-stats{display:flex;gap:16px;flex-wrap:wrap}
+.r-stats b{font:800 22px 'Baloo 2';color:#17456B;display:block;line-height:1}
+.r-stats span{font-size:10.5px;color:#6B7D8A;display:block;margin-top:2px}
+.r-fila{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #F0F4F7;font-size:13.5px;cursor:pointer}
+.r-dia{font-weight:700;width:76px;flex:none}
+.r-hora{font:800 13px 'Baloo 2';color:#17456B;width:42px;flex:none}
+.r-txt{flex:1;min-width:0;font-size:12px;color:#6B7D8A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-def{border-left:5px solid #BE3D2A}
+.t-just{border-left:5px solid #C99A00}
+.t-ok{border-left:5px solid #2C7A4B}
+</style>
+</head>
+<body>
+<div class="tel">
+  <header class="banda">
+    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">Compartim el camí a l'escola</div></div>
+    <div class="chip-estat" id="estat">—</div>
+  </header>
+  <div class="zebra"></div>
+  <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div></main>
+  <div class="barra amaga" id="barra"><div class="barra-int">
+    <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
+    <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
+  </div></div>
+</div>
+<script>
+/*JS-INICI*/
+"use strict";
+
+/* ── CONFIGURACIÓ: canvia aquestes 4 línies ── */
+const CONFIG = {
+  OWNER: "EL-TEU-USUARI-GITHUB",     // el teu usuari o organització de GitHub
+  REPO_DADES: "cotxes-anoia-dades",  // repositori PRIVAT amb el fitxer de dades
+  FITXER: "dades.json",              // nom del fitxer de dades dins el repo
+  BRANCA: "main"                     // branca on viu el fitxer
+};
+
+const DIES = ["dl","dt","dc","dj","dv"];
+const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
+const DIES_NOM = {dl:"Dilluns",dt:"Dimarts",dc:"Dimecres",dj:"Dijous",dv:"Divendres"};
+const FRANGES = [
+  {id:"e8", hora:"8.00", tipus:"Entrada"},
+  {id:"e9", hora:"9.00", tipus:"Entrada"},
+  {id:"e15",hora:"15.00",tipus:"Entrada"},
+  {id:"r17",hora:"17.00",tipus:"Recollida"}
+];
+
+/* ── Estat ── */
+let token = lsGet("cx_token");
+let famId = lsGet("cx_fam");
+let doc = null, sha = null;
+let pinzell = "cotxe", dirty = false;
+let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
+let tabAct = "horari";
+let ultimToc = {k:"", t:0};
+
+function lsGet(k){ try{ return localStorage.getItem(k) || ""; }catch(e){ return ""; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+function slug(n){ return n.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""); }
+
+/* ── Base64 amb accents (UTF-8) ── */
+function b64enc(str){
+  const b = new TextEncoder().encode(str); let s = "";
+  for (let i=0;i<b.length;i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+function b64dec(b64){
+  const bin = atob(b64.replace(/\s/g,""));
+  const b = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) b[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(b);
+}
+
+/* ── GitHub com a base de dades ── */
+const API = () => "https://api.github.com/repos/" + CONFIG.OWNER + "/" + CONFIG.REPO_DADES + "/contents/" + CONFIG.FITXER;
+const caps = () => ({ "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" });
+
+async function ghGet(){
+  const r = await fetch(API() + "?ref=" + CONFIG.BRANCA + "&t=" + Date.now(), { headers: caps() });
+  if (r.status === 401 || r.status === 403) throw { tipus: "clau" };
+  if (r.status === 404) throw { tipus: "no-trobat" };
+  if (!r.ok) throw { tipus: "xarxa" };
+  const j = await r.json();
+  return { doc: JSON.parse(b64dec(j.content)), sha: j.sha };
+}
+
+async function ghPut(missatge, intent){
+  intent = intent || 0;
+  doc.actualitzat = new Date().toISOString();
+  const cos = { message: missatge, branch: CONFIG.BRANCA, sha: sha, content: b64enc(JSON.stringify(doc, null, 2)) };
+  const r = await fetch(API(), { method: "PUT", headers: Object.assign({ "Content-Type": "application/json" }, caps()), body: JSON.stringify(cos) });
+  if ((r.status === 409 || r.status === 422) && intent < 3){
+    // Algú ha desat abans que tu: agafa la versió nova i torna a posar-hi NOMÉS la teva família
+    const fresc = await ghGet();
+    const meva = doc.families.find(f => f.id === famId) || null;
+    const idx = fresc.doc.families.findIndex(f => f.id === famId);
+    if (meva){ if (idx >= 0) fresc.doc.families[idx] = meva; else fresc.doc.families.push(meva); }
+    else if (idx >= 0) fresc.doc.families.splice(idx, 1);
+    doc = fresc.doc; sha = fresc.sha;
+    return ghPut(missatge, intent + 1);
+  }
+  if (!r.ok) throw { tipus: "desar" };
+  const j = await r.json(); sha = j.content.sha;
+  return true;
+}
+
+/* ── Utilitats de marques ── */
+function te(m, slot, dia){ return !!(m && m[slot] && m[slot].indexOf(dia) >= 0); }
+function posa(m, slot, dia){ if (!m[slot]) m[slot] = []; if (m[slot].indexOf(dia) < 0) m[slot].push(dia); }
+function treu(m, slot, dia){ if (m && m[slot]) m[slot] = m[slot].filter(d => d !== dia); }
+function commuta(m, slot, dia){ if (te(m, slot, dia)) treu(m, slot, dia); else posa(m, slot, dia); }
+function lameva(){ return doc ? doc.families.find(f => f.id === famId) : null; }
+function famOrd(){ return doc.families.slice().sort((a,b) => a.nom.localeCompare(b.nom, "ca")); }
+
+function balanc(slot, dia){
+  const conds = doc.families.filter(f => te(f.cotxe, slot, dia));
+  const places = conds.reduce((s,f) => s + (f.places || 0), 0);
+  const nens = [];
+  doc.families.forEach(f => {
+    if (te(f.cotxe, slot, dia)) return; // els seus fills van al seu cotxe
+    (f.nens || []).forEach(n => { if (te(n.marca, slot, dia)) nens.push({ nom: n.nom, fam: f.nom }); });
+  });
+  return { conds, places, nens, diff: places - nens.length };
+}
+
+/* ── Estat visual de la capçalera i la barra ── */
+function estat(txt, err){ const e = $("#estat"); e.textContent = txt; e.className = "chip-estat" + (err ? " err" : ""); }
+function avis(txt){ const a = $("#avis"); if (!txt){ a.style.display = "none"; return; } a.innerHTML = txt; a.style.display = "block"; }
+function pintaBarra(){ $("#barra").classList.toggle("amaga", !dirty); }
+
+async function desa(){
+  const b = $("#btn-desa"); b.disabled = true; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
+  try {
+    const f = lameva();
+    await ghPut("Horari " + (f ? f.nom : "grup") + " · " + new Date().toLocaleDateString("ca"));
+    dirty = false; pintaBarra(); estat("Desat ✓");
+  } catch(e){
+    estat("No s'ha desat", true);
+    $("#barra-txt").textContent = "No s'ha pogut desar. Comprova la connexió i torna-ho a provar.";
+  }
+  b.disabled = false;
+}
+
+/* ── Arrencada ── */
+async function inici(){
+  if (CONFIG.OWNER === "EL-TEU-USUARI-GITHUB"){
+    estat("Sense configurar", true);
+    $("#pantalla").innerHTML = "<div class='targeta'><h2>Falta configurar l'app</h2><p class='lead'>Obre <b>index.html</b> i canvia les 4 línies del bloc CONFIG de dalt de tot (usuari de GitHub, repositori de dades, fitxer i branca). Ho tens explicat pas a pas a INSTRUCCIONS.md.</p></div>";
+    return;
+  }
+  if (!token){ pantallaClau(); return; }
+  estat("Connectant…");
+  try {
+    const r = await ghGet(); doc = r.doc; sha = r.sha;
+    if (!doc.families) doc.families = [];
+    estat("Connectat ✓");
+    if (famId && lameva()) pantallaApp(); else { famId = ""; lsDel("cx_fam"); pantallaTria(); }
+  } catch(e){
+    if (e.tipus === "clau"){ token = ""; lsDel("cx_token"); pantallaClau("La clau no funciona. Revisa que l'hagis copiat sencera o demana la nova al grup."); }
+    else if (e.tipus === "no-trobat"){ estat("Error", true); avis("No trobo <b>" + esc(CONFIG.FITXER) + "</b> al repositori <b>" + esc(CONFIG.OWNER + "/" + CONFIG.REPO_DADES) + "</b>. Comprova el bloc CONFIG i que el fitxer existeixi."); }
+    else { estat("Sense connexió", true); avis("No puc connectar amb GitHub ara mateix. Comprova la connexió i recarrega la pàgina."); }
+  }
+}
+
+/* ── Pantalla: clau del grup ── */
+function pantallaClau(err){
+  estat("Cal la clau");
+  $("#pantalla").innerHTML =
+    "<div class='targeta'><h2>Clau del grup</h2>" +
+    "<p class='lead'>Enganxa la clau que s'ha compartit al grup de famílies (comença per <b>github_pat_</b>). Aquest mòbil la recordarà.</p>" +
+    (err ? "<p class='lead' style='color:#8F2B1C'><b>" + esc(err) + "</b></p>" : "") +
+    "<div class='fila'><input class='input' id='inp-clau' type='password' autocomplete='off' placeholder='github_pat_…'>" +
+    "<button class='boto' onclick='provaClau()'>Entra</button></div></div>";
+}
+async function provaClau(){
+  const v = $("#inp-clau").value.trim();
+  if (!v) return;
+  token = v; estat("Comprovant…");
+  try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; lsSet("cx_token", token); estat("Connectat ✓"); avis(""); pantallaTria(); }
+  catch(e){ token = ""; pantallaClau(e.tipus === "clau" ? "Aquesta clau no obre el grup." : "No puc connectar. Torna-ho a provar."); }
+}
+
+/* ── Pantalla: tria o crea la família ── */
+function pantallaTria(){
+  const fams = famOrd();
+  const fitxes = fams.map(f => {
+    const noms = (f.nens || []).map(n => n.nom).join(", ");
+    return "<button class='fitxa' onclick=\"triaFam('" + f.id + "')\"><b>" + esc(f.nom) + "</b>" + esc(noms) + "</button>";
+  }).join("");
+  $("#pantalla").innerHTML =
+    "<div class='targeta'><h2>Qui sou?</h2>" +
+    (fams.length ? "<p class='lead'>Toca la teva família (hi surten els nens de cadascuna):</p><div class='fitxes'>" + fitxes + "</div>"
+                 : "<p class='lead'>Encara no hi ha cap família. Crea la primera!</p>") +
+    "</div>" +
+    "<div class='targeta'><h2>Crea la teva família</h2>" +
+    "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>com us coneixen al grup (ex: Família Vila)</span></span></div>" +
+    "<input class='input' id='nf-nom' placeholder='Família …' maxlength='30'>" +
+    "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies quan conduïu</span></span>" +
+    "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
+    "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
+    "<div id='nf-nens'></div>" +
+    "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
+    "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>";
+  nfNens = [""]; nfPl = 3; pintaNfNens();
+}
+let nfNens = [""], nfPl = 3;
+function nfPlaces(d){ nfPl = Math.min(6, Math.max(0, nfPl + d)); $("#nf-pl").textContent = nfPl; }
+function pintaNfNens(){
+  $("#nf-nens").innerHTML = nfNens.map((v,i) =>
+    "<div class='fila' style='margin-bottom:6px'><input class='input' value=\"" + esc(v) + "\" placeholder='Nom del nen o nena' maxlength='20' oninput='nfNens[" + i + "]=this.value'>" +
+    (nfNens.length > 1 ? "<button class='mini-x' onclick='nfTreuNen(" + i + ")'>treu</button>" : "") + "</div>").join("");
+}
+function nfAfegeixNen(){ if (nfNens.length < 6) nfNens.push(""); pintaNfNens(); }
+function nfTreuNen(i){ nfNens.splice(i,1); pintaNfNens(); }
+
+async function creaFam(){
+  const nom = $("#nf-nom").value.trim();
+  const nens = nfNens.map(s => s.trim()).filter(Boolean);
+  if (!nom){ avis("Posa el nom de la família."); return; }
+  if (!nens.length){ avis("Afegeix com a mínim un nen."); return; }
+  avis("");
+  let id = slug(nom) || "familia";
+  while (doc.families.some(f => f.id === id)) id += "-2";
+  const usats = {};
+  const fam = { id: id, nom: nom, places: nfPl, cotxe: {}, nens: nens.map(n => {
+    let nid = slug(n) || "nen"; while (usats[nid]) nid += "-2"; usats[nid] = 1;
+    return { id: nid, nom: n, marca: {} };
+  })};
+  doc.families.push(fam); famId = id;
+  estat("Desant…");
+  try { await ghPut("Alta " + nom); lsSet("cx_fam", famId); estat("Desat ✓"); pantallaApp(); }
+  catch(e){ doc.families = doc.families.filter(f => f.id !== id); famId = ""; estat("Error", true); avis("No s'ha pogut crear la família. Torna-ho a provar."); }
+}
+function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
+
+/* ── Pantalla principal ── */
+function pantallaApp(){
+  const f = lameva();
+  $("#pantalla").innerHTML =
+    "<div class='salut'><span>Hola, <b>" + esc(f.nom) + "</b></span><button class='enllac' onclick='canviaFam()'>canvia</button></div>" +
+    "<div class='tabs'><button class='tab' id='tab-horari' onclick=\"triaTab('horari')\">Horari</button>" +
+    "<button class='tab' id='tab-cal' onclick=\"triaTab('cal')\">Calendari</button>" +
+    "<button class='tab' id='tab-resum' onclick=\"triaTab('resum')\">Resum</button></div>" +
+    "<div id='tab-cos'></div>";
+  triaTab(tabAct);
+}
+function triaTab(t){
+  tabAct = t;
+  $("#tab-horari").classList.toggle("actiu", t === "horari");
+  $("#tab-cal").classList.toggle("actiu", t === "cal");
+  $("#tab-resum").classList.toggle("actiu", t === "resum");
+  if (t === "horari") pintaHorariComplet();
+  else if (t === "cal") pintaCalendari();
+  else pintaResum();
+}
+function canviaFam(){
+  if (dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
+  dirty = false; pintaBarra(); famId = ""; lsDel("cx_fam"); pantallaTria();
+}
+
+/* ── Pestanya: el nostre horari ── */
+function pintaHorariComplet(){
+  const f = lameva();
+  const chipsNens = f.nens.map(n =>
+    "<button class='pinzell nen " + (pinzell === n.id ? "actiu nen" : "") + "' onclick=\"triaPinzell('" + n.id + "')\">🙋 " + esc(n.nom) + "</button>").join("");
+  $("#tab-cos").innerHTML =
+    "<div class='pinzells'>" +
+    "<button class='pinzell cond " + (pinzell === "cotxe" ? "actiu cond" : "") + "' onclick=\"triaPinzell('cotxe')\">🚗 El cotxe (" + f.places + ")</button>" +
+    chipsNens +
+    "<button class='pinzell esb " + (pinzell === "esborra" ? "actiu esb" : "") + "' onclick=\"triaPinzell('esborra')\">Esborra</button></div>" +
+    "<p class='hint'>1. Tria el cotxe o un nen · 2. Toca les caselles. El cotxe = conduïu vosaltres; un nen = necessita plaça.</p>" +
+    "<div class='targeta' style='padding:12px 10px'><div class='graella' id='graella'></div></div>" +
+    "<details class='conf'><summary>⚙️ La família i la configuració</summary><div class='targeta' style='margin-top:8px'>" +
+    "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies</span></span>" +
+    "<span class='stepper'><button onclick='canviaPlaces(-1)'>−</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
+    "<div class='nens-llista' id='nens-llista'></div>" +
+    "<div class='fila' style='margin-top:8px'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20'><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
+    "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la família del grup</button><br>" +
+    "<button class='enllac' onclick='canviaClau()'>Canvia la clau del grup en aquest mòbil</button></div>" +
+    "</div></details>";
+  pintaGraella(); pintaNensLlista();
+}
+function triaPinzell(p){ pinzell = p; pintaHorariComplet(); }
+
+function pintaGraella(){
+  const f = lameva();
+  let h = "<div></div>" + DIES.map(d => "<div class='g-dia'>" + DIES_LBL[d] + "</div>").join("");
+  FRANGES.forEach((fr, i) => {
+    if (i === 0 || FRANGES[i-1].tipus !== fr.tipus)
+      h += "<div class='g-grup'>" + (fr.tipus === "Entrada" ? "🌅 Entrada" : "🎒 Recollida") + "</div>";
+    h += "<div class='g-hora'>" + fr.hora + "</div>";
+    DIES.forEach(d => {
+      const cond = te(f.cotxe, fr.id, d);
+      const marcats = f.nens.filter(n => te(n.marca, fr.id, d));
+      let cls = "", cont = "";
+      if (cond){ cls = "cond"; cont = "🚗"; }
+      else if (marcats.length){
+        cls = "nec";
+        cont = marcats.slice(0,2).map(n => esc(n.nom[0].toUpperCase())).join("·") + (marcats.length > 2 ? "+" : "");
+      }
+      h += "<button class='cel " + cls + "' onclick=\"pinta('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
+    });
+  });
+  $("#graella").innerHTML = h;
+}
+
+function pinta(slot, dia){
+  const f = lameva(); if (!f) return;
+  const k = slot + "-" + dia, ara = Date.now();
+  if (ultimToc.k === k && ara - ultimToc.t < 350) return; // escut anti-tocs dobles
+  ultimToc = { k: k, t: ara };
+  if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); }
+  else if (pinzell === "cotxe"){ commuta(f.cotxe, slot, dia); }
+  else { const n = f.nens.find(x => x.id === pinzell); if (!n) return; commuta(n.marca, slot, dia); }
+  dirty = true; pintaBarra(); pintaGraella();
+}
+
+function canviaPlaces(d){
+  const f = lameva();
+  f.places = Math.min(6, Math.max(0, (f.places || 0) + d));
+  $("#pl-num").textContent = f.places;
+  dirty = true; pintaBarra(); pintaHorariComplet();
+}
+function pintaNensLlista(){
+  const f = lameva();
+  $("#nens-llista").innerHTML = f.nens.map(n =>
+    "<div class='p-fila'><span>🧒 " + esc(n.nom) + "</span><button class='mini-x' onclick=\"treuNen('" + n.id + "')\">treu</button></div>").join("");
+}
+function afegeixNen(){
+  const f = lameva(); const v = $("#nou-nen").value.trim();
+  if (!v || f.nens.length >= 6) return;
+  let nid = slug(v) || "nen"; while (f.nens.some(n => n.id === nid)) nid += "-2";
+  f.nens.push({ id: nid, nom: v, marca: {} });
+  if (pinzell !== "cotxe" && pinzell !== "esborra" && !f.nens.some(n => n.id === pinzell)) pinzell = "cotxe";
+  dirty = true; pintaBarra(); pintaHorariComplet();
+}
+function treuNen(id){
+  const f = lameva(); const n = f.nens.find(x => x.id === id);
+  if (!n || !confirm("Treure " + n.nom + " i totes les seves marques?")) return;
+  f.nens = f.nens.filter(x => x.id !== id);
+  if (pinzell === id) pinzell = "cotxe";
+  dirty = true; pintaBarra(); pintaHorariComplet();
+}
+async function esborraFam(){
+  const f = lameva();
+  if (!confirm("Segur que vols esborrar " + f.nom + " del grup? Aquesta acció es desa a l'instant.")) return;
+  doc.families = doc.families.filter(x => x.id !== famId);
+  estat("Desant…");
+  try { await ghPut("Baixa " + f.nom); dirty = false; pintaBarra(); famId = ""; lsDel("cx_fam"); estat("Desat ✓"); pantallaTria(); }
+  catch(e){ doc.families.push(f); estat("Error", true); avis("No s'ha pogut esborrar. Torna-ho a provar."); }
+}
+function canviaClau(){
+  if (dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
+  dirty = false; pintaBarra(); token = ""; lsDel("cx_token"); pantallaClau();
+}
+
+/* ── Pestanya: calendari del grup ── */
+let vistaCal = "set";
+
+async function pintaCalendari(){
+  // agafa l'ultima versio abans de pintar (sense trepitjar canvis locals no desats)
+  if (!dirty){
+    try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; if (!lameva()){ famId = ""; lsDel("cx_fam"); pantallaTria(); return; } } catch(e){}
+  }
+  renderCal();
+}
+
+function renderCal(){
+  let mapa = "<div></div>" + DIES.map(d =>
+    "<button class='m-cel' style='background:none;min-height:auto' onclick=\"selDia('" + d + "')\"><span class='m-cap'>" + DIES_LBL[d] + "</span></button>").join("");
+  FRANGES.forEach(fr => {
+    const t = fr.tipus === "Entrada" ? "e" : "r";
+    mapa += "<div class='m-fr'><span class='m-hora'>" + fr.hora + "</span><span class='m-tip " + t + "'>" + fr.tipus + "</span></div>";
+    DIES.forEach(d => {
+      const b = balanc(fr.id, d);
+      let cls, n1, n2;
+      if (!b.conds.length && !b.nens.length){ cls = "cap"; n1 = "\u00b7"; n2 = ""; }
+      else if (b.diff < 0){ cls = "def"; n1 = "\u2212" + (-b.diff); n2 = b.diff < -1 ? "falten" : "falta"; }
+      else if (b.diff === 0){ cls = "just"; n1 = "0"; n2 = "just"; }
+      else { cls = "ok"; n1 = "+" + b.diff; n2 = b.diff > 1 ? "sobren" : "sobra"; }
+      mapa += "<button class='m-cel " + cls + "' onclick=\"selDia('" + d + "')\"><span class='n1'>" + n1 + "</span><span class='n2'>" + n2 + "</span></button>";
+    });
+  });
+  $("#tab-cos").innerHTML =
+    "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
+    "<div class='mapa'>" + mapa + "</div>" +
+    "<div class='subtabs'><button class='subtab " + (vistaCal === "set" ? "actiu" : "") + "' onclick=\"triaVistaCal('set')\">Setmana sencera</button>" +
+    "<button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dia a dia</button></div>" +
+    "<div id='cal-cos'></div>" +
+    "<button class='boto sec' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
+  if (vistaCal === "set") pintaSetmana(); else pintaVistaDia();
+}
+function triaVistaCal(v){ vistaCal = v; renderCal(); }
+function selDia(d){ diaSel = d; vistaCal = "dia"; if (tabAct !== "cal") triaTab("cal"); else renderCal(); }
+
+/* Vista de setmana sencera: els 5 dies seguits, amb noms i estat de cada franja */
+function pintaSetmana(){
+  let h = "";
+  DIES.forEach(d => {
+    let files = "", nDef = 0, nJust = 0, nAct = 0;
+    FRANGES.forEach(fr => {
+      const b = balanc(fr.id, d);
+      let cls, pt;
+      if (!b.conds.length && !b.nens.length){ cls = "cap"; pt = "\u00b7"; }
+      else {
+        nAct++;
+        if (b.diff < 0){ cls = "def"; pt = "\u2212" + (-b.diff); nDef++; }
+        else if (b.diff === 0){ cls = "just"; pt = "0"; nJust++; }
+        else { cls = "ok"; pt = "+" + b.diff; }
+      }
+      const conds = b.conds.map(f => esc(f.nom.replace(/^fam[i\u00ed]lia\s+/i, ""))).join(", ");
+      const nens = b.nens.map(n => esc(n.nom)).join(", ");
+      let txt = (conds ? "\ud83d\ude97 " + conds : "") + (conds && nens ? " \u00b7 " : "") + (nens ? "\ud83d\ude4b " + nens : "");
+      if (!txt || txt === " ") txt = "\u2014";
+      files += "<div class='d-fila'><span class='d-hora'>" + fr.hora + "</span><span class='d-txt'>" + txt + "</span><span class='mp " + cls + "'>" + pt + "</span></div>";
+    });
+    const resum = nDef ? "<span class='mp def'>\u26a0 falten places</span>"
+      : nAct ? (nJust ? "<span class='mp just'>va just</span>" : "<span class='mp ok'>tot cobert</span>")
+      : "<span class='mp cap'>buit</span>";
+    h += "<div class='dcard' role='button' tabindex='0' onclick=\"selDia('" + d + "')\">" +
+         "<div class='d-cap'><span class='d-nom'>" + DIES_NOM[d] + "</span>" + resum + "</div>" + files + "</div>";
+  });
+  $("#cal-cos").innerHTML = h;
+}
+
+/* Vista dia a dia */
+function pintaVistaDia(){
+  $("#cal-cos").innerHTML =
+    "<div class='dies-sel'>" + DIES.map(d => "<button class='dia-b " + (diaSel === d ? "actiu" : "") + "' onclick=\"selDiaChip('" + d + "')\">" + DIES_LBL[d] + "</button>").join("") + "</div>" +
+    "<h2 style='margin:2px 2px 10px'>" + DIES_NOM[diaSel] + "</h2><div id='dia-detall'></div>";
+  pintaDia();
+}
+function selDiaChip(d){ diaSel = d; pintaVistaDia(); }
+
+function pintaDia(){
+  let h = "";
+  FRANGES.forEach(fr => {
+    const b = balanc(fr.id, diaSel);
+    const t = fr.tipus === "Entrada" ? "e" : "r";
+    let badge;
+    if (!b.conds.length && !b.nens.length) badge = "<span class='badge buit'>ning\u00fa apuntat</span>";
+    else if (b.diff < 0) badge = "<span class='badge mal'>" + (b.diff < -1 ? "falten " : "falta ") + (-b.diff) + "</span>";
+    else if (b.nens.length) badge = "<span class='badge be'>cobert" + (b.diff > 0 ? " \u00b7 " + b.diff + " de marge" : "") + "</span>";
+    else badge = "<span class='badge be'>" + b.places + " " + (b.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</span>";
+    const conds = b.conds.map(f => esc(f.nom) + " (" + f.places + ")").join(", ");
+    const perFam = {};
+    b.nens.forEach(n => { (perFam[n.fam] = perFam[n.fam] || []).push(n.nom); });
+    const nens = Object.keys(perFam).map(fn => esc(perFam[fn].join(" i ")) + " (" + esc(fn) + ")").join(" \u00b7 ");
+    h += "<div class='targeta franja'><div class='f-cap'><span class='f-hora'>" + fr.hora + "</span>" +
+         "<span class='m-tip " + t + "'>" + fr.tipus + "</span>" + badge + "</div>" +
+         (conds ? "<div class='f-linia'>\ud83d\ude97 " + conds + "</div>" : "") +
+         (nens ? "<div class='f-linia'>\ud83d\ude4b " + nens + "</div>" : "") + "</div>";
+  });
+  $("#dia-detall").innerHTML = h;
+}
+
+/* \u2500\u2500 Pestanya: resum final del grup \u2500\u2500 */
+async function pintaResum(){
+  if (!dirty){
+    try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; if (!lameva()){ famId = ""; lsDel("cx_fam"); pantallaTria(); return; } } catch(e){}
+  }
+  const defs = [], justs = [], marges = [];
+  let buides = 0, totPlaces = 0, totNens = 0;
+  DIES.forEach(d => FRANGES.forEach(fr => {
+    const b = balanc(fr.id, d);
+    if (!b.conds.length && !b.nens.length){ buides++; return; }
+    totPlaces += b.places; totNens += b.nens.length;
+    const it = { d: d, fr: fr, b: b };
+    if (b.diff < 0) defs.push(it);
+    else if (b.diff === 0) justs.push(it);
+    else marges.push(it);
+  }));
+  const pendents = doc.families.filter(f => {
+    const c = Object.keys(f.cotxe || {}).some(k => f.cotxe[k] && f.cotxe[k].length);
+    const n = (f.nens || []).some(x => Object.keys(x.marca || {}).some(k => x.marca[k] && x.marca[k].length));
+    return !c && !n;
+  });
+  const fila = (it, cls) => {
+    const b = it.b;
+    const txt = b.places + " " + (b.places === 1 ? "pla\u00e7a" : "places") + " per a " + b.nens.length + " " + (b.nens.length === 1 ? "nen" : "nens");
+    const pt = b.diff < 0 ? "\u2212" + (-b.diff) : b.diff === 0 ? "0" : "+" + b.diff;
+    return "<div class='r-fila' onclick=\"selDia('" + it.d + "')\"><span class='r-dia'>" + DIES_NOM[it.d] + "</span>" +
+           "<span class='r-hora'>" + it.fr.hora + "</span><span class='r-txt'>" + txt + "</span>" +
+           "<span class='mp " + cls + "'>" + pt + "</span></div>";
+  };
+  const nNens = doc.families.reduce((s,f) => s + (f.nens || []).length, 0);
+  let h = "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
+    "<div><b>" + doc.families.length + "</b><span>fam\u00edlies</span></div>" +
+    "<div><b>" + nNens + "</b><span>nens</span></div>" +
+    "<div><b>" + totPlaces + "</b><span>places ofertes/setm.</span></div>" +
+    "<div><b>" + totNens + "</b><span>trajectes a cobrir</span></div></div>" +
+    (pendents.length
+      ? "<p class='lead' style='margin:10px 0 0'>\u23f3 Encara no han marcat res: <b>" + pendents.map(f => esc(f.nom)).join(", ") + "</b></p>"
+      : "<p class='lead' style='margin:10px 0 0;color:#1F5C3B'><b>\u2713 Totes les fam\u00edlies han omplert l'horari.</b></p>") +
+    "</div>";
+  h += defs.length
+    ? "<div class='targeta t-def'><h2 style='color:#8F2B1C'>\u2757 Falta cobrir</h2>" + defs.map(it => fila(it, "def")).join("") +
+      "<p class='hint' style='margin:8px 2px 0'>Toca una l\u00ednia per anar al dia i veure quins nens s\u00f3n.</p></div>"
+    : "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>\ud83c\udf89 Tot cobert</h2><p class='lead' style='margin:0'>Cap nen sense pla\u00e7a en tota la setmana.</p></div>";
+  if (justs.length) h += "<div class='targeta t-just'><h2 style='color:#6E4E00'>Va just (sense marge)</h2>" + justs.map(it => fila(it, "just")).join("") + "</div>";
+  if (marges.length) h += "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>On sobren places</h2>" + marges.map(it => fila(it, "ok")).join("") + "</div>";
+  if (buides) h += "<p class='hint' style='text-align:center'>" + buides + " franges sense ning\u00fa apuntat.</p>";
+  h += "<button class='boto sec' style='width:100%' onclick='pintaResum()'>\u21bb Actualitza</button>";
+  $("#tab-cos").innerHTML = h;
+}
+
+document.addEventListener("DOMContentLoaded", inici);
+/*JS-FI*/
+</script>
+</body>
+</html>
