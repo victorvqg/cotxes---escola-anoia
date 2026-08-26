@@ -385,6 +385,7 @@ function pantallaTria(){
         "<button class='boto' onclick=\"entraSel()\">Entra</button></div>"
       : "<p class='lead'>Encara no hi ha cap família. Crea la primera!</p>") +
     "</div>" +
+    (esAdmin ? "<details class='conf'><summary>➕ Crear una família nova (només si encara no és al grup)</summary>" : "") +
     "<div class='targeta'><h2>Crea la teva família</h2>" +
     "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>com us coneixen al grup (ex: Família Vila)</span></span></div>" +
     "<input class='input' id='nf-nom' placeholder='Família …' maxlength='30'>" +
@@ -395,7 +396,7 @@ function pantallaTria(){
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
     "<div id='nf-nens'></div>" +
     "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
-    "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>" +
+    "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>" + (esAdmin ? "</details>" : "") +
     "<p style='text-align:center;margin-top:2px'><button class='enllac' onclick='obreAdmin()'>🛡️ Accés administrador</button></p>";
   nfNens = [""]; nfPl = 3; pintaNfNens();
 }
