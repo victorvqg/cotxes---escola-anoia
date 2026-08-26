@@ -49,17 +49,22 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:18px;color:#17456B;margin-bot
 .pinzell.actiu.cond{background:#DCF1E3;border-color:#2C7A4B;color:#1F5C3B}
 .pinzell.actiu.nen{background:#FCEBB8;border-color:#C99A00;color:#6E4E00}
 .pinzell.actiu.esb{background:#E7EDF1;border-color:#5B6B78;color:#33424F}
+.pinzell.actiu.propi{background:#E3E9EE;border-color:#5B6B78;color:#33424F}
 .hint{font-size:12px;color:#5B6E7C;margin:0 2px 10px}
 .graella{display:grid;grid-template-columns:52px repeat(5,1fr);gap:6px}
 .g-dia{font:700 11.5px 'Baloo 2';text-align:center;color:#46596A;text-transform:uppercase;letter-spacing:.04em;padding:2px 0}
 .g-grup{grid-column:1/-1;font:700 11px 'Baloo 2';color:#17456B;text-transform:uppercase;letter-spacing:.06em;padding:7px 2px 1px}
 .g-hora{font-size:12.5px;font-weight:700;color:#33424F;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
-.cel{min-height:46px;border-radius:12px;border:1.5px solid #D6E0E7;background:#FAFCFD;font-size:18px;line-height:1;padding:2px}
+.cel{min-height:50px;border-radius:12px;border:1.5px solid #D6E0E7;background:#FAFCFD;line-height:1;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.cel .c-ico{font-size:15px;line-height:1}
+.cel .c-nom{font:700 8.5px 'Atkinson Hyperlegible';max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6E4E00}
+.cel.propi{background:#E3E9EE;border-color:#9AA8B2}
 .cel:active{transform:scale(.93)}
 .cel.cond{background:#DCF1E3;border-color:#7FBF98}
 .cel.nec{background:#FCEBB8;border-color:#E0B93B;font:800 12.5px 'Baloo 2';color:#6E4E00}
 .nens-llista .p-fila span{font-size:14px}
 .mini-x{border:none;background:#F9E2DD;color:#97301F;font:700 12px 'Atkinson Hyperlegible';border-radius:999px;padding:5px 10px}
+.input.i-nen{flex:1;min-width:0;padding:9px 11px;font-size:14.5px}
 .dies-sel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px}
 .dia-b{border:1.5px solid #B9CBD7;background:#fff;color:#46596A;font:700 13.5px 'Baloo 2';padding:9px 0;border-radius:12px}
 .dia-b.actiu{background:#17456B;border-color:#17456B;color:#fff}
@@ -226,13 +231,14 @@ function famOrd(){ return doc.families.slice().sort((a,b) => a.nom.localeCompare
 
 function balanc(slot, dia){
   const conds = doc.families.filter(f => te(f.cotxe, slot, dia));
+  const propis = doc.families.filter(f => te(f.propi, slot, dia));
   const places = conds.reduce((s,f) => s + (f.places || 0), 0);
   const nens = [];
   doc.families.forEach(f => {
-    if (te(f.cotxe, slot, dia)) return; // els seus fills van al seu cotxe
+    if (te(f.cotxe, slot, dia) || te(f.propi, slot, dia)) return; // coberts per la mateixa família
     (f.nens || []).forEach(n => { if (te(n.marca, slot, dia)) nens.push({ nom: n.nom, fam: f.nom }); });
   });
-  return { conds, places, nens, diff: places - nens.length };
+  return { conds, propis, places, nens, diff: places - nens.length };
 }
 
 /* ── Estat visual de la capçalera i la barra ── */
@@ -379,11 +385,14 @@ function pintaHorariComplet(){
     "<div class='pinzells'>" +
     "<button class='pinzell cond " + (pinzell === "cotxe" ? "actiu cond" : "") + "' onclick=\"triaPinzell('cotxe')\">🚗 El cotxe (" + f.places + ")</button>" +
     chipsNens +
+    "<button class='pinzell propi " + (pinzell === "propi" ? "actiu propi" : "") + "' onclick=\"triaPinzell('propi')\">🚫 Pel nostre compte</button>" +
     "<button class='pinzell esb " + (pinzell === "esborra" ? "actiu esb" : "") + "' onclick=\"triaPinzell('esborra')\">Esborra</button></div>" +
-    "<p class='hint'>1. Tria el cotxe o un nen · 2. Toca les caselles. El cotxe = conduïu vosaltres; un nen = necessita plaça.</p>" +
+    "<p class='hint'>1. Tria què marques · 2. Toca les caselles. 🚗 conduïu i oferiu places · 🚫 aquell dia aneu pel vostre compte (sense places) · 🙋 nen que necessita plaça.</p>" +
     "<div class='targeta' style='padding:12px 10px'><div class='graella' id='graella'></div></div>" +
     "<details class='conf'><summary>⚙️ La família i la configuració</summary><div class='targeta' style='margin-top:8px'>" +
-    "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies</span></span>" +
+    "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>toca'l, canvia'l i després «Desa els canvis»</span></span></div>" +
+    "<input class='input' value=\"" + esc(f.nom) + "\" maxlength='30' onchange=\"renomFam(this.value)\">" +
+    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies</span></span>" +
     "<span class='stepper'><button onclick='canviaPlaces(-1)'>−</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
     "<div class='nens-llista' id='nens-llista'></div>" +
     "<div class='fila' style='margin-top:8px'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20'><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
@@ -403,12 +412,14 @@ function pintaGraella(){
     h += "<div class='g-hora'>" + fr.hora + "</div>";
     DIES.forEach(d => {
       const cond = te(f.cotxe, fr.id, d);
+      const propi = te(f.propi, fr.id, d);
       const marcats = f.nens.filter(n => te(n.marca, fr.id, d));
       let cls = "", cont = "";
-      if (cond){ cls = "cond"; cont = "🚗"; }
+      if (cond){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
+      else if (propi){ cls = "propi"; cont = "<span class='c-ico'>🚫</span>"; }
       else if (marcats.length){
         cls = "nec";
-        cont = marcats.slice(0,2).map(n => esc(n.nom[0].toUpperCase())).join("·") + (marcats.length > 2 ? "+" : "");
+        cont = "<span class='c-ico'>🙋</span><span class='c-nom'>" + marcats.map(n => esc(n.nom)).join(" · ") + "</span>";
       }
       h += "<button class='cel " + cls + "' onclick=\"pinta('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
@@ -421,8 +432,10 @@ function pinta(slot, dia){
   const k = slot + "-" + dia, ara = Date.now();
   if (ultimToc.k === k && ara - ultimToc.t < 350) return; // escut anti-tocs dobles
   ultimToc = { k: k, t: ara };
-  if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); }
-  else if (pinzell === "cotxe"){ commuta(f.cotxe, slot, dia); }
+  if (!f.propi) f.propi = {};
+  if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); treu(f.propi, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); }
+  else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); }
+  else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); commuta(f.propi, slot, dia); }
   else { const n = f.nens.find(x => x.id === pinzell); if (!n) return; commuta(n.marca, slot, dia); }
   dirty = true; pintaBarra(); pintaGraella();
 }
@@ -436,7 +449,9 @@ function canviaPlaces(d){
 function pintaNensLlista(){
   const f = lameva();
   $("#nens-llista").innerHTML = f.nens.map(n =>
-    "<div class='p-fila'><span>🧒 " + esc(n.nom) + "</span><button class='mini-x' onclick=\"treuNen('" + n.id + "')\">treu</button></div>").join("");
+    "<div class='p-fila' style='gap:8px'><span style='flex:none'>🧒</span>" +
+    "<input class='input i-nen' value=\"" + esc(n.nom) + "\" maxlength='20' onchange=\"renomNen('" + n.id + "', this.value)\">" +
+    "<button class='mini-x' onclick=\"treuNen('" + n.id + "')\">treu</button></div>").join("");
 }
 function afegeixNen(){
   const f = lameva(); const v = $("#nou-nen").value.trim();
@@ -451,6 +466,21 @@ function treuNen(id){
   if (!n || !confirm("Treure " + n.nom + " i totes les seves marques?")) return;
   f.nens = f.nens.filter(x => x.id !== id);
   if (pinzell === id) pinzell = "cotxe";
+  dirty = true; pintaBarra(); pintaHorariComplet();
+}
+function renomFam(v){
+  const f = lameva(); if (!f) return;
+  const nom = v.trim();
+  if (!nom || nom === f.nom){ pintaHorariComplet(); return; }
+  f.nom = nom;
+  dirty = true; pintaBarra(); pantallaApp();
+}
+function renomNen(id, v){
+  const f = lameva(); if (!f) return;
+  const n = f.nens.find(x => x.id === id);
+  const nom = v.trim();
+  if (!n || !nom || nom === n.nom){ pintaHorariComplet(); return; }
+  n.nom = nom;
   dirty = true; pintaBarra(); pintaHorariComplet();
 }
 async function esborraFam(){
@@ -522,8 +552,12 @@ function pintaSetmana(){
       }
       const conds = b.conds.map(f => esc(f.nom.replace(/^fam[i\u00ed]lia\s+/i, ""))).join(", ");
       const nens = b.nens.map(n => esc(n.nom)).join(", ");
-      let txt = (conds ? "\ud83d\ude97 " + conds : "") + (conds && nens ? " \u00b7 " : "") + (nens ? "\ud83d\ude4b " + nens : "");
-      if (!txt || txt === " ") txt = "\u2014";
+      const propis = b.propis.map(f => esc(f.nom.replace(/^fam[i\u00ed]lia\s+/i, ""))).join(", ");
+      const parts = [];
+      if (conds) parts.push("\ud83d\ude97 " + conds);
+      if (nens) parts.push("\ud83d\ude4b " + nens);
+      if (propis) parts.push("\ud83d\udeab " + propis);
+      const txt = parts.length ? parts.join(" \u00b7 ") : "\u2014";
       files += "<div class='d-fila'><span class='d-hora'>" + fr.hora + "</span><span class='d-txt'>" + txt + "</span><span class='mp " + cls + "'>" + pt + "</span></div>";
     });
     const resum = nDef ? "<span class='mp def'>\u26a0 falten places</span>"
@@ -550,7 +584,7 @@ function pintaDia(){
     const b = balanc(fr.id, diaSel);
     const t = fr.tipus === "Entrada" ? "e" : "r";
     let badge;
-    if (!b.conds.length && !b.nens.length) badge = "<span class='badge buit'>ning\u00fa apuntat</span>";
+    if (!b.conds.length && !b.nens.length) badge = "<span class='badge buit'>" + (b.propis.length ? "res a coordinar" : "ning\u00fa apuntat") + "</span>";
     else if (b.diff < 0) badge = "<span class='badge mal'>" + (b.diff < -1 ? "falten " : "falta ") + (-b.diff) + "</span>";
     else if (b.nens.length) badge = "<span class='badge be'>cobert" + (b.diff > 0 ? " \u00b7 " + b.diff + " de marge" : "") + "</span>";
     else badge = "<span class='badge be'>" + b.places + " " + (b.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</span>";
@@ -561,7 +595,8 @@ function pintaDia(){
     h += "<div class='targeta franja'><div class='f-cap'><span class='f-hora'>" + fr.hora + "</span>" +
          "<span class='m-tip " + t + "'>" + fr.tipus + "</span>" + badge + "</div>" +
          (conds ? "<div class='f-linia'>\ud83d\ude97 " + conds + "</div>" : "") +
-         (nens ? "<div class='f-linia'>\ud83d\ude4b " + nens + "</div>" : "") + "</div>";
+         (nens ? "<div class='f-linia'>\ud83d\ude4b " + nens + "</div>" : "") +
+         (b.propis.length ? "<div class='f-linia'>\ud83d\udeab Pel seu compte: " + b.propis.map(f => esc(f.nom)).join(", ") + "</div>" : "") + "</div>";
   });
   $("#dia-detall").innerHTML = h;
 }
@@ -585,7 +620,8 @@ async function pintaResum(){
   const pendents = doc.families.filter(f => {
     const c = Object.keys(f.cotxe || {}).some(k => f.cotxe[k] && f.cotxe[k].length);
     const n = (f.nens || []).some(x => Object.keys(x.marca || {}).some(k => x.marca[k] && x.marca[k].length));
-    return !c && !n;
+    const p = Object.keys(f.propi || {}).some(k => f.propi[k] && f.propi[k].length);
+    return !c && !n && !p;
   });
   const fila = (it, cls) => {
     const b = it.b;
