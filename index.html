@@ -341,7 +341,9 @@ function pantallaTria(){
     "<div class='targeta'><h2>Crea la teva família</h2>" +
     "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>com us coneixen al grup (ex: Família Vila)</span></span></div>" +
     "<input class='input' id='nf-nom' placeholder='Família …' maxlength='30'>" +
-    "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies quan conduïu</span></span>" +
+    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>opcional — el nom del pare o mare al volant</span></span></div>" +
+    "<input class='input' id='nf-cond' placeholder='ex: Marta' maxlength='20'>" +
+    "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies — els vostres no hi compten</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
     "<div id='nf-nens'></div>" +
@@ -367,6 +369,7 @@ async function creaFam(){
     if (ja){ avis("Aquest usuari ja va crear «" + ja.nom + "». Entra-hi amb el desplegable de dalt."); return; }
   }
   const nom = $("#nf-nom").value.trim();
+  const conductor = $("#nf-cond") ? $("#nf-cond").value.trim() : "";
   const nens = nfNens.map(s => s.trim()).filter(Boolean);
   if (!nom){ avis("Posa el nom de la família."); return; }
   if (!nens.length){ avis("Afegeix com a mínim un nen."); return; }
@@ -378,7 +381,7 @@ async function creaFam(){
   let id = slug(nom) || "familia";
   while (doc.families.some(f => f.id === id)) id += "-2";
   const usats = {};
-  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, places: nfPl, cotxe: {}, nens: nens.map(n => {
+  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, conductor: conductor, places: nfPl, cotxe: {}, nens: nens.map(n => {
     let nid = slug(n) || "nen"; while (usats[nid]) nid += "-2"; usats[nid] = 1;
     return { id: nid, nom: n, marca: {} };
   })};
@@ -428,7 +431,7 @@ function pintaHorariComplet(){
     "<button class='pinzell nen " + (pinzell === n.id ? "actiu nen" : "") + "' onclick=\"triaPinzell('" + n.id + "')\">🙋 " + esc(n.nom) + "</button>").join("");
   $("#tab-cos").innerHTML =
     "<div class='pinzells'>" +
-    "<button class='pinzell cond " + (pinzell === "cotxe" ? "actiu cond" : "") + "' onclick=\"triaPinzell('cotxe')\">🚗 El cotxe (" + f.places + ")</button>" +
+    "<button class='pinzell cond " + (pinzell === "cotxe" ? "actiu cond" : "") + "' onclick=\"triaPinzell('cotxe')\">🚗 El cotxe (" + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ")</button>" +
     chipsNens +
     "<button class='pinzell propi " + (pinzell === "propi" ? "actiu propi" : "") + "' onclick=\"triaPinzell('propi')\">🚫 Pel nostre compte</button>" +
     "<button class='pinzell esb " + (pinzell === "esborra" ? "actiu esb" : "") + "' onclick=\"triaPinzell('esborra')\">Esborra</button></div>" +
@@ -437,8 +440,11 @@ function pintaHorariComplet(){
     "<details class='conf'" + (confObert ? " open" : "") + " ontoggle='confObert=this.open'><summary>⚙️ La família i la configuració</summary><div class='targeta' style='margin-top:8px'>" +
     "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>toca'l, canvia'l i després «Desa els canvis»</span></span></div>" +
     "<input class='input' value=\"" + esc(f.nom) + "\" maxlength='30' onchange=\"renomFam(this.value)\">" +
-    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>per a nens d'altres famílies</span></span>" +
+    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>surt al Calendari i al Resum</span></span></div>" +
+    "<input class='input' value=\"" + esc(f.conductor || "") + "\" placeholder='ex: Marta' maxlength='20' onchange=\"renomConductor(this.value)\">" +
+    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies — els vostres no hi compten</span></span>" +
     "<span class='stepper'><button onclick='canviaPlaces(-1)'>−</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
+    "<p class='hint' style='margin:2px 0 6px'>🚗 Amb " + (f.nens.length === 1 ? "el vostre nen" : "els vostres " + f.nens.length + " nens") + " + " + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ", al cotxe hi " + ((f.nens.length + f.places) === 1 ? "va 1 nen" : "van " + (f.nens.length + f.places) + " nens") + ".</p>" +
     "<div class='nens-llista' id='nens-llista'></div>" +
     "<div class='fila' style='margin-top:8px'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la família del grup</button><br>" +
@@ -569,6 +575,13 @@ function renomFam(v){
   f.nom = nom;
   dirty = true; pintaBarra(); pantallaApp();
 }
+function renomConductor(v){
+  const f = lameva(); if (!f) return;
+  const nou = v.trim();
+  if (nou === (f.conductor || "")){ return; }
+  f.conductor = nou;
+  dirty = true; pintaBarra(); pintaHorariComplet();
+}
 function renomNen(id, v){
   const f = lameva(); if (!f) return;
   const n = f.nens.find(x => x.id === id);
@@ -682,13 +695,19 @@ function pintaDia(){
     else if (b.diff < 0) badge = "<span class='badge mal'>" + (b.diff < -1 ? "falten " : "falta ") + (-b.diff) + "</span>";
     else if (b.nens.length) badge = "<span class='badge be'>cobert" + (b.diff > 0 ? " \u00b7 " + b.diff + " de marge" : "") + "</span>";
     else badge = "<span class='badge be'>" + b.places + " " + (b.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</span>";
-    const conds = b.conds.map(f => esc(f.nom) + " (" + f.places + ")").join(", ");
+    const condsHtml = b.conds.map(f => {
+      const seus = (f.nens || []).map(n => n.nom).join(" i ");
+      return "<div class='f-linia'>\ud83d\ude97 <b>" + esc(f.nom) + "</b>" +
+        (f.conductor ? " \u00b7 condueix " + esc(f.conductor) : "") +
+        (seus ? " \u00b7 amb " + esc(seus) : "") +
+        " \u00b7 <b>" + f.places + " " + (f.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</b></div>";
+    }).join("");
     const perFam = {};
     b.nens.forEach(n => { (perFam[n.fam] = perFam[n.fam] || []).push(n.nom); });
     const nens = Object.keys(perFam).map(fn => esc(perFam[fn].join(" i ")) + " (" + esc(fn) + ")").join(" \u00b7 ");
     h += "<div class='targeta franja'><div class='f-cap'><span class='f-hora'>" + fr.hora + "</span>" +
          "<span class='m-tip " + t + "'>" + fr.tipus + "</span>" + badge + "</div>" +
-         (conds ? "<div class='f-linia'>\ud83d\ude97 " + conds + "</div>" : "") +
+         condsHtml +
          (nens ? "<div class='f-linia'>\ud83d\ude4b " + nens + "</div>" : "") +
          (b.propis.length ? "<div class='f-linia'>\ud83d\udeab Pel seu compte: " + b.propis.map(f => esc(f.nom)).join(", ") + "</div>" : "") + "</div>";
   });
@@ -721,7 +740,7 @@ async function pintaResum(){
     const b = it.b;
     const txt = b.places + " " + (b.places === 1 ? "plaça" : "places") + " per a " + b.nens.length + " " + (b.nens.length === 1 ? "nen" : "nens");
     const pt = b.diff < 0 ? "−" + (-b.diff) : b.diff === 0 ? "0" : "+" + b.diff;
-    const conds = b.conds.map(f => esc(f.nom) + " (" + f.places + ")").join(" · ");
+    const conds = b.conds.map(f => esc(f.nom) + " (" + (f.conductor ? esc(f.conductor) + " · " : "") + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ")").join(" · ");
     const perFam = {};
     b.nens.forEach(n => { (perFam[n.fam] = perFam[n.fam] || []).push(n.nom); });
     const noms = Object.keys(perFam).map(fn => esc(perFam[fn].join(" i ")) + " (" + esc(fn) + ")").join(" · ");
