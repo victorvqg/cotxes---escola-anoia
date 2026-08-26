@@ -349,18 +349,24 @@ function nfAfegeixNen(){ if (nfNens.length < 6) nfNens.push(""); pintaNfNens(); 
 function nfTreuNen(i){ nfNens.splice(i,1); pintaNfNens(); }
 
 async function creaFam(){
-  if (famId && lameva()){ avis("Aquest dispositiu ja té una família: " + lameva().nom + "."); return; }
-  const ja = doc.families.find(x => x.creadaPer === usuariId);
-  if (ja){ avis("Aquest usuari ja va crear «" + ja.nom + "». Entra-hi amb el desplegable de dalt."); return; }
+  if (!esAdmin && famId && lameva()){ avis("Aquest dispositiu ja té una família: " + lameva().nom + "."); return; }
+  if (!esAdmin){
+    const ja = doc.families.find(x => x.creadaPer === usuariId);
+    if (ja){ avis("Aquest usuari ja va crear «" + ja.nom + "». Entra-hi amb el desplegable de dalt."); return; }
+  }
   const nom = $("#nf-nom").value.trim();
   const nens = nfNens.map(s => s.trim()).filter(Boolean);
   if (!nom){ avis("Posa el nom de la família."); return; }
   if (!nens.length){ avis("Afegeix com a mínim un nen."); return; }
+  if (doc.families.some(x => slug(x.nom) === slug(nom))){
+    avis("Ja existeix una família que es diu «" + nom + "»: entra-hi amb el desplegable de dalt. Si de debò és una família diferent, canvia-li una mica el nom.");
+    return;
+  }
   avis("");
   let id = slug(nom) || "familia";
   while (doc.families.some(f => f.id === id)) id += "-2";
   const usats = {};
-  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: usuariId, places: nfPl, cotxe: {}, nens: nens.map(n => {
+  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, places: nfPl, cotxe: {}, nens: nens.map(n => {
     let nid = slug(n) || "nen"; while (usats[nid]) nid += "-2"; usats[nid] = 1;
     return { id: nid, nom: n, marca: {} };
   })};
