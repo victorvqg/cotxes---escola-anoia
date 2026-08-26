@@ -97,6 +97,9 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .dir-fila{display:flex;justify-content:space-between;gap:10px;padding:7px 0;font-size:15px;border-top:1px solid #F0F4F7}
 .dir-fila:first-child{border-top:0}
 .dir-fila b{color:#17456B;flex:none}
+.dir-fila .enllac{flex:none;font-size:13.5px}
+.adm-banner{background:#FCEBB8;border:1.5px solid #E0B84A;color:#6E4E00;border-radius:12px;padding:8px 12px;font-size:14.5px;line-height:1.4;margin-bottom:10px}
+.adm-banner .enllac{font-size:14px}
 .dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peu{font-size:13px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
 details.conf{margin-top:14px}
@@ -436,15 +439,20 @@ async function creaFam(){
 }
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
 function entraSel(){ const v = $("#sel-fam").value; if (v) triaFam(v); }
+function adminEdita(id){ if (!esAdmin) return; confObert = true; tabAct = "horari"; triaFam(id); }
 
 /* ── Pantalla principal ── */
 function pantallaApp(){
   const f = lameva();
   const dirHtml = famOrd().map(x =>
-    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "🛡️ " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span></div>"
+    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "🛡️ " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + (esAdmin ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
   ).join("");
   $("#pantalla").innerHTML =
     "<div class='salut'><span>Hola, <b>" + esc(f.nom) + "</b>" + (esAdmin ? " <span style='font-size:12.5px;color:#6B7D8A'>· admin</span>" : "") + "</span>" + (esAdmin ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
+    (esAdmin && f.creadaPer !== usuariId ? (function(){
+      const pr = doc.families.find(x => x.creadaPer === usuariId);
+      return "<div class='adm-banner'>🛡️ Estàs dins d'una altra família (mode admin): tot el que editis és seu." + (pr ? " <button class='enllac' onclick=\"triaFam('" + pr.id + "')\">torna a la meva</button>" : "") + "</div>";
+    })() : "") +
     "<div class='tabs'><button class='tab' id='tab-horari' onclick=\"triaTab('horari')\">Horari</button>" +
     "<button class='tab' id='tab-cal' onclick=\"triaTab('cal')\">Calendari</button>" +
     "<button class='tab' id='tab-resum' onclick=\"triaTab('resum')\">Resum</button></div>" +
