@@ -137,6 +137,8 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .cm-tip{font:700 13px 'Baloo 2';color:#6B7D8A}
 .cm-x{margin-left:auto;background:none;border:none;font-size:17px;color:#6B7D8A;padding:4px 8px;cursor:pointer}
 .cbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#F4F7FA;border:1.5px solid #E3ECF4;border-radius:12px;padding:11px 12px;font:700 15.5px 'Baloo 2';color:#17456B;margin-top:7px;cursor:pointer}
+.cseg{display:flex;gap:7px;margin-top:7px}
+.cbtn.half{margin-top:0;flex:1}
 .cbtn.on{background:#DCF1E3;border-color:#9CCDAD;color:#1F5C3B}
 .cb-ok{margin-left:auto;font-weight:800}
 .nomgran{font:800 22px 'Baloo 2';color:#0E2A44;margin:2px 0 8px}
@@ -258,7 +260,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.9</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.11</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -651,7 +653,7 @@ async function creaFam(){
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
 function entraSel(){ const v = $("#sel-fam").value; if (v) triaFam(v); }
 async function rolFam(id){
-  if (!esAdmin) return;
+  if (!esAdmin || !doc.adminFam || !lameva() || lameva().id !== doc.adminFam) return;
   const fx = doc.families.find(x => x.id === id); if (!fx) return;
   if (doc.adminFam && fx.id === doc.adminFam){ avis("Aquesta \u00e9s la fam\u00edlia de l'administrador: el seu rol \u00e9s fix."); return; }
   const antic = fx.rol;
@@ -668,7 +670,7 @@ function pantallaApp(){
   document.body.classList.add("dins");
   const f = lameva();
   if (!["perfil", "graella", "cal", "avisos", "rols"].includes(tabAct)) tabAct = "graella";
-  if (tabAct === "rols" && !esAdmin) tabAct = "graella";
+  if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
   const dirHtml = famOrd().map(x =>
     "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
@@ -702,7 +704,7 @@ function pintaMenu(){
     it("graella", "\ud83d\uddd3\ufe0f", "Graella", graellaCompleta(f) ? "" : "<span class='c-lock'>\u26a0</span>") +
     it("cal", "\ud83d\udcc5", "Calendaris", bloc ? "<span class='c-lock'>\ud83d\udd12</span>" : "") +
     it("avisos", "\ud83d\udd14", "Avisos", n ? "<span class='c-bad'>" + n + "</span>" : "") +
-    (esAdmin ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
+    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
     "<div class='c-sep'></div>" +
     "<p class='hint' style='padding:0 12px'>Perfil i Graella complets desbloquegen els Calendaris.</p>";
 }
@@ -780,8 +782,12 @@ function pintaCasella(){
   const fr = FRANGES.find(x => x.id === s) || {};
   const btn = (on, txt, ac) => "<button class='cbtn" + (on ? " on" : "") + "' onclick=\"celAccio('" + ac + "')\">" + txt + (on ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>";
   let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
-  h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 els nens v\u00e9nen amb nosaltres i oferim " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
-  f.nens.forEach(n => { h += btn(te(n.marca, s, d), "\ud83d\ude4b " + esc(n.nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a", "nen:" + n.id); });
+  const totsMarcats = f.nens.length > 0 && f.nens.every(n => te(n.marca, s, d));
+  const etDemana = f.nens.length === 1 ? "\ud83d\ude4b " + esc(f.nens[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a" : "\ud83d\ude4b Els nens demanen pla\u00e7a";
+  h += "<div class='cseg'>" +
+    "<button class='cbtn half" + (te(f.cotxe, s, d) ? " on" : "") + "' onclick=\"celAccio('cotxe')\">\ud83d\ude97 Condu\u00efm \u2014 " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places") + (te(f.cotxe, s, d) ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>" +
+    "<button class='cbtn half" + (totsMarcats ? " on" : "") + "' onclick=\"celAccio('demana')\">" + etDemana + (totsMarcats ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>" +
+    "</div>";
   h += btn(te(f.propi, s, d), "\ud83d\udeab Anem pel nostre compte", "propi");
   h += btn(false, "Buida la casella", "esborra");
   h += "<button class='boto' style='width:100%;margin-top:10px' onclick='tancaCasella()'>Fet</button>";
@@ -791,8 +797,38 @@ function pintaCasella(){
 }
 function celAccio(ac){
   if (!celObert) return;
+  const s = celObert.slot, d = celObert.dia;
+  if (ac === "demana"){
+    const k = s + "-" + d + "|demana", ara = Date.now();
+    if (ultimToc.k === k && ara - ultimToc.t < 350) return;
+    ultimToc = { k: k, t: ara };
+    const f = lameva(); if (!f || !f.nens.length) return;
+    const cel = s + "-" + d;
+    const portatsAbans = te(f.cotxe, s, d) ? portaValids(f, s, d).map(r => {
+      const ff = doc.families.find(x => x.id === r.fam);
+      const nn = ff && (ff.nens || []).find(x => x.id === r.nen);
+      return nn ? nn.nom.trim().split(/\s+/)[0] : null;
+    }).filter(Boolean) : [];
+    const tots = f.nens.every(n => te(n.marca, s, d));
+    if (tots){ f.nens.forEach(n => treu(n.marca, s, d)); }
+    else {
+      treu(f.propi, s, d);
+      if (te(f.cotxe, s, d)){ treu(f.cotxe, s, d); if (f.porta) delete f.porta[cel]; }
+      f.nens.forEach(n => {
+        if (!te(n.marca, s, d)) commuta(n.marca, s, d);
+        if (s === "e8") treu(n.marca, "e9", d); else if (s === "e9") treu(n.marca, "e8", d);
+      });
+    }
+    dirty = true; pintaBarra(); pintaGraella();
+    if (portatsAbans.length && !te(f.cotxe, s, d)){
+      const hhFr = (FRANGES.find(x => x.id === s) || {}).hora || "";
+      barraAvis("\u2139\ufe0f Has tret el cotxe de " + DIES_NOM[d] + " " + hhFr + ": <b>" + esc(portatsAbans.join(" i ")) + "</b> es queden sense pla\u00e7a. Les seves fam\u00edlies ho veuran als Avisos quan desis.", "info");
+    }
+    pintaCasella();
+    return;
+  }
   triaPinzell(ac.indexOf("nen:") === 0 ? ac.slice(4) : ac);
-  pinta(celObert.slot, celObert.dia);
+  pinta(s, d);
   pintaCasella();
 }
 function pintaGraella(){
@@ -900,6 +936,7 @@ function pantallaAdmin(){
     "<div class='targeta'>" + cos + "</div>";
 }
 async function estableixPin(){
+  if (doc.adminPin) return;
   const v = $("#pin-nou").value.trim();
   if (v.length < 4){ avis("El codi d'administrador ha de tenir 4 caràcters o més."); return; }
   avis(""); doc.adminPin = v;
@@ -910,6 +947,7 @@ async function estableixPin(){
   catch(e){ delete doc.adminPin; delete doc.adminFam; estat("Error", true); avis("No s'ha pogut desar el codi. Torna-ho a provar."); }
 }
 async function canviaPin(){
+  if (!esAdmin) return;
   const v = $("#pin-canvi").value.trim();
   if (v.length < 4){ avis("El codi ha de tenir 4 caràcters o més."); return; }
   avis(""); const antic = doc.adminPin; doc.adminPin = v;
@@ -979,7 +1017,7 @@ function pintaBloqueig(){
     "<div class='fila' style='margin-top:12px'>" + (perfilComplet(f) ? "" : "<button class='boto sec' onclick=\"triaTab('perfil')\">V\u00e9s al Perfil</button>") + (pend.length ? "<button class='boto' onclick=\"triaTab('graella')\">V\u00e9s a la Graella</button>" : "") + "</div></div>";
 }
 function pintaRols(){
-  if (!esAdmin){ triaTab("graella"); return; }
+  if (!esAdmin || !doc.adminFam || !lameva() || lameva().id !== doc.adminFam){ triaTab("graella"); return; }
   const files = famOrd().map(x => {
     const fix = doc.adminFam ? x.id === doc.adminFam : x.rol === "admin";
     const eti = x.rol === "admin" ? "\ud83d\udee1\ufe0f admin" : x.rol === "staff" ? "\ud83d\udee0\ufe0f staff" : "usuari";
