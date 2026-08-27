@@ -133,32 +133,37 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .ocult{display:none}
 @media print{ body > *{display:none !important} #full-horari{display:block !important;position:static} .fh-eines{display:none !important} }
 @page{size:A4 landscape;margin:8mm}
-.fullh{position:fixed;inset:0;background:#fff;z-index:70;overflow:auto;padding:12px}
+.fullh{position:fixed;inset:0;background:#fdfefe;z-index:70;overflow:auto;padding:12px}
 .fullh.ocult{display:none}
-.fh-eines{display:flex;gap:10px;justify-content:space-between;margin-bottom:10px;position:sticky;top:0;background:#fff;padding:4px 0;z-index:2}
-.fh-full{max-width:1120px;margin:0 auto}
-.fh-cap{display:flex;justify-content:space-between;align-items:center;background:#17456B;color:#fff;border-radius:14px 14px 0 0;padding:16px 20px}
-.fh-t{font:800 26px 'Baloo 2'}
-.fh-s{font:600 15px 'Baloo 2';color:#BFD6E8}
-.fh-marca{font:800 17px 'Baloo 2';color:#F5B91E}
-.fh-zebra{height:14px;background:repeating-linear-gradient(90deg,#17456B 0 34px,#fff 34px 68px)}
-.fh-graella{display:grid;grid-template-columns:86px repeat(5,1fr);gap:7px;margin-top:10px}
-.fh-dia{background:#0E2A44;color:#fff;border-radius:99px;text-align:center;font:800 15px 'Baloo 2';padding:7px 0}
-.fh-grup{grid-column:1/-1;border-radius:10px;font:800 13.5px 'Baloo 2';letter-spacing:.06em;padding:7px 12px}
-.fh-grup.ent{background:#FDF3DC;color:#8A6A12}
-.fh-grup.rec{background:#FBE9E5;color:#8F2B1C}
-.fh-hora{font:800 21px 'Baloo 2';color:#0E2A44;align-self:center}
-.fh-cel{border-radius:12px;border:2px solid #DCE5EC;padding:9px 8px 9px 14px;position:relative;min-height:52px}
-.fh-cel::before{content:'';position:absolute;left:4px;top:6px;bottom:6px;width:6px;border-radius:3px;background:#C7D2DB}
-.fh-gran{font:800 15.5px 'Baloo 2';line-height:1.25}
-.fh-xic{font:700 12.5px 'Baloo 2';color:#5E6E7A;margin-top:3px;line-height:1.3}
-.fh-buida{display:flex;align-items:center;justify-content:center;color:#C7D2DB;font-weight:800}
-.fh-ok{background:#EAF6EE;border-color:#9CCDAD}.fh-ok::before{background:#2F7D4F}.fh-ok .fh-gran{color:#1F5C3B}
-.fh-fam{background:#EAF1F7;border-color:#B9CBD7}.fh-fam::before{background:#17456B}.fh-fam .fh-gran{color:#17456B}
-.fh-propi{background:#F1F3F6;border-color:#D3DBE1}.fh-propi::before{background:#8A99A5}.fh-propi .fh-gran{color:#5E6E7A}
-.fh-pend{background:#FBE9E5;border-color:#E8B3A8}.fh-pend::before{background:#BE3D2A}.fh-pend .fh-gran{color:#8F2B1C}
-.fh-llegenda{font:700 12.5px 'Baloo 2';color:#5E6E7A;text-align:center;margin-top:12px}
-.fh-peu{font:600 12px 'Baloo 2';color:#8A99A5;text-align:center;margin-top:6px}
+.fh-eines{display:flex;gap:10px;justify-content:space-between;margin-bottom:10px;position:sticky;top:0;background:#fdfefe;padding:4px 0;z-index:2}
+.fh-full{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:9px}
+.fh-cap{display:flex;justify-content:space-between;align-items:center;background:#1d4a6e;border-radius:16px 16px 4px 4px;padding:14px 24px;color:#fff}
+.fh-tl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.fh-t{font:800 25px/1.1 'Baloo 2'}
+.fh-badge{background:#f6c026;color:#1d4a6e;font:800 10px 'Baloo 2';letter-spacing:1.2px;padding:3px 11px;border-radius:999px;white-space:nowrap}
+.fh-s{font:600 12.5px 'Baloo 2';color:#c9dcee;margin-top:2px}
+.fh-marca{font:800 14px 'Baloo 2';color:#f6c026;white-space:nowrap}
+.fh-zebra{height:8px;margin:0 12px;background:repeating-linear-gradient(90deg,#1d4a6e 0 16px,transparent 16px 32px)}
+.fh-fila{display:grid;grid-template-columns:58px repeat(5,1fr);gap:8px;align-items:stretch}
+.fh-dia{background:#16324f;color:#fff;border-radius:999px;padding:5px 0;text-align:center;font:700 13.5px 'Baloo 2'}
+.fh-grup{display:flex;align-items:center;gap:7px;border-radius:8px;padding:3px 12px;font:800 10.5px 'Baloo 2';letter-spacing:1.5px}
+.fh-grup.ent{background:#fdf1d9;color:#8a5a12}
+.fh-grup.rec{background:#fbe4e0;color:#b3372c}
+.fh-hora{display:flex;align-items:center;font:800 17px 'Baloo 2';color:#16324c}
+.fh-cel{display:flex;align-items:center;gap:8px;min-height:68px;box-sizing:border-box;border:1.5px solid #e4eaf0;background:#fff;border-radius:12px;padding:7px 11px 7px 8px}
+.fh-barra{align-self:stretch;width:4.5px;border-radius:3px;background:#d5dee6}
+.fh-mig{flex:1;text-align:left}
+.fh-titol{font:800 13.5px/1.25 'Baloo 2';color:#bcc7d1}
+.fh-nota{font:600 11px/1.3 'Baloo 2';color:#5c7189}
+.fh-buida .fh-mig{text-align:center}
+.fh-ok{background:#eaf6ee;border-color:#abd6b6}.fh-ok .fh-barra{background:#2e8047}.fh-ok .fh-titol{color:#1d5c33}
+.fh-fam{background:#eaf2fb;border-color:#c2d7ec}.fh-fam .fh-barra{background:#1d4a6e}.fh-fam .fh-titol{color:#1d4a6e}
+.fh-propi{background:#eef1f3;border-color:#d8dee3}.fh-propi .fh-barra{background:#9aa6b0}.fh-propi .fh-titol{color:#4c5a66}
+.fh-pend{background:#fdecec;border-color:#f0c5c5}.fh-pend .fh-barra{background:#d64545}.fh-pend .fh-titol{color:#a83232}
+.fh-llegenda{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;margin-top:6px}
+.fh-chip{display:inline-flex;align-items:center;gap:6px;font:700 10.5px 'Baloo 2';color:#44576b}
+.fh-q{width:10px;height:10px;border-radius:3px;display:inline-block}
+.fh-peu{text-align:center;font:600 10px 'Baloo 2';color:#8fa3b8}
 .jvisor.ocult{display:none}
 .jvisor{position:fixed;inset:0;background:rgba(14,42,68,.75);z-index:70;display:flex;align-items:center;justify-content:center;padding:16px}
 .jv-caixa{background:#fff;border-radius:16px;padding:12px;max-width:96vw;max-height:92vh;overflow:auto}
@@ -294,7 +299,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.25</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.27</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1365,12 +1370,13 @@ function trosseja(txt, m){
 }
 let fullActual = null;
 const esAppInstalada = (window.navigator && window.navigator.standalone === true) || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+const esIOS = /iPad|iPhone|iPod/.test((navigator && navigator.userAgent) || "") || ((navigator && navigator.platform) === "MacIntel" && navigator.maxTouchPoints > 1);
 function rrCtx(ctx, x, y, w, h2, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h2, r); ctx.arcTo(x + w, y + h2, x, y + h2, r); ctx.arcTo(x, y + h2, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 function palColors(pal){
-  return pal === "ok" ? ["#EAF6EE", "#9CCDAD", "#2F7D4F", "#1F5C3B"]
-    : pal === "fam" ? ["#EAF1F7", "#B9CBD7", "#17456B", "#17456B"]
-    : pal === "pend" ? ["#FBE9E5", "#E8B3A8", "#BE3D2A", "#8F2B1C"]
-    : ["#F1F3F6", "#D3DBE1", "#8A99A5", "#5E6E7A"];
+  return pal === "ok" ? ["#eaf6ee", "#abd6b6", "#2e8047", "#1d5c33"]
+    : pal === "fam" ? ["#eaf2fb", "#c2d7ec", "#1d4a6e", "#1d4a6e"]
+    : pal === "pend" ? ["#fdecec", "#f0c5c5", "#d64545", "#a83232"]
+    : ["#eef1f3", "#d8dee3", "#9aa6b0", "#4c5a66"];
 }
 function dibuixaCanvasHorari(fa){
   const cv = document.createElement("canvas");
@@ -1379,27 +1385,28 @@ function dibuixaCanvasHorari(fa){
   const W = 2480, H = 1754; cv.width = W; cv.height = H;
   const F = "px 'Baloo 2', 'Trebuchet MS', sans-serif";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#17456B"; ctx.fillRect(0, 0, W, 200);
+  ctx.fillStyle = "#fdfefe"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#1d4a6e"; ctx.fillRect(0, 0, W, 200);
   ctx.fillStyle = "#FFFFFF"; for (let x = 30; x < W; x += 120) ctx.fillRect(x, 172, 60, 28);
   ctx.font = "800 64" + F; ctx.fillText(fa.titol, 70, 82);
-  ctx.fillStyle = "#BFD6E8"; ctx.font = "600 36" + F; ctx.fillText(fa.sub, 70, 140);
-  ctx.fillStyle = "#F5B91E"; ctx.font = "800 38" + F; ctx.textAlign = "right";
+  ctx.fillStyle = "#c9dcee"; ctx.font = "600 36" + F; ctx.fillText(fa.sub, 70, 140);
+  ctx.fillStyle = "#f6c026"; ctx.font = "800 38" + F; ctx.textAlign = "right";
   ctx.fillText("\ud83d\ude97 Cotxes \u00b7 Escola Anoia", W - 70, 82); ctx.textAlign = "left";
   const x0 = 70, colE = 240, colW = (W - x0 * 2 - colE) / 5, yCap = 280, rowH = 226, grupH = 56;
   DIES.forEach((d, i) => {
     const cx = x0 + colE + colW * i + 10;
-    ctx.fillStyle = "#0E2A44"; rrCtx(ctx, cx, yCap - 52, colW - 20, 60, 30); ctx.fill();
+    ctx.fillStyle = "#16324f"; rrCtx(ctx, cx, yCap - 52, colW - 20, 60, 30); ctx.fill();
     ctx.fillStyle = "#FFFFFF"; ctx.font = "800 32" + F; ctx.textAlign = "center";
     ctx.fillText(DIES_NOM[d], cx + (colW - 20) / 2, yCap - 22); ctx.textAlign = "left";
   });
   let y = yCap + 24;
   FRANGES.forEach((fr, r) => {
-    if (r === 0 || FRANGES[r - 1].tipus !== fr.tipus){
-      ctx.fillStyle = fr.tipus === "Entrada" ? "#FDF3DC" : "#FBE9E5";
+    const banda = BANDES.find(b => b.fr[0] === fr.id);
+    if (banda){
+      ctx.fillStyle = banda.cls === "ent" ? "#fdf1d9" : "#fbe4e0";
       rrCtx(ctx, x0, y, W - x0 * 2, grupH, 14); ctx.fill();
-      ctx.fillStyle = fr.tipus === "Entrada" ? "#8A6A12" : "#8F2B1C"; ctx.font = "800 28" + F;
-      ctx.fillText(fr.tipus === "Entrada" ? "\ud83c\udf05  ENTRADA" : "\ud83c\udf92  RECOLLIDA", x0 + 24, y + grupH / 2);
+      ctx.fillStyle = banda.cls === "ent" ? "#8a5a12" : "#b3372c"; ctx.font = "800 28" + F;
+      ctx.fillText(banda.icona + "  " + banda.nom, x0 + 24, y + grupH / 2);
       y += grupH + 14;
     }
     ctx.fillStyle = "#0E2A44"; ctx.font = "800 50" + F; ctx.fillText(fr.hora, x0, y + 58);
@@ -1417,9 +1424,9 @@ function dibuixaCanvasHorari(fa){
       ctx.fillStyle = p[2]; rrCtx(ctx, cx, y, 13, ch, 6); ctx.fill();
       ctx.textAlign = "center"; const mx = cx + 10 + (cw - 10) / 2;
       ctx.fillStyle = p[3]; ctx.font = "800 32" + F;
-      const grans = trosseja(c.gran, 18).slice(0, 2);
+      const grans = trosseja(ICONA_PAL[c.pal] + " " + c.titol, 18).slice(0, 2);
       grans.forEach((l, li) => ctx.fillText(l, mx, y + 44 + li * 38));
-      const xic = (c.xics || []).join(" \u00b7 ");
+      const xic = c.nota || "";
       if (xic){
         ctx.font = "700 24" + F; ctx.fillStyle = "#5E6E7A";
         trosseja(xic, 26).slice(0, 3).forEach((l, li) => ctx.fillText(l, mx, y + 44 + grans.length * 38 + 12 + li * 30));
@@ -1429,7 +1436,7 @@ function dibuixaCanvasHorari(fa){
     y += rowH;
   });
   ctx.textAlign = "center"; ctx.fillStyle = "#5E6E7A"; ctx.font = "700 25" + F;
-  ctx.fillText(fa.llegenda, W / 2, H - 92);
+  ctx.fillText(fa.llegenda.map(l => l[1]).join("   ·   "), W / 2, H - 92);
   ctx.fillStyle = "#8A99A5"; ctx.font = "600 23" + F;
   ctx.fillText("De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 " + new Date().toLocaleDateString("ca"), W / 2, H - 46);
   ctx.textAlign = "left";
@@ -1465,6 +1472,13 @@ async function comparteixFull(){
   } catch(e){ avis("No s'ha pogut desar autom\u00e0ticament: fes una captura de pantalla del full."); }
 }
 function palCls(pal){ return pal === "ok" ? "fh-ok" : pal === "fam" ? "fh-fam" : pal === "pend" ? "fh-pend" : "fh-propi"; }
+const BANDES = [
+  { fr: ["e8", "e9"], icona: "\ud83c\udf05", nom: "ENTRADA \u00b7 MAT\u00cd", cls: "ent" },
+  { fr: ["r13"], icona: "\ud83c\udf92", nom: "RECOLLIDA \u00b7 MIGDIA", cls: "rec" },
+  { fr: ["e15"], icona: "\ud83c\udf05", nom: "ENTRADA \u00b7 TARDA", cls: "ent" },
+  { fr: ["r17"], icona: "\ud83c\udf92", nom: "RECOLLIDA \u00b7 TARDA", cls: "rec" }
+];
+const ICONA_PAL = { ok: "\ud83d\ude97", fam: "\ud83d\ude97", propi: "\ud83d\udeab", pend: "\u23f3" };
 function nomsPortats(cond, slot, dia){
   return portaValids(cond, slot, dia).map(r2 => {
     const ff = doc.families.find(x => x.id === r2.fam);
@@ -1472,35 +1486,39 @@ function nomsPortats(cond, slot, dia){
     return nn ? nn.nom.trim().split(/\s+/)[0] : null;
   }).filter(Boolean);
 }
-function fullHorariHtml(titol, sub, contingut, llegenda){
+function fullHorariHtml(titol, sub, cont, distintiu, llegenda){
   let h = "<div class='fh-full'>";
-  h += "<div class='fh-cap'><div><div class='fh-t'>" + esc(titol) + "</div><div class='fh-s'>" + esc(sub) + "</div></div><div class='fh-marca'>\ud83d\ude97 Cotxes \u00b7 Escola Anoia</div></div>";
+  h += "<div class='fh-cap'><div><div class='fh-tl'><span class='fh-t'>" + esc(titol) + "</span><span class='fh-badge'>" + esc(distintiu) + "</span></div><div class='fh-s'>" + esc(sub) + "</div></div><div class='fh-marca'>\ud83d\ude97 Cotxes \u00b7 Escola Anoia</div></div>";
   h += "<div class='fh-zebra'></div>";
-  h += "<div class='fh-graella'><div></div>" + DIES.map(d => "<div class='fh-dia'>" + DIES_NOM[d] + "</div>").join("");
-  FRANGES.forEach((fr, r) => {
-    if (r === 0 || FRANGES[r - 1].tipus !== fr.tipus)
-      h += "<div class='fh-grup " + (fr.tipus === "Entrada" ? "ent" : "rec") + "'>" + (fr.tipus === "Entrada" ? "\ud83c\udf05 ENTRADA" : "\ud83c\udf92 RECOLLIDA") + "</div>";
-    h += "<div class='fh-hora'>" + fr.hora + "</div>";
-    DIES.forEach(d => {
-      const c = contingut[fr.id] && contingut[fr.id][d];
-      h += c
-        ? "<div class='fh-cel " + palCls(c.pal) + "'><div class='fh-gran'>" + esc(c.gran) + "</div>" + (c.xics && c.xics.length ? "<div class='fh-xic'>" + esc(c.xics.join(" \u00b7 ")) + "</div>" : "") + "</div>"
-        : "<div class='fh-cel fh-buida'>\u2014</div>";
+  h += "<div class='fh-fila fh-capdies'><div></div>" + DIES.map(d => "<div class='fh-dia'>" + DIES_NOM[d] + "</div>").join("") + "</div>";
+  BANDES.forEach(b => {
+    h += "<div class='fh-grup " + b.cls + "'><span>" + b.icona + "</span><span>" + b.nom + "</span></div>";
+    b.fr.forEach(fid => {
+      const fr = FRANGES.find(x => x.id === fid);
+      h += "<div class='fh-fila'><div class='fh-hora'>" + fr.hora + "</div>";
+      DIES.forEach(d => {
+        const c = cont[fid] && cont[fid][d];
+        if (!c){ h += "<div class='fh-cel fh-buida'><div class='fh-barra'></div><div class='fh-mig'><div class='fh-titol'>\u2014</div></div></div>"; return; }
+        h += "<div class='fh-cel " + palCls(c.pal) + "'><div class='fh-barra'></div><div class='fh-mig'><div class='fh-titol'>" + ICONA_PAL[c.pal] + " " + esc(c.titol) + "</div>" + (c.nota ? "<div class='fh-nota'>" + esc(c.nota) + "</div>" : "") + "</div></div>";
+      });
+      h += "</div>";
     });
   });
-  h += "</div>";
-  h += "<div class='fh-llegenda'>" + esc(llegenda) + "</div>";
+  h += "<div class='fh-llegenda'>" + llegenda.map(l => "<span class='fh-chip'><span class='fh-q' style='background:" + l[0] + "'></span>" + esc(l[1]) + "</span>").join("") + "</div>";
   h += "<div class='fh-peu'>De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 " + new Date().toLocaleDateString("ca") + "</div>";
   h += "</div>";
   return h;
 }
+
 function mostraFull(html){
   const dv = $("#full-horari"); if (!dv) return;
   dv.innerHTML =
     "<div class='fh-eines'><button class='boto sec' onclick='tancaFull()'>\u2190 Torna</button>" +
     "<button class='boto' onclick='comparteixFull()'>\ud83d\udce4 Desa / comparteix</button>" +
-    (esAppInstalada ? "" : "<button class='boto sec' onclick='imprimeixFull()'>\ud83d\udda8\ufe0f Imprimeix</button>") +
-    "</div>" + html;
+    (esAppInstalada || esIOS ? "" : "<button class='boto sec' onclick='imprimeixFull()'>\ud83d\udda8\ufe0f Imprimeix</button>") +
+    "</div>" +
+    (esAppInstalada || esIOS ? "<p class='hint' style='text-align:center;margin:0 0 8px'>\ud83d\udca1 Per imprimir: toca \u00ab\ud83d\udce4 Desa / comparteix\u00bb \u2192 <b>Desa la imatge</b> (va a Fotos) \u2192 obre-la a Fotos \u2192 <b>Imprimeix</b>.</p>" : "") +
+    html;
   dv.classList.remove("ocult");
   window.scrollTo(0, 0);
 }
@@ -1516,25 +1534,25 @@ function descarregaHorariNen(fid, nid){
     let c = null;
     if (te(fam.cotxe, fr.id, d)){
       const comp = fam.nens.filter(x => x.id !== nid).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(fam, fr.id, d));
-      c = { pal: "fam", gran: "\ud83d\ude97 " + (fam.conductor || "la fam\u00edlia"), xics: comp.length ? ["amb " + comp.join(", ")] : ["hi va sol"] };
+      c = { pal: "fam", titol: fam.conductor || "la fam\u00edlia", nota: comp.length ? "amb " + comp.join(", ") : "hi va sol" };
     } else if (te(nen.marca, fr.id, d)){
       const cf = elPorta(fid, nid, fr.id, d);
       if (cf){
         const comp = nomsPortats(cf, fr.id, d).filter(x => x !== jo).concat((cf.nens || []).map(x => x.nom.trim().split(/\s+/)[0]));
-        c = { pal: "ok", gran: "\ud83d\ude97 " + nomConductor(cf), xics: comp.length ? ["amb " + comp.join(", ")] : ["hi va sol"] };
+        c = { pal: "ok", titol: nomConductor(cf), nota: comp.length ? "amb " + comp.join(", ") : "hi va sol" };
       } else {
-        c = { pal: "pend", gran: "\u23f3 pendent", xics: ["cal conductor"] };
+        c = { pal: "pend", titol: "pendent", nota: "cal conductor" };
       }
     } else if (te(fam.propi, fr.id, d)){
-      c = { pal: "propi", gran: "\ud83d\udeab pel seu compte", xics: [] };
+      c = { pal: "propi", titol: "pel seu compte", nota: "" };
     }
     if (c) cont[fr.id][d] = c;
   }); });
-  fullActual = { titol: "Horari de " + nen.nom, sub: "Amb qui va cada dia \u00b7 " + fam.nom, cont: cont, fitxer: "horari-" + slug(nen.nom) + ".jpg",
-    llegenda: "verd = cotxe compartit \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte \u00b7 vermell = pendent" };
-  mostraFull(fullHorariHtml("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont,
-    "verd = cotxe compartit (el nom \u00e9s qui condueix) \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte \u00b7 vermell = pendent de conductor"));
+  const lleg = [["#2e8047", "cotxe compartit (el nom \u00e9s qui condueix)"], ["#1d4a6e", "amb la seva fam\u00edlia"], ["#9aa6b0", "pel seu compte"], ["#d64545", "pendent de conductor"]];
+  fullActual = { titol: "Horari de " + nen.nom, sub: "Amb qui va cada dia \u00b7 " + fam.nom, cont: cont, fitxer: "horari-" + slug(nen.nom) + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont, "FULL DEL NEN", lleg));
 }
+
 function descarregaHorariConductor(){
   const f = lameva(); if (!f) return;
   const cont = {};
@@ -1543,18 +1561,19 @@ function descarregaHorariConductor(){
     if (te(f.cotxe, fr.id, d)){
       const tots = f.nens.map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
       const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
-      c = { pal: "ok", gran: "\ud83d\ude97 " + (tots.length ? "portes " + tots.length : "el teu cotxe"),
-            xics: (tots.length ? [tots.join(", ")] : ["sense passatgers"]).concat([lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures")]) };
+      const pl = lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures");
+      c = { pal: "ok", titol: tots.length ? "portes " + tots.length : "el teu cotxe",
+            nota: (tots.length ? tots.join(", ") : "sense passatgers") + " \u00b7 " + pl };
     } else if (te(f.propi, fr.id, d)){
-      c = { pal: "propi", gran: "\ud83d\udeab pel vostre compte", xics: [] };
+      c = { pal: "propi", titol: "pel vostre compte", nota: "" };
     }
     if (c) cont[fr.id][d] = c;
   }); });
-  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: "Qui puges a cada viatge \u00b7 " + f.nom, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + ".jpg",
-    llegenda: "verd = viatges que condueixes \u00b7 gris = pel vostre compte" };
-  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont,
-    "verd = viatges que condueixes (amb els nens i les places que et queden) \u00b7 gris = pel vostre compte"));
+  const lleg = [["#2e8047", "viatges que condueixes (amb els nens i les places que et queden)"], ["#9aa6b0", "pel vostre compte"]];
+  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: "Qui puges a cada viatge \u00b7 " + f.nom, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont, "FULL DEL CONDUCTOR", lleg));
 }
+
 function pintaDescarrega(){
   const f = lameva();
   let h = "<div class='targeta'><div class='p-fila'><span class='p-lab'>\ud83d\udda8\ufe0f Horaris per imprimir<span class='p-sub'>s'obren a pantalla \u2192 Imprimeix o desa'ls en PDF des del di\u00e0leg del m\u00f2bil</span></span></div>";
