@@ -261,7 +261,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.20</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.21</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -673,7 +673,11 @@ async function creaFam(){
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
 async function entraSel(){
   const v = $("#sel-fam").value; if (!v) return;
-  if (esAdmin || esStaff){ triaFam(v); return; }
+  if (esAdmin){ triaFam(v); return; }
+  if (esStaff){
+    if (doc.adminFam && v === doc.adminFam){ avis("La fam\u00edlia de l'administrador nom\u00e9s la gestiona l'administrador."); return; }
+    triaFam(v); return;
+  }
   const fx = doc.families.find(x => x.id === v); if (!fx) return;
   if (!fx.usuaris) fx.usuaris = [];
   const meva = fx.creadaPer === usuariId || fx.usuaris.includes(usuariId);
@@ -701,7 +705,11 @@ async function rolFam(id){
   try { await ghPut("Rol de " + fx.nom + ": " + nou); estat("Desat \u2713", "ok"); if (tabAct === "rols") pintaRols(); else pantallaApp(); }
   catch(e){ fx.rol = antic; estat("Error", true); avis("No s'ha pogut canviar el rol."); }
 }
-function adminEdita(id){ if (!esAdmin && !esStaff) return; tabAct = "perfil"; triaFam(id); }
+function adminEdita(id){
+  if (!esAdmin && !esStaff) return;
+  if (!esAdmin && esStaff && doc.adminFam && id === doc.adminFam){ avis("La fam\u00edlia de l'administrador nom\u00e9s la gestiona l'administrador."); return; }
+  tabAct = "perfil"; triaFam(id);
+}
 
 /* ── Pantalla principal ── */
 function pantallaApp(){
@@ -712,7 +720,7 @@ function pantallaApp(){
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
   const dirHtml = famOrd().map(x =>
-    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
+    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + ((esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam))) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
   ).join("");
   $("#pantalla").innerHTML =
     "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet'>\u00b7 " + (f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
