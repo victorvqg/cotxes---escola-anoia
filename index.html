@@ -260,7 +260,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.12</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.13</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -684,7 +684,9 @@ function pantallaApp(){
     "<div class='captab'><span class='cap-titol' id='cap-titol'></span></div>" +
     "<div id='tab-cos'></div>" +
     "<details class='conf'><summary>\ud83d\udc65 Les fam\u00edlies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>" +
-    ((esAdmin || esStaff || f.rol === "staff" || !doc.adminPin || (doc.adminFam && f.id === doc.adminFam)) ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "\ud83d\udee1\ufe0f Administrador \u00b7 gestiona" : esStaff ? "\ud83d\udee0\ufe0f Staff \u00b7 gestiona" : "\ud83d\udee1\ufe0f Acc\u00e9s administrador") + "</button></p>" : "") +
+    ((esAdmin || !doc.adminPin || (doc.adminFam && f.id === doc.adminFam)) ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "\ud83d\udee1\ufe0f Administrador \u00b7 gestiona" : "\ud83d\udee1\ufe0f Acc\u00e9s administrador") + "</button></p>" :
+     esStaff ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>\ud83d\udee0\ufe0f Staff \u00b7 gestiona</button></p>" :
+     f.rol === "staff" ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>\ud83d\udee0\ufe0f Activa el mode staff</button></p>" : "") +
     "<div id='vel' class='vel' onclick='tancaMenu()'></div><nav id='calaix' class='calaix'></nav>" +
     "<div id='cel-vel' class='vel' onclick='tancaCasella()'></div><div id='cel-menu' class='cmenu'></div>";
   pintaMenu();
@@ -1152,7 +1154,9 @@ function pintaSetmana(){
 function pintaVistaDia(){
   $("#cal-cos").innerHTML =
     "<div class='dies-sel'>" + DIES.map(d => "<button class='dia-b " + (diaSel === d ? "actiu" : "") + "' onclick=\"selDiaChip('" + d + "')\">" + DIES_LBL[d] + "</button>").join("") + "</div>" +
-    "<h2 style='margin:2px 2px 10px'>" + DIES_NOM[diaSel] + "</h2><div id='dia-detall'></div>";
+    "<h2 style='margin:2px 2px 10px'>" + DIES_NOM[diaSel] + "</h2>" +
+    "<p class='hint' style='margin:0 2px 10px'>\ud83d\ude97 Aquesta \u00e9s la vista dels conductors: si aquell dia condu\u00efu, a la vostra targeta hi surt \u00abQui puges al teu cotxe?\u00bb amb caselles per marcar els nens que recollireu.</p>" +
+    "<div id='dia-detall'></div>";
   pintaDia();
 }
 function selDiaChip(d){ diaSel = d; pintaVistaDia(); }
