@@ -123,6 +123,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
 .nomgran{font:800 22px 'Baloo 2';color:#0E2A44;margin:2px 0 8px}
+.barra-avis.info{background:#FFF6DD;color:#7A5A00;border-color:#EAD289}
 .barra-avis{background:#FBE9E5;color:#8F2B1C;border:1.5px solid #E8B3A8;border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.45;margin:0 0 8px;text-align:left}
 .credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px;line-height:1.5}
 .credit .versio{font-size:11.5px;color:#A5B2BC}
@@ -189,7 +190,7 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.4</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.5</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -303,7 +304,7 @@ function portaValids(f, slot, dia){
     const ff = doc.families.find(x => x.id === r.fam);
     if (!ff) return false;
     const nn = (ff.nens || []).find(x => x.id === r.nen);
-    return !!nn && te(nn.marca, slot, dia);
+    return !!nn && te(nn.marca, slot, dia) && !te(ff.cotxe, slot, dia);
   });
 }
 function elPorta(famId, nenId, slot, dia){
@@ -393,7 +394,7 @@ function pintaBarra(){
   const tp = $(".targeta.perfil");
   if (tp) tp.classList.toggle("pendent", dirty);
   const ba = $("#barra-avis");
-  if (ba && !ba.classList.contains("ocult")){
+  if (ba && !ba.classList.contains("ocult") && ba.dataset.tipus !== "info"){
     const fb = lameva();
     if (fb && doblesDe(fb).length === 0 && celesPendents(fb).length === 0) barraAvisNeteja();
   } $("#barra").classList.toggle("amaga", !dirty); }
@@ -405,7 +406,7 @@ function doblesDe(f){
   }));
   return out;
 }
-function barraAvis(html){ const b = $("#barra-avis"); if (!b) return; b.innerHTML = html; b.classList.remove("ocult"); }
+function barraAvis(html, tipus){ const b = $("#barra-avis"); if (!b) return; b.innerHTML = html; b.dataset.tipus = tipus || "valida"; b.classList.toggle("info", tipus === "info"); b.classList.remove("ocult"); }
 function barraAvisNeteja(){ const b = $("#barra-avis"); if (b){ b.classList.add("ocult"); b.innerHTML = ""; } }
 async function desa(){
   const fg = lameva();
@@ -710,11 +711,27 @@ function pinta(slot, dia){
   ultimToc = { k: k, t: ara };
   if (!f.propi) f.propi = {};
   const cel = slot + "-" + dia;
+  const portatsAbans = te(f.cotxe, slot, dia) ? portaValids(f, slot, dia).map(r => {
+    const ff = doc.families.find(x => x.id === r.fam);
+    const nn = ff && (ff.nens || []).find(x => x.id === r.nen);
+    return nn ? nn.nom.trim().split(/\s+/)[0] : null;
+  }).filter(Boolean) : [];
+  const meusPre = f.nens.filter(n => te(n.marca, slot, dia) && elPorta(f.id, n.id, slot, dia)).map(n => ({ id: n.id, nom: n.nom.trim().split(/\s+/)[0] }));
   if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); treu(f.propi, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (!te(f.cotxe, slot, dia) && f.porta) delete f.porta[cel]; }
   else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
   else { const n = f.nens.find(x => x.id === pinzell); if (!n) return; treu(f.propi, slot, dia); commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
   dirty = true; pintaBarra(); pintaGraella();
+  const hhFr = (FRANGES.find(x => x.id === slot) || {}).hora || "";
+  const araCond = te(f.cotxe, slot, dia);
+  if (portatsAbans.length && !araCond){
+    barraAvis("\u2139\ufe0f Has tret el cotxe de " + DIES_NOM[dia] + " " + hhFr + ": <b>" + esc(portatsAbans.join(" i ")) + "</b> es queden sense pla\u00e7a. Les seves fam\u00edlies ho veuran als Avisos quan desis.", "info");
+  } else {
+    const meusAfectats = meusPre.filter(x => { const nn = f.nens.find(k => k.id === x.id); return !nn || !te(nn.marca, slot, dia) || araCond; });
+    if (meusAfectats.length){
+      barraAvis("\u2139\ufe0f " + esc(meusAfectats.map(x => x.nom).join(" i ")) + " ja no " + (meusAfectats.length === 1 ? "puja" : "pugen") + " al cotxe que tenien assignat (" + DIES_NOM[dia] + " " + hhFr + "). En desar, la pla\u00e7a quedar\u00e0 lliure i l'altra fam\u00edlia ho veur\u00e0 al calendari.", "info");
+    }
+  }
 }
 
 function canviaPlaces(d){
@@ -912,13 +929,13 @@ function renderCal(){
     });
   });
   $("#tab-cos").innerHTML =
-    "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
-    "<div class='mapa'>" + mapa + "</div>" +
     "<div class='subtabs'><button class='subtab " + (vistaCal === "quadre" ? "actiu" : "") + "' onclick=\"triaVistaCal('quadre')\">Quadre</button>" +
     "<button class='subtab " + (vistaCal === "set" ? "actiu" : "") + "' onclick=\"triaVistaCal('set')\">Setmana</button>" +
     "<button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button>" +
     "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button>" +
     "<button class='subtab " + (vistaCal === "resum" ? "actiu" : "") + "' onclick=\"triaVistaCal('resum')\">Resum</button></div>" +
+    "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
+    "<div class='mapa'>" + mapa + "</div>" +
     "<div id='cal-cos'></div>" +
     "<button class='boto sec' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
   if (vistaCal === "quadre") pintaQuadre(); else if (vistaCal === "set") pintaSetmana(); else if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else pintaVistaNen();
