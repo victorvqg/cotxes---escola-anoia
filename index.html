@@ -260,7 +260,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.14</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.15</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -578,7 +578,7 @@ async function provaClau(){
 function pantallaTria(){
   document.body.classList.remove("dins");
   if (!esAdmin && !esStaff){
-    const jaMeva = doc.families.find(x => x.creadaPer === usuariId);
+    const jaMeva = doc.families.find(x => x.creadaPer === usuariId || (x.usuaris || []).includes(usuariId));
     if (jaMeva){ triaFam(jaMeva.id); return; }
   }
   const fams = famOrd();
@@ -641,7 +641,7 @@ async function creaFam(){
   let id = slug(nom) || "familia";
   while (doc.families.some(f => f.id === id)) id += "-2";
   const usats = {};
-  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, cognomPare: cpare, cognomMare: cmare, conductor: conductor, places: nfPl, cotxe: {}, nens: nens.map(n => {
+  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, usuaris: esAdmin ? [] : [usuariId], cognomPare: cpare, cognomMare: cmare, conductor: conductor, places: nfPl, cotxe: {}, nens: nens.map(n => {
     let nid = slug(n) || "nen"; while (usats[nid]) nid += "-2"; usats[nid] = 1;
     return { id: nid, nom: n, marca: {} };
   })};
@@ -651,7 +651,25 @@ async function creaFam(){
   catch(e){ doc.families = doc.families.filter(f => f.id !== id); famId = ""; estat("Error", true); avis("No s'ha pogut crear la família. Torna-ho a provar."); }
 }
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
-function entraSel(){ const v = $("#sel-fam").value; if (v) triaFam(v); }
+async function entraSel(){
+  const v = $("#sel-fam").value; if (!v) return;
+  if (esAdmin || esStaff){ triaFam(v); return; }
+  const fx = doc.families.find(x => x.id === v); if (!fx) return;
+  if (!fx.usuaris) fx.usuaris = [];
+  const meva = fx.creadaPer === usuariId || fx.usuaris.includes(usuariId);
+  if (!meva){
+    if (fx.creadaPer || fx.usuaris.length){
+      if (!confirm("\u26a0 La fam\u00edlia \u00ab" + fx.nom + "\u00bb ja est\u00e0 en marxa en un altre m\u00f2bil.\n\nNom\u00e9s has de continuar si ets d'aquesta fam\u00edlia (pare, mare o tutor): tot el que editis \u00e9s seu.\n\nContinues?")) return;
+    } else {
+      fx.creadaPer = usuariId;
+    }
+    fx.usuaris.push(usuariId);
+    estat("Desant\u2026");
+    try { await ghPut("Nou m\u00f2bil a " + fx.nom); estat("Desat \u2713", "ok"); }
+    catch(e){ estat("Error", true); }
+  }
+  triaFam(v);
+}
 async function rolFam(id){
   if (!esAdmin || !doc.adminFam || !lameva() || lameva().id !== doc.adminFam) return;
   const fx = doc.families.find(x => x.id === id); if (!fx) return;
