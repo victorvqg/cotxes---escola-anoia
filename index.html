@@ -123,7 +123,8 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
 .nomgran{font:800 22px 'Baloo 2';color:#0E2A44;margin:2px 0 8px}
-.credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px}
+.credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px;line-height:1.5}
+.credit .versio{font-size:11.5px;color:#A5B2BC}
 .rolbt{flex:none;font-size:13px;border:1.5px solid #C7D3DC;border-radius:99px;padding:1px 9px;text-decoration:none}
 .dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peu{font-size:13px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
@@ -187,7 +188,7 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana</footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.3</span></footer></main>
   <div class="barra amaga" id="barra"><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -394,6 +395,15 @@ function pintaBarra(){
 async function desa(){
   const fg = lameva();
   if (fg){
+    const dobles = [];
+    (fg.nens || []).forEach(n => DIES.forEach(d2 => {
+      if (te(n.marca, "e8", d2) && te(n.marca, "e9", d2)) dobles.push(n.nom.trim().split(/\s+/)[0] + " (" + DIES_NOM[d2] + ")");
+    }));
+    if (dobles.length){
+      avis("\u26a0 No es pot desar: cada nen entra a les 8.00 <b>o</b> a les 9.00, no a totes dues. Tenen les dues hores marcades el mateix dia: " + esc(dobles.join(", ")) + ". Toca la marca que sobri per treure-la.");
+      if (tabAct !== "graella") triaTab("graella");
+      return;
+    }
     const pend = celesPendents(fg);
     if (pend.length){
       avis("\u26a0 No es pot desar encara: falten <b>" + pend.length + "</b> caselles per respondre a la Graella (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab; de les entrades 8.00/9.00 nom\u00e9s en cal una per nen). Primera: " + esc(pend[0]) + ".");
