@@ -131,6 +131,34 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
+@media print{ body > *{display:none !important} #full-horari{display:block !important;position:static} .fh-eines{display:none !important} }
+@page{size:A4 landscape;margin:8mm}
+.fullh{position:fixed;inset:0;background:#fff;z-index:70;overflow:auto;padding:12px}
+.fullh.ocult{display:none}
+.fh-eines{display:flex;gap:10px;justify-content:space-between;margin-bottom:10px;position:sticky;top:0;background:#fff;padding:4px 0;z-index:2}
+.fh-full{max-width:1120px;margin:0 auto}
+.fh-cap{display:flex;justify-content:space-between;align-items:center;background:#17456B;color:#fff;border-radius:14px 14px 0 0;padding:16px 20px}
+.fh-t{font:800 26px 'Baloo 2'}
+.fh-s{font:600 15px 'Baloo 2';color:#BFD6E8}
+.fh-marca{font:800 17px 'Baloo 2';color:#F5B91E}
+.fh-zebra{height:14px;background:repeating-linear-gradient(90deg,#17456B 0 34px,#fff 34px 68px)}
+.fh-graella{display:grid;grid-template-columns:86px repeat(5,1fr);gap:7px;margin-top:10px}
+.fh-dia{background:#0E2A44;color:#fff;border-radius:99px;text-align:center;font:800 15px 'Baloo 2';padding:7px 0}
+.fh-grup{grid-column:1/-1;border-radius:10px;font:800 13.5px 'Baloo 2';letter-spacing:.06em;padding:7px 12px}
+.fh-grup.ent{background:#FDF3DC;color:#8A6A12}
+.fh-grup.rec{background:#FBE9E5;color:#8F2B1C}
+.fh-hora{font:800 21px 'Baloo 2';color:#0E2A44;align-self:center}
+.fh-cel{border-radius:12px;border:2px solid #DCE5EC;padding:9px 8px 9px 14px;position:relative;min-height:52px}
+.fh-cel::before{content:'';position:absolute;left:4px;top:6px;bottom:6px;width:6px;border-radius:3px;background:#C7D2DB}
+.fh-gran{font:800 15.5px 'Baloo 2';line-height:1.25}
+.fh-xic{font:700 12.5px 'Baloo 2';color:#5E6E7A;margin-top:3px;line-height:1.3}
+.fh-buida{display:flex;align-items:center;justify-content:center;color:#C7D2DB;font-weight:800}
+.fh-ok{background:#EAF6EE;border-color:#9CCDAD}.fh-ok::before{background:#2F7D4F}.fh-ok .fh-gran{color:#1F5C3B}
+.fh-fam{background:#EAF1F7;border-color:#B9CBD7}.fh-fam::before{background:#17456B}.fh-fam .fh-gran{color:#17456B}
+.fh-propi{background:#F1F3F6;border-color:#D3DBE1}.fh-propi::before{background:#8A99A5}.fh-propi .fh-gran{color:#5E6E7A}
+.fh-pend{background:#FBE9E5;border-color:#E8B3A8}.fh-pend::before{background:#BE3D2A}.fh-pend .fh-gran{color:#8F2B1C}
+.fh-llegenda{font:700 12.5px 'Baloo 2';color:#5E6E7A;text-align:center;margin-top:12px}
+.fh-peu{font:600 12px 'Baloo 2';color:#8A99A5;text-align:center;margin-top:6px}
 .jvisor.ocult{display:none}
 .jvisor{position:fixed;inset:0;background:rgba(14,42,68,.75);z-index:70;display:flex;align-items:center;justify-content:center;padding:16px}
 .jv-caixa{background:#fff;border-radius:16px;padding:12px;max-width:96vw;max-height:92vh;overflow:auto}
@@ -265,8 +293,8 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <div id="jpeg-visor" class="jvisor ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.23</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <div id="full-horari" class="fullh ocult"></div>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.24</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1335,103 +1363,7 @@ function trosseja(txt, m){
   if (l.trim()) out.push(l.trim());
   return out;
 }
-function palCel(pal){
-  return pal === "ok" ? { fons: "#EAF6EE", vora: "#9CCDAD", accent: "#2F7D4F", color: "#1F5C3B" }
-    : pal === "fam" ? { fons: "#EAF1F7", vora: "#B9CBD7", accent: "#17456B", color: "#17456B" }
-    : { fons: "#F1F3F6", vora: "#D3DBE1", accent: "#8A99A5", color: "#5E6E7A" };
-}
-function dibuixaHorariJpeg(titol, subtitol, contingut, llegenda){
-  const cv = document.createElement("canvas");
-  const ctx = cv.getContext && cv.getContext("2d");
-  if (!ctx){ avis("Aquest navegador no pot generar la imatge de l'horari."); return null; }
-  const W = 2480, H = 1754; cv.width = W; cv.height = H;
-  const F = "px 'Baloo 2', 'Trebuchet MS', sans-serif";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#F3F6F9"; ctx.fillRect(0, 0, W, H);
-  // capçalera
-  ctx.fillStyle = "#17456B"; ctx.fillRect(0, 0, W, 210);
-  ctx.fillStyle = "#FFFFFF";
-  for (let x = 30; x < W; x += 120) ctx.fillRect(x, 180, 60, 30);
-  ctx.font = "800 68" + F; ctx.fillText(titol, 70, 86);
-  ctx.fillStyle = "#BFD6E8"; ctx.font = "600 38" + F; ctx.fillText(subtitol, 70, 148);
-  ctx.fillStyle = "#F5B91E"; ctx.font = "800 40" + F; ctx.textAlign = "right";
-  ctx.fillText("\ud83d\ude97 Cotxes \u00b7 Escola Anoia", W - 70, 86);
-  ctx.textAlign = "left";
-  // geometria
-  const x0 = 70, colE = 250;
-  const colW = (W - x0 * 2 - colE) / 5;
-  const yCap = 290, rowH = 232, grupH = 58;
-  // capçaleres de dia (píndoles)
-  DIES.forEach((d, i) => {
-    const cx = x0 + colE + colW * i + 10;
-    ctx.fillStyle = "#0E2A44";
-    rrCtx(ctx, cx, yCap - 54, colW - 20, 62, 31); ctx.fill();
-    ctx.fillStyle = "#FFFFFF"; ctx.font = "800 34" + F; ctx.textAlign = "center";
-    ctx.fillText(DIES_NOM[d], cx + (colW - 20) / 2, yCap - 23);
-    ctx.textAlign = "left";
-  });
-  let y = yCap + 26;
-  FRANGES.forEach((fr, r) => {
-    if (r === 0 || FRANGES[r - 1].tipus !== fr.tipus){
-      ctx.fillStyle = fr.tipus === "Entrada" ? "#FDF3DC" : "#FBE9E5";
-      rrCtx(ctx, x0, y, W - x0 * 2, grupH, 16); ctx.fill();
-      ctx.fillStyle = fr.tipus === "Entrada" ? "#8A6A12" : "#8F2B1C";
-      ctx.font = "800 30" + F;
-      ctx.fillText((fr.tipus === "Entrada" ? "\ud83c\udf05  ENTRADA" : "\ud83c\udf92  RECOLLIDA"), x0 + 26, y + grupH / 2);
-      y += grupH + 16;
-    }
-    ctx.fillStyle = "#0E2A44"; ctx.font = "800 52" + F;
-    ctx.fillText(fr.hora, x0, y + 62);
-    DIES.forEach((d, i) => {
-      const c = contingut[fr.id] && contingut[fr.id][d];
-      const cx = x0 + colE + colW * i + 10, cw = colW - 20, ch = rowH - 26;
-      if (!c){
-        ctx.strokeStyle = "#E1E8EE"; ctx.lineWidth = 3;
-        rrCtx(ctx, cx, y, cw, ch, 20); ctx.stroke();
-        ctx.fillStyle = "#C7D2DB"; ctx.font = "800 36" + F; ctx.textAlign = "center";
-        ctx.fillText("\u2014", cx + cw / 2, y + ch / 2); ctx.textAlign = "left";
-        return;
-      }
-      ctx.fillStyle = c.pal.fons; ctx.strokeStyle = c.pal.vora; ctx.lineWidth = 4;
-      rrCtx(ctx, cx, y, cw, ch, 20); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = c.pal.accent;
-      rrCtx(ctx, cx, y, 14, ch, 7); ctx.fill();
-      ctx.textAlign = "center";
-      const mx = cx + 10 + (cw - 10) / 2;
-      ctx.fillStyle = c.pal.color; ctx.font = "800 33" + F;
-      const grans = trosseja(c.gran, 17).slice(0, 2);
-      grans.forEach((l, li) => ctx.fillText(l, mx, y + 46 + li * 40));
-      if (c.xics && c.xics.length){
-        ctx.font = "700 25" + F; ctx.fillStyle = "#5E6E7A";
-        c.xics.slice(0, 3).forEach((l, li) => ctx.fillText(l, mx, y + 46 + grans.length * 40 + 14 + li * 32));
-      }
-      ctx.textAlign = "left";
-    });
-    y += rowH;
-  });
-  // llegenda + peu
-  ctx.font = "700 26" + F; ctx.textAlign = "center"; ctx.fillStyle = "#5E6E7A";
-  ctx.fillText(llegenda, W / 2, H - 96);
-  ctx.fillStyle = "#8A99A5"; ctx.font = "600 24" + F;
-  const dHui = new Date();
-  ctx.fillText("De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 generat el " + dHui.toLocaleDateString("ca"), W / 2, H - 48);
-  ctx.textAlign = "left";
-  return cv.toDataURL("image/jpeg", 0.92);
-}
-function dataUrlABlob(url){
-  try {
-    const parts = url.split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return new Blob([arr], { type: "image/jpeg" });
-  } catch(e){ return null; }
-}
-function baixaJpeg(nom, url){
-  if (!url) return;
-  const b = dataUrlABlob(url);
-  const href = b && URL.createObjectURL ? URL.createObjectURL(b) : url;
-  const a = document.createElement("a"); a.href = href; a.download = nom;
-  document.body.appendChild(a); a.click(); a.remove();
-}
+function palCls(pal){ return pal === "ok" ? "fh-ok" : pal === "fam" ? "fh-fam" : pal === "pend" ? "fh-pend" : "fh-propi"; }
 function nomsPortats(cond, slot, dia){
   return portaValids(cond, slot, dia).map(r2 => {
     const ff = doc.families.find(x => x.id === r2.fam);
@@ -1439,59 +1371,64 @@ function nomsPortats(cond, slot, dia){
     return nn ? nn.nom.trim().split(/\s+/)[0] : null;
   }).filter(Boolean);
 }
-function pintaDescarrega(){
-  const f = lameva();
-  let h = "<div class='targeta'><div class='p-fila'><span class='p-lab'>\ud83d\udda8\ufe0f Horaris per imprimir<span class='p-sub'>JPEG \u00b7 A4 apa\u00efsat \u00b7 al m\u00f2bil: mant\u00e9n el dit sobre la imatge per desar-la a Fotos</span></span></div>";
-  (f.nens || []).forEach(n2 => {
-    const p = nenPendents(f, n2);
-    const nomC = esc(n2.nom.trim().split(/\s+/)[0]);
-    h += p
-      ? "<p class='hint' style='margin:8px 0 0'>\u23f3 <b>" + nomC + "</b>: " + (p === 1 ? "falta 1 trajecte" : "falten " + p + " trajectes") + " sense conductor \u2014 quan estigui cobert, aqu\u00ed tindr\u00e0s el seu horari.</p>"
-      : "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udcc4 Horari de " + nomC + "</button>";
+function fullHorariHtml(titol, sub, contingut, llegenda){
+  let h = "<div class='fh-full'>";
+  h += "<div class='fh-cap'><div><div class='fh-t'>" + esc(titol) + "</div><div class='fh-s'>" + esc(sub) + "</div></div><div class='fh-marca'>\ud83d\ude97 Cotxes \u00b7 Escola Anoia</div></div>";
+  h += "<div class='fh-zebra'></div>";
+  h += "<div class='fh-graella'><div></div>" + DIES.map(d => "<div class='fh-dia'>" + DIES_NOM[d] + "</div>").join("");
+  FRANGES.forEach((fr, r) => {
+    if (r === 0 || FRANGES[r - 1].tipus !== fr.tipus)
+      h += "<div class='fh-grup " + (fr.tipus === "Entrada" ? "ent" : "rec") + "'>" + (fr.tipus === "Entrada" ? "\ud83c\udf05 ENTRADA" : "\ud83c\udf92 RECOLLIDA") + "</div>";
+    h += "<div class='fh-hora'>" + fr.hora + "</div>";
+    DIES.forEach(d => {
+      const c = contingut[fr.id] && contingut[fr.id][d];
+      h += c
+        ? "<div class='fh-cel " + palCls(c.pal) + "'><div class='fh-gran'>" + esc(c.gran) + "</div>" + (c.xics && c.xics.length ? "<div class='fh-xic'>" + esc(c.xics.join(" \u00b7 ")) + "</div>" : "") + "</div>"
+        : "<div class='fh-cel fh-buida'>\u2014</div>";
+    });
   });
-  const condueix = FRANGES.some(fr => DIES.some(d => te(f.cotxe, fr.id, d)));
-  h += condueix
-    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udcc4 Horari del conductor (" + esc(nomConductor(f)) + ")</button>"
-    : "<p class='hint' style='margin:10px 0 0'>Aquesta setmana no condu\u00efu cap dia: no hi ha horari de conductor a generar.</p>";
   h += "</div>";
-  $("#tab-cos").innerHTML = h;
+  h += "<div class='fh-llegenda'>" + esc(llegenda) + "</div>";
+  h += "<div class='fh-peu'>De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 " + new Date().toLocaleDateString("ca") + "</div>";
+  h += "</div>";
+  return h;
 }
-function mostraJpeg(nom, url){
-  if (!url) return;
-  const dv = $("#jpeg-visor"); if (!dv) return;
+function mostraFull(html){
+  const dv = $("#full-horari"); if (!dv) return;
   dv.innerHTML =
-    "<div class='jv-caixa'><img src='" + url + "' alt='" + esc(nom) + "'>" +
-    "<p class='hint' style='text-align:center;margin:8px 0'>\ud83d\udcf1 Al m\u00f2bil: <b>mant\u00e9n el dit sobre la imatge</b> i tria \u00abDesa la imatge\u00bb.</p>" +
-    "<div class='fila'><button class='boto sec' style='flex:1' onclick='tancaJpeg()'>Tanca</button>" +
-    "<button class='boto' style='flex:1' id='jv-baixa'>\u2b07\ufe0f Descarrega</button></div></div>";
+    "<div class='fh-eines'><button class='boto sec' onclick='tancaFull()'>\u2190 Torna</button>" +
+    "<button class='boto' onclick='imprimeixFull()'>\ud83d\udda8\ufe0f Imprimeix / desa en PDF</button></div>" + html;
   dv.classList.remove("ocult");
-  $("#jv-baixa").onclick = function(){ baixaJpeg(nom, url); };
+  window.scrollTo(0, 0);
 }
-function tancaJpeg(){ const dv = $("#jpeg-visor"); if (dv){ dv.classList.add("ocult"); dv.innerHTML = ""; } }
+function tancaFull(){ const dv = $("#full-horari"); if (dv){ dv.classList.add("ocult"); dv.innerHTML = ""; } }
+function imprimeixFull(){ try { window.print(); } catch(e){ avis("Fes una captura de pantalla del full per desar-lo."); } }
 function descarregaHorariNen(fid, nid){
   const fam = doc.families.find(x => x.id === fid);
   const nen = fam && (fam.nens || []).find(x => x.id === nid);
   if (!fam || !nen) return;
-  if (nenPendents(fam, nen)){ avis("Encara hi ha trajectes del nen sense conductor assignat."); return; }
   const jo = nen.nom.trim().split(/\s+/)[0];
   const cont = {};
   FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
     let c = null;
     if (te(fam.cotxe, fr.id, d)){
       const comp = fam.nens.filter(x => x.id !== nid).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(fam, fr.id, d));
-      c = { pal: palCel("fam"), gran: "\ud83d\ude97 " + (fam.conductor || "la fam\u00edlia"), xics: comp.length ? trosseja("amb " + comp.join(", "), 24) : ["(hi va sol)"] };
+      c = { pal: "fam", gran: "\ud83d\ude97 " + (fam.conductor || "la fam\u00edlia"), xics: comp.length ? ["amb " + comp.join(", ")] : ["hi va sol"] };
     } else if (te(nen.marca, fr.id, d)){
       const cf = elPorta(fid, nid, fr.id, d);
-      const comp = nomsPortats(cf, fr.id, d).filter(x => x !== jo).concat((cf.nens || []).map(x => x.nom.trim().split(/\s+/)[0]));
-      c = { pal: palCel("ok"), gran: "\ud83d\ude97 " + nomConductor(cf), xics: comp.length ? trosseja("amb " + comp.join(", "), 24) : ["(hi va sol)"] };
+      if (cf){
+        const comp = nomsPortats(cf, fr.id, d).filter(x => x !== jo).concat((cf.nens || []).map(x => x.nom.trim().split(/\s+/)[0]));
+        c = { pal: "ok", gran: "\ud83d\ude97 " + nomConductor(cf), xics: comp.length ? ["amb " + comp.join(", ")] : ["hi va sol"] };
+      } else {
+        c = { pal: "pend", gran: "\u23f3 pendent", xics: ["cal conductor"] };
+      }
     } else if (te(fam.propi, fr.id, d)){
-      c = { pal: palCel("propi"), gran: "\ud83d\udeab pel seu compte", xics: [] };
+      c = { pal: "propi", gran: "\ud83d\udeab pel seu compte", xics: [] };
     }
     if (c) cont[fr.id][d] = c;
   }); });
-  const url = dibuixaHorariJpeg("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont,
-    "verd = cotxe compartit (el nom gran \u00e9s qui condueix) \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte");
-  mostraJpeg("horari-" + slug(nen.nom) + ".jpg", url);
+  mostraFull(fullHorariHtml("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont,
+    "verd = cotxe compartit (el nom \u00e9s qui condueix) \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte \u00b7 vermell = pendent de conductor"));
 }
 function descarregaHorariConductor(){
   const f = lameva(); if (!f) return;
@@ -1501,16 +1438,31 @@ function descarregaHorariConductor(){
     if (te(f.cotxe, fr.id, d)){
       const tots = f.nens.map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
       const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
-      c = { pal: palCel("ok"), gran: "\ud83d\ude97 " + (tots.length ? "portes " + tots.length : "el teu cotxe"),
-            xics: (tots.length ? trosseja(tots.join(", "), 24) : ["(sense passatgers)"]).concat([lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures")]) };
+      c = { pal: "ok", gran: "\ud83d\ude97 " + (tots.length ? "portes " + tots.length : "el teu cotxe"),
+            xics: (tots.length ? [tots.join(", ")] : ["sense passatgers"]).concat([lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures")]) };
     } else if (te(f.propi, fr.id, d)){
-      c = { pal: palCel("propi"), gran: "\ud83d\udeab pel vostre compte", xics: [] };
+      c = { pal: "propi", gran: "\ud83d\udeab pel vostre compte", xics: [] };
     }
     if (c) cont[fr.id][d] = c;
   }); });
-  const url = dibuixaHorariJpeg("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont,
-    "verd = viatges que condueixes (amb els nens que portes i les places que et queden) \u00b7 gris = pel vostre compte");
-  mostraJpeg("horari-conductor-" + slug(nomConductor(f)) + ".jpg", url);
+  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont,
+    "verd = viatges que condueixes (amb els nens i les places que et queden) \u00b7 gris = pel vostre compte"));
+}
+function pintaDescarrega(){
+  const f = lameva();
+  let h = "<div class='targeta'><div class='p-fila'><span class='p-lab'>\ud83d\udda8\ufe0f Horaris per imprimir<span class='p-sub'>s'obren a pantalla \u2192 Imprimeix o desa'ls en PDF des del di\u00e0leg del m\u00f2bil</span></span></div>";
+  (f.nens || []).forEach(n2 => {
+    const p = nenPendents(f, n2);
+    const nomC = esc(n2.nom.trim().split(/\s+/)[0]);
+    h += "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udda8\ufe0f Horari de " + nomC + "</button>";
+    if (p) h += "<p class='hint' style='margin:4px 0 0'>\u26a0 " + nomC + " t\u00e9 " + (p === 1 ? "1 trajecte" : p + " trajectes") + " sense conductor: al full " + (p === 1 ? "surt" : "surten") + " en vermell com a \u00abpendent\u00bb.</p>";
+  });
+  const condueix = FRANGES.some(fr => DIES.some(d => te(f.cotxe, fr.id, d)));
+  h += condueix
+    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udda8\ufe0f Horari del conductor (" + esc(nomConductor(f)) + ")</button>"
+    : "<p class='hint' style='margin:10px 0 0'>Aquesta setmana no condu\u00efu cap dia: no hi ha horari de conductor a generar.</p>";
+  h += "</div>";
+  $("#tab-cos").innerHTML = h;
 }
 function pintaVistaNen(){
   const tots = [];
