@@ -122,6 +122,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
+.nomgran{font:800 22px 'Baloo 2';color:#0E2A44;margin:2px 0 8px}
 .credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px}
 .rolbt{flex:none;font-size:13px;border:1.5px solid #C7D3DC;border-radius:99px;padding:1px 9px;text-decoration:none}
 .dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -391,6 +392,15 @@ function pintaBarra(){
   if (tp) tp.classList.toggle("pendent", dirty); $("#barra").classList.toggle("amaga", !dirty); }
 
 async function desa(){
+  const fg = lameva();
+  if (fg){
+    const pend = celesPendents(fg);
+    if (pend.length){
+      avis("\u26a0 No es pot desar encara: falten <b>" + pend.length + "</b> caselles per respondre a la Graella (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab; de les entrades 8.00/9.00 nom\u00e9s en cal una per nen). Primera: " + esc(pend[0]) + ".");
+      if (tabAct !== "graella") triaTab("graella");
+      return;
+    }
+  }
   const b = $("#btn-desa"); b.disabled = true; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
   try {
     const f = lameva();
@@ -464,8 +474,8 @@ function pantallaTria(){
     "</div>" +
     (esAdmin ? "<details class='conf'><summary>➕ Crear una família nova (només si encara no és al grup)</summary>" : "") +
     "<div class='targeta" + (esStaff && !esAdmin ? " ocult" : "") + "'><h2>Crea la teva família</h2>" +
-    "<div class='p-fila'><span class='p-lab'>Nom de la família<span class='p-sub'>com us coneixen al grup (ex: Família Vila)</span></span></div>" +
-    "<input class='input' id='nf-nom' placeholder='Família …' maxlength='30'>" +
+    "<div class='p-fila'><span class='p-lab'>Cognoms de la família<span class='p-sub'>el nom del grup es forma sol: 1r cognom del pare + 1r cognom de la mare</span></span></div>" +
+    "<div class='fila' style='align-items:flex-start'><input class='input' id='nf-cpare' placeholder='1r cognom del pare' maxlength='20'><input class='input' id='nf-cmare' placeholder='1r cognom de la mare' maxlength='20'></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>opcional — el nom del pare o mare al volant</span></span></div>" +
     "<input class='input' id='nf-cond' placeholder='ex: Marta' maxlength='20'>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies — els vostres no hi compten</span></span>" +
@@ -494,10 +504,12 @@ async function creaFam(){
     const ja = doc.families.find(x => x.creadaPer === usuariId);
     if (ja){ avis("Aquest usuari ja va crear «" + ja.nom + "». Entra-hi amb el desplegable de dalt."); return; }
   }
-  const nom = $("#nf-nom").value.trim();
+  const cpare = $("#nf-cpare") ? $("#nf-cpare").value.trim() : "";
+  const cmare = $("#nf-cmare") ? $("#nf-cmare").value.trim() : "";
+  const nom = (cpare + " " + cmare).trim();
   const conductor = $("#nf-cond") ? $("#nf-cond").value.trim() : "";
   const nens = nfNens.map(s => s.trim()).filter(Boolean);
-  if (!nom){ avis("Posa el nom de la família."); return; }
+  if (!cpare || !cmare){ avis("Posa els dos cognoms: el del pare i el de la mare."); return; }
   if (!nens.length){ avis("Afegeix com a mínim un nen."); return; }
   if (doc.families.some(x => slug(x.nom) === slug(nom))){
     avis("Ja existeix una família que es diu «" + nom + "»: entra-hi amb el desplegable de dalt. Si de debò és una família diferent, canvia-li una mica el nom.");
@@ -507,7 +519,7 @@ async function creaFam(){
   let id = slug(nom) || "familia";
   while (doc.families.some(f => f.id === id)) id += "-2";
   const usats = {};
-  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, conductor: conductor, places: nfPl, cotxe: {}, nens: nens.map(n => {
+  const fam = { id: id, nom: nom, rol: "usuari", creadaPer: esAdmin ? "" : usuariId, cognomPare: cpare, cognomMare: cmare, conductor: conductor, places: nfPl, cotxe: {}, nens: nens.map(n => {
     let nid = slug(n) || "nen"; while (usats[nid]) nid += "-2"; usats[nid] = 1;
     return { id: nid, nom: n, marca: {} };
   })};
@@ -600,8 +612,8 @@ function pintaPerfil(){
   const okP = perfilComplet(f);
   $("#tab-cos").innerHTML =
     "<div class='targeta perfil" + (dirty ? " pendent" : "") + "'>" +
-    "<div class='p-fila'><span class='p-lab'>Nom de la fam\u00edlia<span class='p-sub'>com us coneixen al grup (ex: Fam\u00edlia Vila)</span></span></div>" +
-    "<input class='input' value=\"" + esc(f.nom) + "\" maxlength='30' onchange=\"renomFam(this.value)\">" +
+    "<div class='p-fila'><span class='p-lab'>Nom de la fam\u00edlia<span class='p-sub'>es forma sol: 1r cognom del pare + 1r cognom de la mare</span></span></div>" +
+    "<div class='nomgran'>" + esc(f.nom || "\u2014") + "</div>" +
     "<div class='fila' style='margin-top:6px;align-items:flex-start'><div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>1r cognom del pare</span></div><input class='input' value=\"" + esc(f.cognomPare || "") + "\" maxlength='20' placeholder='ex: Vila' onchange=\"renomCognomPare(this.value)\"></div>" +
     "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>1r cognom de la mare</span></div><input class='input' value=\"" + esc(f.cognomMare || "") + "\" maxlength='20' placeholder='ex: Prat' onchange=\"renomCognomMare(this.value)\"></div></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>surt als Calendaris i als avisos</span></span></div>" +
@@ -677,8 +689,8 @@ function pinta(slot, dia){
   const cel = slot + "-" + dia;
   if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); treu(f.propi, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (!te(f.cotxe, slot, dia) && f.porta) delete f.porta[cel]; }
-  else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
-  else { const n = f.nens.find(x => x.id === pinzell); if (!n) return; commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
+  else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
+  else { const n = f.nens.find(x => x.id === pinzell); if (!n) return; treu(f.propi, slot, dia); commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
   dirty = true; pintaBarra(); pintaGraella();
 }
 
@@ -794,8 +806,9 @@ function renomFam(v){
   f.nom = nom;
   dirty = true; pintaBarra(); pantallaApp();
 }
-function renomCognomPare(v){ const f = lameva(); if (!f) return; const nou = v.trim(); if (nou === (f.cognomPare || "")) return; f.cognomPare = nou; dirty = true; pintaBarra(); pintaPerfil(); }
-function renomCognomMare(v){ const f = lameva(); if (!f) return; const nou = v.trim(); if (nou === (f.cognomMare || "")) return; f.cognomMare = nou; dirty = true; pintaBarra(); pintaPerfil(); }
+function recomponNom(f){ const a = (f.cognomPare || "").trim(), b = (f.cognomMare || "").trim(); if (a && b) f.nom = a + " " + b; }
+function renomCognomPare(v){ const f = lameva(); if (!f) return; const nou = v.trim(); if (nou === (f.cognomPare || "")) return; f.cognomPare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
+function renomCognomMare(v){ const f = lameva(); if (!f) return; const nou = v.trim(); if (nou === (f.cognomMare || "")) return; f.cognomMare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
 function pintaBloqueig(){
   const f = lameva();
   const pend = celesPendents(f);
