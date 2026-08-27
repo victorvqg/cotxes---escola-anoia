@@ -222,7 +222,6 @@ body.amb-barra .cal-actualitza{display:none}
 .subtabs{display:flex;overflow-x:auto;scrollbar-width:none}
 .subtabs::-webkit-scrollbar{display:none}
 .subtab{flex:1 0 auto;white-space:nowrap}
-.llegenda{position:sticky;top:8px;z-index:6;background:#EDF2F5}
 .cel .c-nom{font-size:13px}
 .m-cel .n1{font-size:20px}
 .m-cel.def .n1{font-size:24px}
@@ -260,7 +259,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.15</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.17</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -844,6 +843,7 @@ function celAccio(ac){
         if (s === "e8") treu(n.marca, "e9", d); else if (s === "e9") treu(n.marca, "e8", d);
       });
     }
+    netejaGermana(f, s, d);
     dirty = true; pintaBarra(); pintaGraella();
     if (portatsAbans.length && !te(f.cotxe, s, d)){
       const hhFr = (FRANGES.find(x => x.id === s) || {}).hora || "";
@@ -855,6 +855,27 @@ function celAccio(ac){
   triaPinzell(ac.indexOf("nen:") === 0 ? ac.slice(4) : ac);
   pinta(s, d);
   pintaCasella();
+}
+function netejaGermana(f, slot, dia){
+  if (slot !== "e8" && slot !== "e9") return;
+  if (!respon(f, slot, dia)) return;
+  const g = slot === "e8" ? "e9" : "e8";
+  const celG = g + "-" + dia;
+  let portats = [];
+  if (te(f.cotxe, g, dia)){
+    portats = portaValids(f, g, dia).map(r => {
+      const ff = doc.families.find(x => x.id === r.fam);
+      const nn = ff && (ff.nens || []).find(x => x.id === r.nen);
+      return nn ? nn.nom.trim().split(/\s+/)[0] : null;
+    }).filter(Boolean);
+    treu(f.cotxe, g, dia);
+    if (f.porta) delete f.porta[celG];
+  }
+  treu(f.propi, g, dia);
+  f.nens.forEach(n => treu(n.marca, g, dia));
+  if (portats.length){
+    barraAvis("\u2139\ufe0f L'entrada ha passat a les " + (slot === "e8" ? "8.00" : "9.00") + " i el cotxe de les " + (g === "e8" ? "8.00" : "9.00") + " s'ha tret: <b>" + esc(portats.join(" i ")) + "</b> es queden sense pla\u00e7a. Les seves fam\u00edlies ho veuran als Avisos quan desis.", "info");
+  }
 }
 function pintaGraella(){
   refrescaEstatG();
@@ -900,6 +921,7 @@ function pinta(slot, dia){
   else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (te(f.cotxe, slot, dia)) f.nens.forEach(n => treu(n.marca, slot, dia)); else if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
   else { const n = f.nens.find(x => x.id === pinzell); if (!n){ pinzell = "cotxe"; pintaGraellaTab(); return; } treu(f.propi, slot, dia); if (te(f.cotxe, slot, dia)){ treu(f.cotxe, slot, dia); if (f.porta) delete f.porta[cel]; } commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
+  netejaGermana(f, slot, dia);
   dirty = true; pintaBarra(); pintaGraella();
   const hhFr = (FRANGES.find(x => x.id === slot) || {}).hora || "";
   const araCond = te(f.cotxe, slot, dia);
