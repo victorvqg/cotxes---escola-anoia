@@ -260,7 +260,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.11</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.12</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -784,12 +784,9 @@ function pintaCasella(){
   let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
   const totsMarcats = f.nens.length > 0 && f.nens.every(n => te(n.marca, s, d));
   const etDemana = f.nens.length === 1 ? "\ud83d\ude4b " + esc(f.nens[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a" : "\ud83d\ude4b Els nens demanen pla\u00e7a";
-  h += "<div class='cseg'>" +
-    "<button class='cbtn half" + (te(f.cotxe, s, d) ? " on" : "") + "' onclick=\"celAccio('cotxe')\">\ud83d\ude97 Condu\u00efm \u2014 " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places") + (te(f.cotxe, s, d) ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>" +
-    "<button class='cbtn half" + (totsMarcats ? " on" : "") + "' onclick=\"celAccio('demana')\">" + etDemana + (totsMarcats ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>" +
-    "</div>";
+  h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 els nens v\u00e9nen amb nosaltres \u00b7 " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
+  h += btn(totsMarcats, etDemana, "demana");
   h += btn(te(f.propi, s, d), "\ud83d\udeab Anem pel nostre compte", "propi");
-  h += btn(false, "Buida la casella", "esborra");
   h += "<button class='boto' style='width:100%;margin-top:10px' onclick='tancaCasella()'>Fet</button>";
   const m = $("#cel-menu"), v = $("#cel-vel");
   if (!m || !v) return;
