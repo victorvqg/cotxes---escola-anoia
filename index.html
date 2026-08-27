@@ -261,7 +261,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.21</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.22</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1328,52 +1328,86 @@ function trosseja(txt, m){
   if (l.trim()) out.push(l.trim());
   return out;
 }
-function palCel(pal, linies){
-  const p = pal === "ok" ? ["#DCF1E3", "#9CCDAD", "#1F5C3B"]
-    : pal === "fam" ? ["#E3ECF4", "#B9CBD7", "#17456B"]
-    : ["#ECEFF2", "#D3DBE1", "#6B7D8A"];
-  return { fons: p[0], vora: p[1], color: p[2], linies: linies.filter(Boolean) };
+function palCel(pal){
+  return pal === "ok" ? { fons: "#EAF6EE", vora: "#9CCDAD", accent: "#2F7D4F", color: "#1F5C3B" }
+    : pal === "fam" ? { fons: "#EAF1F7", vora: "#B9CBD7", accent: "#17456B", color: "#17456B" }
+    : { fons: "#F1F3F6", vora: "#D3DBE1", accent: "#8A99A5", color: "#5E6E7A" };
 }
-function rrCtx(ctx, x, y, w, h2, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h2, r); ctx.arcTo(x + w, y + h2, x, y + h2, r); ctx.arcTo(x, y + h2, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
-function dibuixaHorariJpeg(titol, subtitol, contingut){
+function dibuixaHorariJpeg(titol, subtitol, contingut, llegenda){
   const cv = document.createElement("canvas");
   const ctx = cv.getContext && cv.getContext("2d");
   if (!ctx){ avis("Aquest navegador no pot generar la imatge de l'horari."); return null; }
-  const W = 1754, H = 1240; cv.width = W; cv.height = H;
+  const W = 2480, H = 1754; cv.width = W; cv.height = H;
   const F = "px 'Baloo 2', 'Trebuchet MS', sans-serif";
-  ctx.fillStyle = "#EDF2F5"; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#17456B"; ctx.fillRect(0, 0, W, 150);
-  ctx.fillStyle = "#FFFFFF";
-  for (let x = 24; x < W; x += 88) ctx.fillRect(x, 130, 44, 20);
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#FFFFFF"; ctx.font = "800 50" + F; ctx.fillText(titol, 48, 60);
-  ctx.fillStyle = "#CFE0EE"; ctx.font = "600 28" + F; ctx.fillText(subtitol, 48, 106);
-  const x0 = 48, y0 = 186, colE = 186;
-  const colW = (W - x0 * 2 - colE) / 5, rowH = 172, capH = 56;
-  ctx.fillStyle = "#0E2A44"; ctx.font = "800 30" + F; ctx.textAlign = "center";
-  DIES.forEach((d, i) => ctx.fillText(DIES_NOM[d], x0 + colE + colW * i + colW / 2, y0 + capH / 2));
+  ctx.fillStyle = "#F3F6F9"; ctx.fillRect(0, 0, W, H);
+  // capçalera
+  ctx.fillStyle = "#17456B"; ctx.fillRect(0, 0, W, 210);
+  ctx.fillStyle = "#FFFFFF";
+  for (let x = 30; x < W; x += 120) ctx.fillRect(x, 180, 60, 30);
+  ctx.font = "800 68" + F; ctx.fillText(titol, 70, 86);
+  ctx.fillStyle = "#BFD6E8"; ctx.font = "600 38" + F; ctx.fillText(subtitol, 70, 148);
+  ctx.fillStyle = "#F5B91E"; ctx.font = "800 40" + F; ctx.textAlign = "right";
+  ctx.fillText("\ud83d\ude97 Cotxes \u00b7 Escola Anoia", W - 70, 86);
   ctx.textAlign = "left";
+  // geometria
+  const x0 = 70, colE = 250;
+  const colW = (W - x0 * 2 - colE) / 5;
+  const yCap = 290, rowH = 232, grupH = 58;
+  // capçaleres de dia (píndoles)
+  DIES.forEach((d, i) => {
+    const cx = x0 + colE + colW * i + 10;
+    ctx.fillStyle = "#0E2A44";
+    rrCtx(ctx, cx, yCap - 54, colW - 20, 62, 31); ctx.fill();
+    ctx.fillStyle = "#FFFFFF"; ctx.font = "800 34" + F; ctx.textAlign = "center";
+    ctx.fillText(DIES_NOM[d], cx + (colW - 20) / 2, yCap - 23);
+    ctx.textAlign = "left";
+  });
+  let y = yCap + 26;
   FRANGES.forEach((fr, r) => {
-    const y = y0 + capH + r * rowH + 8;
-    ctx.fillStyle = "#6B7D8A"; ctx.font = "800 22" + F; ctx.fillText(fr.tipus.toUpperCase(), x0, y + 28);
-    ctx.fillStyle = "#0E2A44"; ctx.font = "800 38" + F; ctx.fillText(fr.hora, x0, y + 74);
+    if (r === 0 || FRANGES[r - 1].tipus !== fr.tipus){
+      ctx.fillStyle = fr.tipus === "Entrada" ? "#FDF3DC" : "#FBE9E5";
+      rrCtx(ctx, x0, y, W - x0 * 2, grupH, 16); ctx.fill();
+      ctx.fillStyle = fr.tipus === "Entrada" ? "#8A6A12" : "#8F2B1C";
+      ctx.font = "800 30" + F;
+      ctx.fillText((fr.tipus === "Entrada" ? "\ud83c\udf05  ENTRADA" : "\ud83c\udf92  RECOLLIDA"), x0 + 26, y + grupH / 2);
+      y += grupH + 16;
+    }
+    ctx.fillStyle = "#0E2A44"; ctx.font = "800 52" + F;
+    ctx.fillText(fr.hora, x0, y + 62);
     DIES.forEach((d, i) => {
       const c = contingut[fr.id] && contingut[fr.id][d];
-      const cx = x0 + colE + colW * i + 6, cw = colW - 12, ch = rowH - 18;
-      ctx.fillStyle = c ? c.fons : "#FFFFFF";
-      ctx.strokeStyle = c ? c.vora : "#DCE5EC"; ctx.lineWidth = 3;
-      rrCtx(ctx, cx, y, cw, ch, 18); ctx.fill(); ctx.stroke();
-      if (c){
-        const ls = c.linies.slice(0, 3);
-        ctx.fillStyle = c.color; ctx.textAlign = "center";
-        ctx.font = "800 " + (ls.length > 1 ? 26 : 29) + F;
-        ls.forEach((l, li) => ctx.fillText(l, cx + cw / 2, y + ch / 2 + (li - (ls.length - 1) / 2) * 33));
-        ctx.textAlign = "left";
+      const cx = x0 + colE + colW * i + 10, cw = colW - 20, ch = rowH - 26;
+      if (!c){
+        ctx.strokeStyle = "#E1E8EE"; ctx.lineWidth = 3;
+        rrCtx(ctx, cx, y, cw, ch, 20); ctx.stroke();
+        ctx.fillStyle = "#C7D2DB"; ctx.font = "800 36" + F; ctx.textAlign = "center";
+        ctx.fillText("\u2014", cx + cw / 2, y + ch / 2); ctx.textAlign = "left";
+        return;
       }
+      ctx.fillStyle = c.pal.fons; ctx.strokeStyle = c.pal.vora; ctx.lineWidth = 4;
+      rrCtx(ctx, cx, y, cw, ch, 20); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c.pal.accent;
+      rrCtx(ctx, cx, y, 14, ch, 7); ctx.fill();
+      ctx.textAlign = "center";
+      const mx = cx + 10 + (cw - 10) / 2;
+      ctx.fillStyle = c.pal.color; ctx.font = "800 33" + F;
+      const grans = trosseja(c.gran, 17).slice(0, 2);
+      grans.forEach((l, li) => ctx.fillText(l, mx, y + 46 + li * 40));
+      if (c.xics && c.xics.length){
+        ctx.font = "700 25" + F; ctx.fillStyle = "#5E6E7A";
+        c.xics.slice(0, 3).forEach((l, li) => ctx.fillText(l, mx, y + 46 + grans.length * 40 + 14 + li * 32));
+      }
+      ctx.textAlign = "left";
     });
+    y += rowH;
   });
-  ctx.fillStyle = "#8A99A5"; ctx.font = "600 21" + F; ctx.textAlign = "center";
-  ctx.fillText("Cotxes \u00b7 Escola Anoia \u2014 creat per V\u00edctor Quintana", W / 2, H - 32);
+  // llegenda + peu
+  ctx.font = "700 26" + F; ctx.textAlign = "center"; ctx.fillStyle = "#5E6E7A";
+  ctx.fillText(llegenda, W / 2, H - 96);
+  ctx.fillStyle = "#8A99A5"; ctx.font = "600 24" + F;
+  const dHui = new Date();
+  ctx.fillText("De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 generat el " + dHui.toLocaleDateString("ca"), W / 2, H - 48);
   ctx.textAlign = "left";
   return cv.toDataURL("image/jpeg", 0.92);
 }
@@ -1382,21 +1416,37 @@ function baixaJpeg(nom, url){
   const a = document.createElement("a"); a.href = url; a.download = nom;
   document.body.appendChild(a); a.click(); a.remove();
 }
+function nomsPortats(cond, slot, dia){
+  return portaValids(cond, slot, dia).map(r2 => {
+    const ff = doc.families.find(x => x.id === r2.fam);
+    const nn = ff && (ff.nens || []).find(x => x.id === r2.nen);
+    return nn ? nn.nom.trim().split(/\s+/)[0] : null;
+  }).filter(Boolean);
+}
 function descarregaHorariNen(){
   const fid = nenSel.split("|")[0], nid = nenSel.split("|")[1];
   const fam = doc.families.find(x => x.id === fid);
   const nen = fam && (fam.nens || []).find(x => x.id === nid);
   if (!fam || !nen) return;
   if (nenPendents(fam, nen)){ avis("Encara hi ha trajectes del nen sense conductor assignat."); return; }
+  const jo = nen.nom.trim().split(/\s+/)[0];
   const cont = {};
   FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
     let c = null;
-    if (te(fam.cotxe, fr.id, d)) c = palCel("fam", ["\ud83d\ude97 amb la fam\u00edlia", fam.conductor ? "(" + fam.conductor + ")" : ""]);
-    else if (te(nen.marca, fr.id, d)){ const cf = elPorta(fam.id, nen.id, fr.id, d); c = palCel("ok", ["\ud83d\ude97 el porta"].concat(trosseja(nomConductor(cf), 14))); }
-    else if (te(fam.propi, fr.id, d)) c = palCel("propi", ["\ud83d\udeab pel seu compte"]);
+    if (te(fam.cotxe, fr.id, d)){
+      const comp = fam.nens.filter(x => x.id !== nid).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(fam, fr.id, d));
+      c = { pal: palCel("fam"), gran: "\ud83d\ude97 " + (fam.conductor || "la fam\u00edlia"), xics: comp.length ? trosseja("amb " + comp.join(", "), 24) : ["(hi va sol)"] };
+    } else if (te(nen.marca, fr.id, d)){
+      const cf = elPorta(fid, nid, fr.id, d);
+      const comp = nomsPortats(cf, fr.id, d).filter(x => x !== jo).concat((cf.nens || []).map(x => x.nom.trim().split(/\s+/)[0]));
+      c = { pal: palCel("ok"), gran: "\ud83d\ude97 " + nomConductor(cf), xics: comp.length ? trosseja("amb " + comp.join(", "), 24) : ["(hi va sol)"] };
+    } else if (te(fam.propi, fr.id, d)){
+      c = { pal: palCel("propi"), gran: "\ud83d\udeab pel seu compte", xics: [] };
+    }
     if (c) cont[fr.id][d] = c;
   }); });
-  const url = dibuixaHorariJpeg("Horari de " + nen.nom, "Setmana escolar \u00b7 " + fam.nom, cont);
+  const url = dibuixaHorariJpeg("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont,
+    "verd = cotxe compartit (el nom gran \u00e9s qui condueix) \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte");
   baixaJpeg("horari-" + slug(nen.nom) + ".jpg", url);
 }
 function descarregaHorariConductor(){
@@ -1405,16 +1455,17 @@ function descarregaHorariConductor(){
   FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
     let c = null;
     if (te(f.cotxe, fr.id, d)){
-      const noms = portaValids(f, fr.id, d).map(r2 => {
-        const ff = doc.families.find(x => x.id === r2.fam);
-        const nn = ff && (ff.nens || []).find(x => x.id === r2.nen);
-        return nn ? nn.nom.trim().split(/\s+/)[0] : null;
-      }).filter(Boolean);
-      c = palCel("ok", noms.length ? ["\ud83d\ude97 portes:"].concat(trosseja(noms.join(", "), 16)) : ["\ud83d\ude97 el teu cotxe", "(sense passatgers)"]);
-    } else if (te(f.propi, fr.id, d)) c = palCel("propi", ["\ud83d\udeab pel vostre compte"]);
+      const tots = f.nens.map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
+      const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
+      c = { pal: palCel("ok"), gran: "\ud83d\ude97 " + (tots.length ? "portes " + tots.length : "el teu cotxe"),
+            xics: (tots.length ? trosseja(tots.join(", "), 24) : ["(sense passatgers)"]).concat([lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures")]) };
+    } else if (te(f.propi, fr.id, d)){
+      c = { pal: palCel("propi"), gran: "\ud83d\udeab pel vostre compte", xics: [] };
+    }
     if (c) cont[fr.id][d] = c;
   }); });
-  const url = dibuixaHorariJpeg("Horari del conductor \u2014 " + nomConductor(f), "Setmana escolar \u00b7 " + f.nom, cont);
+  const url = dibuixaHorariJpeg("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont,
+    "verd = viatges que condueixes (amb els nens que portes i les places que et queden) \u00b7 gris = pel vostre compte");
   baixaJpeg("horari-conductor-" + slug(nomConductor(f)) + ".jpg", url);
 }
 function botonsExport(fam, nen){
