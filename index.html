@@ -122,6 +122,8 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
+.credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px}
+.rolbt{flex:none;font-size:13px;border:1.5px solid #C7D3DC;border-radius:99px;padding:1px 9px;text-decoration:none}
 .dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peu{font-size:13px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
 details.conf{margin-top:14px}
@@ -179,11 +181,12 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
 <body>
 <div class="tel">
   <header class="banda">
-    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">Compartim el camí de Montbui poble a l'Escola Anoia</div></div>
+    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">De Montbui poble a l'Escola Anoia</div></div>
     <div class="chip-estat" id="estat">—</div>
   </header>
   <div class="zebra"></div>
-  <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div></main>
+  <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
+  <footer class="credit">creat per Víctor Quintana</footer></main>
   <div class="barra amaga" id="barra"><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -479,7 +482,7 @@ function nfPlaces(d){ nfPl = Math.min(6, Math.max(0, nfPl + d)); $("#nf-pl").tex
 function pintaNfNens(){
   $("#nf-nens").innerHTML = nfNens.map((v,i) =>
     "<div class='fila' style='margin-bottom:6px'><input class='input' value=\"" + esc(v) + "\" placeholder='Nom del nen o nena' maxlength='20' oninput='nfNens[" + i + "]=this.value'>" +
-    (nfNens.length > 1 ? "<button class='mini-x' onclick='nfTreuNen(" + i + ")'>treu</button>" : "") + "</div>").join("");
+    (nfNens.length > 1 ? "<button class='mini-x' onclick='nfTreuNen(" + i + ")'>esborra</button>" : "") + "</div>").join("");
 }
 function nfAfegeixNen(){ if (nfNens.length < 6) nfNens.push(""); pintaNfNens(); }
 function nfTreuNen(i){ nfNens.splice(i,1); pintaNfNens(); }
@@ -515,6 +518,17 @@ async function creaFam(){
 }
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
 function entraSel(){ const v = $("#sel-fam").value; if (v) triaFam(v); }
+async function rolFam(id){
+  if (!esAdmin) return;
+  const fx = doc.families.find(x => x.id === id); if (!fx) return;
+  if (fx.rol === "admin" && fx.creadaPer === usuariId){ avis("Tu ets l'administrador del grup: el teu rol no es toca."); return; }
+  const antic = fx.rol;
+  const nou = fx.rol === "staff" ? "usuari" : fx.rol === "admin" ? "usuari" : "staff";
+  fx.rol = nou;
+  estat("Desant\u2026");
+  try { await ghPut("Rol de " + fx.nom + ": " + nou); estat("Desat \u2713"); pantallaApp(); }
+  catch(e){ fx.rol = antic; estat("Error", true); avis("No s'ha pogut canviar el rol."); }
+}
 function adminEdita(id){ if (!esAdmin && !esStaff) return; tabAct = "perfil"; triaFam(id); }
 
 /* ── Pantalla principal ── */
@@ -523,10 +537,10 @@ function pantallaApp(){
   if (!["perfil", "graella", "cal", "avisos"].includes(tabAct)) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
   const dirHtml = famOrd().map(x =>
-    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
+    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + (esAdmin ? "<button class='enllac rolbt' onclick=\"rolFam('" + x.id + "')\">" + (x.rol === "admin" ? "admin" : x.rol === "staff" ? "staff" : "usuari") + "</button>" : "") + ((esAdmin || esStaff) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
   ).join("");
   $("#pantalla").innerHTML =
-    "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + (esAdmin ? " <span class='rolet'>\u00b7 admin</span>" : esStaff ? " <span class='rolet'>\u00b7 staff</span>" : "") + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
+    "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet'>\u00b7 " + (f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
     ((esAdmin || esStaff) && f.creadaPer !== usuariId ? (function(){
       const pr = doc.families.find(x => x.creadaPer === usuariId);
       return "<div class='adm-banner'>\ud83d\udee1\ufe0f Est\u00e0s dins d'una altra fam\u00edlia: tot el que editis \u00e9s seu." + (pr ? " <button class='enllac' onclick=\"triaFam('" + pr.id + "')\">torna a la meva</button>" : "") + "</div>";
@@ -621,7 +635,7 @@ function pintaGraellaTab(){
     pinzells +
     "<p class='lead' style='margin:2px 0 6px'>1. Tria qu\u00e8 marques \u00b7 2. Toca les caselles. \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte \u00b7 \ud83d\ude4b nen que necessita pla\u00e7a. Cada nen entra a les 8.00 <b>o</b> a les 9.00: marcar una hora li desmarca l'altra.</p>" +
     estatG +
-    "<div id='graella'></div>";
+    "<div class='graella' id='graella'></div>";
   pintaGraella();
 }
 
@@ -735,15 +749,22 @@ async function canviaPin(){
 function entraAdmin(){
   const v = $("#pin-admin").value.trim();
   if (doc.adminPin && v === doc.adminPin){
-    avis("");
     const fj = lameva();
+    if (fj && fj.rol !== "admin" && doc.families.some(x => x.rol === "admin")){
+      avis("Nom\u00e9s la fam\u00edlia de l'administrador pot activar el mode admin.");
+      return;
+    }
+    avis("");
     if (fj && fj.rol !== "admin"){ fj.rol = "admin"; dirty = true; pintaBarra(); }
     esAdmin = true; lsSet("cx_admin", "1"); tancaAdmin(); return;
   }
   if (doc.staffPin && v === doc.staffPin){
-    avis("");
     const fj = lameva();
-    if (fj && fj.rol !== "admin" && fj.rol !== "staff"){ fj.rol = "staff"; dirty = true; pintaBarra(); }
+    if (!fj || fj.rol !== "staff"){
+      avis("L'administrador primer ha d'assignar el rol de staff a la teva fam\u00edlia (bot\u00f3 de rol al directori \ud83d\udc65).");
+      return;
+    }
+    avis("");
     esStaff = true; lsSet("cx_staff", "1"); tancaAdmin(); return;
   }
   avis("Codi incorrecte.");
