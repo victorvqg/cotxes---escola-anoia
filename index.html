@@ -294,7 +294,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.24</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.25</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1363,6 +1363,107 @@ function trosseja(txt, m){
   if (l.trim()) out.push(l.trim());
   return out;
 }
+let fullActual = null;
+const esAppInstalada = (window.navigator && window.navigator.standalone === true) || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+function rrCtx(ctx, x, y, w, h2, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h2, r); ctx.arcTo(x + w, y + h2, x, y + h2, r); ctx.arcTo(x, y + h2, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function palColors(pal){
+  return pal === "ok" ? ["#EAF6EE", "#9CCDAD", "#2F7D4F", "#1F5C3B"]
+    : pal === "fam" ? ["#EAF1F7", "#B9CBD7", "#17456B", "#17456B"]
+    : pal === "pend" ? ["#FBE9E5", "#E8B3A8", "#BE3D2A", "#8F2B1C"]
+    : ["#F1F3F6", "#D3DBE1", "#8A99A5", "#5E6E7A"];
+}
+function dibuixaCanvasHorari(fa){
+  const cv = document.createElement("canvas");
+  const ctx = cv.getContext && cv.getContext("2d");
+  if (!ctx) return null;
+  const W = 2480, H = 1754; cv.width = W; cv.height = H;
+  const F = "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#17456B"; ctx.fillRect(0, 0, W, 200);
+  ctx.fillStyle = "#FFFFFF"; for (let x = 30; x < W; x += 120) ctx.fillRect(x, 172, 60, 28);
+  ctx.font = "800 64" + F; ctx.fillText(fa.titol, 70, 82);
+  ctx.fillStyle = "#BFD6E8"; ctx.font = "600 36" + F; ctx.fillText(fa.sub, 70, 140);
+  ctx.fillStyle = "#F5B91E"; ctx.font = "800 38" + F; ctx.textAlign = "right";
+  ctx.fillText("\ud83d\ude97 Cotxes \u00b7 Escola Anoia", W - 70, 82); ctx.textAlign = "left";
+  const x0 = 70, colE = 240, colW = (W - x0 * 2 - colE) / 5, yCap = 280, rowH = 226, grupH = 56;
+  DIES.forEach((d, i) => {
+    const cx = x0 + colE + colW * i + 10;
+    ctx.fillStyle = "#0E2A44"; rrCtx(ctx, cx, yCap - 52, colW - 20, 60, 30); ctx.fill();
+    ctx.fillStyle = "#FFFFFF"; ctx.font = "800 32" + F; ctx.textAlign = "center";
+    ctx.fillText(DIES_NOM[d], cx + (colW - 20) / 2, yCap - 22); ctx.textAlign = "left";
+  });
+  let y = yCap + 24;
+  FRANGES.forEach((fr, r) => {
+    if (r === 0 || FRANGES[r - 1].tipus !== fr.tipus){
+      ctx.fillStyle = fr.tipus === "Entrada" ? "#FDF3DC" : "#FBE9E5";
+      rrCtx(ctx, x0, y, W - x0 * 2, grupH, 14); ctx.fill();
+      ctx.fillStyle = fr.tipus === "Entrada" ? "#8A6A12" : "#8F2B1C"; ctx.font = "800 28" + F;
+      ctx.fillText(fr.tipus === "Entrada" ? "\ud83c\udf05  ENTRADA" : "\ud83c\udf92  RECOLLIDA", x0 + 24, y + grupH / 2);
+      y += grupH + 14;
+    }
+    ctx.fillStyle = "#0E2A44"; ctx.font = "800 50" + F; ctx.fillText(fr.hora, x0, y + 58);
+    DIES.forEach((d, i) => {
+      const c = fa.cont[fr.id] && fa.cont[fr.id][d];
+      const cx = x0 + colE + colW * i + 10, cw = colW - 20, ch = rowH - 24;
+      if (!c){
+        ctx.strokeStyle = "#E1E8EE"; ctx.lineWidth = 3; rrCtx(ctx, cx, y, cw, ch, 18); ctx.stroke();
+        ctx.fillStyle = "#C7D2DB"; ctx.font = "800 34" + F; ctx.textAlign = "center";
+        ctx.fillText("\u2014", cx + cw / 2, y + ch / 2); ctx.textAlign = "left"; return;
+      }
+      const p = palColors(c.pal);
+      ctx.fillStyle = p[0]; ctx.strokeStyle = p[1]; ctx.lineWidth = 4;
+      rrCtx(ctx, cx, y, cw, ch, 18); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = p[2]; rrCtx(ctx, cx, y, 13, ch, 6); ctx.fill();
+      ctx.textAlign = "center"; const mx = cx + 10 + (cw - 10) / 2;
+      ctx.fillStyle = p[3]; ctx.font = "800 32" + F;
+      const grans = trosseja(c.gran, 18).slice(0, 2);
+      grans.forEach((l, li) => ctx.fillText(l, mx, y + 44 + li * 38));
+      const xic = (c.xics || []).join(" \u00b7 ");
+      if (xic){
+        ctx.font = "700 24" + F; ctx.fillStyle = "#5E6E7A";
+        trosseja(xic, 26).slice(0, 3).forEach((l, li) => ctx.fillText(l, mx, y + 44 + grans.length * 38 + 12 + li * 30));
+      }
+      ctx.textAlign = "left";
+    });
+    y += rowH;
+  });
+  ctx.textAlign = "center"; ctx.fillStyle = "#5E6E7A"; ctx.font = "700 25" + F;
+  ctx.fillText(fa.llegenda, W / 2, H - 92);
+  ctx.fillStyle = "#8A99A5"; ctx.font = "600 23" + F;
+  ctx.fillText("De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 " + new Date().toLocaleDateString("ca"), W / 2, H - 46);
+  ctx.textAlign = "left";
+  return cv;
+}
+function canvasABlob(cv){
+  return new Promise(res => {
+    if (!cv) return res(null);
+    try {
+      if (cv.toBlob){ cv.toBlob(b => res(b || null), "image/jpeg", 0.92); return; }
+      const u = cv.toDataURL("image/jpeg", 0.92);
+      const bin = atob(u.split(",")[1]), arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      res(new Blob([arr], { type: "image/jpeg" }));
+    } catch(e){ res(null); }
+  });
+}
+async function comparteixFull(){
+  if (!fullActual) return;
+  const cv = dibuixaCanvasHorari(fullActual);
+  const blob = await canvasABlob(cv);
+  if (!blob){ avis("El navegador no ha pogut generar la imatge: fes una captura de pantalla del full."); return; }
+  const fitxer = new File([blob], fullActual.fitxer, { type: "image/jpeg" });
+  if (navigator.canShare && navigator.canShare({ files: [fitxer] }) && navigator.share){
+    try { await navigator.share({ files: [fitxer], title: fullActual.titol }); return; }
+    catch(e){ if (e && e.name === "AbortError") return; }
+  }
+  try {
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = href; a.download = fullActual.fitxer;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 4000);
+  } catch(e){ avis("No s'ha pogut desar autom\u00e0ticament: fes una captura de pantalla del full."); }
+}
 function palCls(pal){ return pal === "ok" ? "fh-ok" : pal === "fam" ? "fh-fam" : pal === "pend" ? "fh-pend" : "fh-propi"; }
 function nomsPortats(cond, slot, dia){
   return portaValids(cond, slot, dia).map(r2 => {
@@ -1397,7 +1498,9 @@ function mostraFull(html){
   const dv = $("#full-horari"); if (!dv) return;
   dv.innerHTML =
     "<div class='fh-eines'><button class='boto sec' onclick='tancaFull()'>\u2190 Torna</button>" +
-    "<button class='boto' onclick='imprimeixFull()'>\ud83d\udda8\ufe0f Imprimeix / desa en PDF</button></div>" + html;
+    "<button class='boto' onclick='comparteixFull()'>\ud83d\udce4 Desa / comparteix</button>" +
+    (esAppInstalada ? "" : "<button class='boto sec' onclick='imprimeixFull()'>\ud83d\udda8\ufe0f Imprimeix</button>") +
+    "</div>" + html;
   dv.classList.remove("ocult");
   window.scrollTo(0, 0);
 }
@@ -1427,6 +1530,8 @@ function descarregaHorariNen(fid, nid){
     }
     if (c) cont[fr.id][d] = c;
   }); });
+  fullActual = { titol: "Horari de " + nen.nom, sub: "Amb qui va cada dia \u00b7 " + fam.nom, cont: cont, fitxer: "horari-" + slug(nen.nom) + ".jpg",
+    llegenda: "verd = cotxe compartit \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte \u00b7 vermell = pendent" };
   mostraFull(fullHorariHtml("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont,
     "verd = cotxe compartit (el nom \u00e9s qui condueix) \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte \u00b7 vermell = pendent de conductor"));
 }
@@ -1445,6 +1550,8 @@ function descarregaHorariConductor(){
     }
     if (c) cont[fr.id][d] = c;
   }); });
+  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: "Qui puges a cada viatge \u00b7 " + f.nom, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + ".jpg",
+    llegenda: "verd = viatges que condueixes \u00b7 gris = pel vostre compte" };
   mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont,
     "verd = viatges que condueixes (amb els nens i les places que et queden) \u00b7 gris = pel vostre compte"));
 }
