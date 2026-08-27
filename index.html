@@ -260,7 +260,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.13</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.14</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -759,12 +759,20 @@ function pintaPerfil(){
     "</div>";
 }
 
-function pintaGraellaTab(){
-  const f = lameva();
+function estatGHtml(f){
   const pend = celesPendents(f);
-  const estatG = pend.length
+  return pend.length
     ? "<div class='g-estat mal'>\u26a0 Falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab). Primera: " + esc(pend[0]) + ".</div>"
     : "<div class='g-estat be'>\u2713 Setmana completa \u2014 els Calendaris estan oberts.</div>";
+}
+function refrescaEstatG(){
+  const el = $("#g-estat-box"); if (!el) return;
+  const f = lameva(); if (!f) return;
+  el.innerHTML = estatGHtml(f);
+}
+function pintaGraellaTab(){
+  const f = lameva();
+  const estatG = "<div id='g-estat-box'>" + estatGHtml(f) + "</div>";
   $("#tab-cos").innerHTML =
     "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. Cada nen entra a les 8.00 <b>o</b> a les 9.00: marcar-li una li treu l'altra.</p>" +
     estatG +
@@ -831,6 +839,7 @@ function celAccio(ac){
   pintaCasella();
 }
 function pintaGraella(){
+  refrescaEstatG();
   const f = lameva();
   let h = "<div></div>" + DIES.map(d => "<div class='g-dia'>" + DIES_LBL[d] + "</div>").join("");
   FRANGES.forEach((fr, i) => {
