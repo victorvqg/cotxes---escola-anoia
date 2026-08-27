@@ -131,6 +131,10 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
+.jvisor.ocult{display:none}
+.jvisor{position:fixed;inset:0;background:rgba(14,42,68,.75);z-index:70;display:flex;align-items:center;justify-content:center;padding:16px}
+.jv-caixa{background:#fff;border-radius:16px;padding:12px;max-width:96vw;max-height:92vh;overflow:auto}
+.jv-caixa img{width:100%;height:auto;border-radius:10px;display:block}
 .cmenu{position:fixed;left:0;right:0;bottom:-100%;background:#fff;z-index:42;border-radius:18px 18px 0 0;box-shadow:0 -6px 24px rgba(14,42,68,.22);padding:14px 16px calc(16px + env(safe-area-inset-bottom));transition:bottom .18s;max-width:560px;margin:0 auto}
 .cmenu.obert{bottom:0}
 .cm-cap{display:flex;align-items:center;gap:8px;font:800 18px 'Baloo 2';color:#0E2A44;margin-bottom:10px}
@@ -261,7 +265,8 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.22</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <div id="jpeg-visor" class="jvisor ocult"></div>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.23</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -716,7 +721,7 @@ function pantallaApp(){
   document.body.classList.add("dins");
   setTimeout(pintaPeuStats, 0);
   const f = lameva();
-  if (!["perfil", "graella", "cal", "avisos", "rols"].includes(tabAct)) tabAct = "graella";
+  if (!["perfil", "graella", "cal", "avisos", "descarrega", "rols"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
   const dirHtml = famOrd().map(x =>
@@ -753,6 +758,7 @@ function pintaMenu(){
     it("graella", "\ud83d\uddd3\ufe0f", "Graella", graellaCompleta(f) ? "" : "<span class='c-lock'>\u26a0</span>") +
     it("cal", "\ud83d\udcc5", "Calendaris", bloc ? "<span class='c-lock'>\ud83d\udd12</span>" : "") +
     it("avisos", "\ud83d\udd14", "Avisos", n ? "<span class='c-bad'>" + n + "</span>" : "") +
+    it("descarrega", "\ud83d\udda8\ufe0f", "Descarrega") +
     (doc.adminFam && f.id === doc.adminFam ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee1\ufe0f Admin</button>" : "") +
     (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
     "<div class='c-sep'></div>" +
@@ -763,12 +769,13 @@ function tancaMenu(){ const v = $("#vel"), c = $("#calaix"); if (v) v.classList.
 
 function triaTab(t){
   tabAct = t; tancaMenu();
-  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", rols: "\ud83d\udee1\ufe0f Rols del grup" };
+  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", rols: "\ud83d\udee1\ufe0f Rols del grup" };
   const el = $("#cap-titol"); if (el) el.textContent = tit[t] || "";
   pintaMenu();
   if (t === "perfil") pintaPerfil();
   else if (t === "graella") pintaGraellaTab();
   else if (t === "avisos") pintaAvisos();
+  else if (t === "descarrega") pintaDescarrega();
   else if (t === "rols") pintaRols();
   else if (!potCal()) pintaBloqueig();
   else pintaCalendari();
@@ -1411,9 +1418,18 @@ function dibuixaHorariJpeg(titol, subtitol, contingut, llegenda){
   ctx.textAlign = "left";
   return cv.toDataURL("image/jpeg", 0.92);
 }
+function dataUrlABlob(url){
+  try {
+    const parts = url.split(","), bin = atob(parts[1]), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: "image/jpeg" });
+  } catch(e){ return null; }
+}
 function baixaJpeg(nom, url){
   if (!url) return;
-  const a = document.createElement("a"); a.href = url; a.download = nom;
+  const b = dataUrlABlob(url);
+  const href = b && URL.createObjectURL ? URL.createObjectURL(b) : url;
+  const a = document.createElement("a"); a.href = href; a.download = nom;
   document.body.appendChild(a); a.click(); a.remove();
 }
 function nomsPortats(cond, slot, dia){
@@ -1423,8 +1439,36 @@ function nomsPortats(cond, slot, dia){
     return nn ? nn.nom.trim().split(/\s+/)[0] : null;
   }).filter(Boolean);
 }
-function descarregaHorariNen(){
-  const fid = nenSel.split("|")[0], nid = nenSel.split("|")[1];
+function pintaDescarrega(){
+  const f = lameva();
+  let h = "<div class='targeta'><div class='p-fila'><span class='p-lab'>\ud83d\udda8\ufe0f Horaris per imprimir<span class='p-sub'>JPEG \u00b7 A4 apa\u00efsat \u00b7 al m\u00f2bil: mant\u00e9n el dit sobre la imatge per desar-la a Fotos</span></span></div>";
+  (f.nens || []).forEach(n2 => {
+    const p = nenPendents(f, n2);
+    const nomC = esc(n2.nom.trim().split(/\s+/)[0]);
+    h += p
+      ? "<p class='hint' style='margin:8px 0 0'>\u23f3 <b>" + nomC + "</b>: " + (p === 1 ? "falta 1 trajecte" : "falten " + p + " trajectes") + " sense conductor \u2014 quan estigui cobert, aqu\u00ed tindr\u00e0s el seu horari.</p>"
+      : "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udcc4 Horari de " + nomC + "</button>";
+  });
+  const condueix = FRANGES.some(fr => DIES.some(d => te(f.cotxe, fr.id, d)));
+  h += condueix
+    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udcc4 Horari del conductor (" + esc(nomConductor(f)) + ")</button>"
+    : "<p class='hint' style='margin:10px 0 0'>Aquesta setmana no condu\u00efu cap dia: no hi ha horari de conductor a generar.</p>";
+  h += "</div>";
+  $("#tab-cos").innerHTML = h;
+}
+function mostraJpeg(nom, url){
+  if (!url) return;
+  const dv = $("#jpeg-visor"); if (!dv) return;
+  dv.innerHTML =
+    "<div class='jv-caixa'><img src='" + url + "' alt='" + esc(nom) + "'>" +
+    "<p class='hint' style='text-align:center;margin:8px 0'>\ud83d\udcf1 Al m\u00f2bil: <b>mant\u00e9n el dit sobre la imatge</b> i tria \u00abDesa la imatge\u00bb.</p>" +
+    "<div class='fila'><button class='boto sec' style='flex:1' onclick='tancaJpeg()'>Tanca</button>" +
+    "<button class='boto' style='flex:1' id='jv-baixa'>\u2b07\ufe0f Descarrega</button></div></div>";
+  dv.classList.remove("ocult");
+  $("#jv-baixa").onclick = function(){ baixaJpeg(nom, url); };
+}
+function tancaJpeg(){ const dv = $("#jpeg-visor"); if (dv){ dv.classList.add("ocult"); dv.innerHTML = ""; } }
+function descarregaHorariNen(fid, nid){
   const fam = doc.families.find(x => x.id === fid);
   const nen = fam && (fam.nens || []).find(x => x.id === nid);
   if (!fam || !nen) return;
@@ -1447,7 +1491,7 @@ function descarregaHorariNen(){
   }); });
   const url = dibuixaHorariJpeg("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont,
     "verd = cotxe compartit (el nom gran \u00e9s qui condueix) \u00b7 blau = amb la seva fam\u00edlia \u00b7 gris = pel seu compte");
-  baixaJpeg("horari-" + slug(nen.nom) + ".jpg", url);
+  mostraJpeg("horari-" + slug(nen.nom) + ".jpg", url);
 }
 function descarregaHorariConductor(){
   const f = lameva(); if (!f) return;
@@ -1466,21 +1510,7 @@ function descarregaHorariConductor(){
   }); });
   const url = dibuixaHorariJpeg("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont,
     "verd = viatges que condueixes (amb els nens que portes i les places que et queden) \u00b7 gris = pel vostre compte");
-  baixaJpeg("horari-conductor-" + slug(nomConductor(f)) + ".jpg", url);
-}
-function botonsExport(fam, nen){
-  if (!nen) return "";
-  const pend = nenPendents(fam, nen);
-  const meva = lameva();
-  const condueix = meva && FRANGES.some(fr => DIES.some(d => te(meva.cotxe, fr.id, d)));
-  let h2 = "<div class='targeta' style='margin-top:4px'><div class='p-fila'><span class='p-lab'>\ud83d\udda8\ufe0f Horaris per imprimir<span class='p-sub'>JPEG \u00b7 A4 apa\u00efsat \u00b7 per a la nevera</span></span></div>";
-  h2 += pend
-    ? "<p class='hint'>\u23f3 Quan tots els trajectes de " + esc(nen.nom.trim().split(/\s+/)[0]) + " tinguin conductor (en " + (pend === 1 ? "falta 1" : "falten " + pend) + "), aqu\u00ed podr\u00e0s descarregar el seu horari setmanal.</p>"
-    : "<button class='boto sec' style='width:100%;margin-top:6px' onclick='descarregaHorariNen()'>\ud83d\udcc4 Horari setmanal de " + esc(nen.nom.trim().split(/\s+/)[0]) + "</button>";
-  if (condueix)
-    h2 += "<button class='boto sec' style='width:100%;margin-top:8px' onclick='descarregaHorariConductor()'>\ud83d\udcc4 Horari setmanal del conductor (" + esc(nomConductor(meva)) + ")</button>";
-  h2 += "</div>";
-  return h2;
+  mostraJpeg("horari-conductor-" + slug(nomConductor(f)) + ".jpg", url);
 }
 function pintaVistaNen(){
   const tots = [];
@@ -1516,7 +1546,6 @@ function pintaVistaNen(){
     });
     h += res || "<p class='lead'>Aquest nen no t\u00e9 cap trajecte marcat.</p>";
   }
-  h += botonsExport(fam, nen);
   $("#cal-cos").innerHTML = h;
 }
 function selNenCanvia(v){ nenSel = v; pintaVistaNen(); }
