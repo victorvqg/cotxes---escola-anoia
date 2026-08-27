@@ -128,6 +128,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px;line-height:1.5}
 .credit .versio{font-size:11.5px;color:#A5B2BC}
 .rolbt{flex:none;font-size:13px;border:1.5px solid #C7D3DC;border-radius:99px;padding:1px 9px;text-decoration:none}
+.rolbt.fixe{color:#6B7D8A;border-color:#E3ECF4;background:#F1F5F8}
 .dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .peu{font-size:13px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
 details.conf{margin-top:14px}
@@ -190,7 +191,7 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.5</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.6</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -562,7 +563,7 @@ async function rolFam(id){
   const nou = fx.rol === "staff" ? "usuari" : fx.rol === "admin" ? "usuari" : "staff";
   fx.rol = nou;
   estat("Desant\u2026");
-  try { await ghPut("Rol de " + fx.nom + ": " + nou); estat("Desat \u2713"); pantallaApp(); }
+  try { await ghPut("Rol de " + fx.nom + ": " + nou); estat("Desat \u2713"); if (tabAct === "rols") pintaRols(); else pantallaApp(); }
   catch(e){ fx.rol = antic; estat("Error", true); avis("No s'ha pogut canviar el rol."); }
 }
 function adminEdita(id){ if (!esAdmin && !esStaff) return; tabAct = "perfil"; triaFam(id); }
@@ -570,10 +571,11 @@ function adminEdita(id){ if (!esAdmin && !esStaff) return; tabAct = "perfil"; tr
 /* ── Pantalla principal ── */
 function pantallaApp(){
   const f = lameva();
-  if (!["perfil", "graella", "cal", "avisos"].includes(tabAct)) tabAct = "graella";
+  if (!["perfil", "graella", "cal", "avisos", "rols"].includes(tabAct)) tabAct = "graella";
+  if (tabAct === "rols" && !esAdmin) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
   const dirHtml = famOrd().map(x =>
-    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + (esAdmin ? "<button class='enllac rolbt' onclick=\"rolFam('" + x.id + "')\">" + (x.rol === "admin" ? "admin" : x.rol === "staff" ? "staff" : "usuari") + "</button>" : "") + ((esAdmin || esStaff) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
+    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "\ud83d\udee1\ufe0f " : x.rol === "staff" ? "\ud83d\udee0\ufe0f " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
   ).join("");
   $("#pantalla").innerHTML =
     "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet'>\u00b7 " + (f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
@@ -603,6 +605,7 @@ function pintaMenu(){
     it("graella", "\ud83d\uddd3\ufe0f", "Graella", graellaCompleta(f) ? "" : "<span class='c-lock'>\u26a0</span>") +
     it("cal", "\ud83d\udcc5", "Calendaris", bloc ? "<span class='c-lock'>\ud83d\udd12</span>" : "") +
     it("avisos", "\ud83d\udd14", "Avisos", n ? "<span class='c-bad'>" + n + "</span>" : "") +
+    (esAdmin ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
     "<div class='c-sep'></div>" +
     "<p class='hint' style='padding:0 12px'>Perfil i Graella complets desbloquegen els Calendaris.</p>";
 }
@@ -611,12 +614,13 @@ function tancaMenu(){ const v = $("#vel"), c = $("#calaix"); if (v) v.classList.
 
 function triaTab(t){
   tabAct = t; tancaMenu();
-  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos" };
+  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", rols: "\ud83d\udee1\ufe0f Rols del grup" };
   const el = $("#cap-titol"); if (el) el.textContent = tit[t] || "";
   pintaMenu();
   if (t === "perfil") pintaPerfil();
   else if (t === "graella") pintaGraellaTab();
   else if (t === "avisos") pintaAvisos();
+  else if (t === "rols") pintaRols();
   else if (!potCal()) pintaBloqueig();
   else pintaCalendari();
 }
@@ -656,6 +660,7 @@ function pintaPerfil(){
 
 function pintaGraellaTab(){
   const f = lameva();
+  if (pinzell !== "cotxe" && pinzell !== "propi" && pinzell !== "esborra" && !f.nens.some(n => n.id === pinzell)) pinzell = "cotxe";
   const pinzells =
     "<div class='pinzells'>" +
     "<button class='pz " + (pinzell === "cotxe" ? "actiu" : "") + "' onclick=\"triaPinzell('cotxe')\">\ud83d\ude97 El cotxe (" + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ")</button>" +
@@ -720,7 +725,7 @@ function pinta(slot, dia){
   if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); treu(f.propi, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (!te(f.cotxe, slot, dia) && f.porta) delete f.porta[cel]; }
   else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
-  else { const n = f.nens.find(x => x.id === pinzell); if (!n) return; treu(f.propi, slot, dia); commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
+  else { const n = f.nens.find(x => x.id === pinzell); if (!n){ pinzell = "cotxe"; pintaGraellaTab(); return; } treu(f.propi, slot, dia); commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
   dirty = true; pintaBarra(); pintaGraella();
   const hhFr = (FRANGES.find(x => x.id === slot) || {}).hora || "";
   const araCond = te(f.cotxe, slot, dia);
@@ -858,6 +863,19 @@ function pintaBloqueig(){
     "<div class='f-linia'>" + (perfilComplet(f) ? "\u2713 Perfil complet" : "\u26a0 <b>Perfil incomplet</b> \u2014 falten dades de la fam\u00edlia") + "</div>" +
     "<div class='f-linia'>" + (pend.length ? "\u26a0 <b>Graella incompleta</b> \u2014 falten " + pend.length + " caselles (primera: " + esc(pend[0]) + ")" : "\u2713 Graella completa") + "</div>" +
     "<div class='fila' style='margin-top:12px'>" + (perfilComplet(f) ? "" : "<button class='boto sec' onclick=\"triaTab('perfil')\">V\u00e9s al Perfil</button>") + (pend.length ? "<button class='boto' onclick=\"triaTab('graella')\">V\u00e9s a la Graella</button>" : "") + "</div></div>";
+}
+function pintaRols(){
+  if (!esAdmin){ triaTab("graella"); return; }
+  const files = famOrd().map(x => {
+    const fix = x.rol === "admin" && x.creadaPer === usuariId;
+    const eti = x.rol === "admin" ? "\ud83d\udee1\ufe0f admin" : x.rol === "staff" ? "\ud83d\udee0\ufe0f staff" : "usuari";
+    return "<div class='dir-fila'><b>" + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" +
+      (fix ? "<span class='rolbt fixe'>" + eti + "</span>" : "<button class='enllac rolbt' onclick=\"rolFam('" + x.id + "')\">" + eti + "</button>") + "</div>";
+  }).join("");
+  $("#tab-cos").innerHTML =
+    "<div class='targeta'><h2>\ud83d\udee1\ufe0f Rols del grup</h2>" +
+    "<p class='lead'>Toca el rol d'una fam\u00edlia per alternar <b>usuari \u2194 staff</b> (es desa a l'instant). El teu rol d'administrador \u00e9s fix. Recorda: el codi de staff nom\u00e9s funciona a les fam\u00edlies que aqu\u00ed tinguin el rol de staff.</p>" +
+    files + "</div>";
 }
 function pintaAvisos(){
   const f = lameva();
