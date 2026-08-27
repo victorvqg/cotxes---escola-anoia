@@ -261,7 +261,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.19</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.20</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1284,7 +1284,8 @@ function pintaDia(){
          "<span class='m-tip " + t + "'>" + fr.tipus + "</span>" + badge + "</div>" +
          condsHtml + nensHtml + propisHtml + pista + "</div>";
   });
-  $("#dia-detall").innerHTML = h;
+  const dEl = $("#dia-detall"); if (!dEl) return;
+  dEl.innerHTML = h;
 }
 
 function assigna(slot, dia, famRef, nenRef, posar){
@@ -1306,6 +1307,122 @@ function assigna(slot, dia, famRef, nenRef, posar){
   dirty = true; pintaBarra(); pintaDia();
 }
 
+function nenPendents(fam, nen){
+  let p = 0;
+  FRANGES.forEach(fr => DIES.forEach(d => {
+    if (te(nen.marca, fr.id, d) && !elPorta(fam.id, nen.id, fr.id, d)) p++;
+  }));
+  return p;
+}
+function trosseja(txt, m){
+  const out = []; let l = "";
+  txt.split(/\s+/).forEach(w => { if ((l + " " + w).trim().length > m){ if (l) out.push(l.trim()); l = w; } else l += " " + w; });
+  if (l.trim()) out.push(l.trim());
+  return out;
+}
+function palCel(pal, linies){
+  const p = pal === "ok" ? ["#DCF1E3", "#9CCDAD", "#1F5C3B"]
+    : pal === "fam" ? ["#E3ECF4", "#B9CBD7", "#17456B"]
+    : ["#ECEFF2", "#D3DBE1", "#6B7D8A"];
+  return { fons: p[0], vora: p[1], color: p[2], linies: linies.filter(Boolean) };
+}
+function rrCtx(ctx, x, y, w, h2, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h2, r); ctx.arcTo(x + w, y + h2, x, y + h2, r); ctx.arcTo(x, y + h2, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function dibuixaHorariJpeg(titol, subtitol, contingut){
+  const cv = document.createElement("canvas");
+  const ctx = cv.getContext && cv.getContext("2d");
+  if (!ctx){ avis("Aquest navegador no pot generar la imatge de l'horari."); return null; }
+  const W = 1754, H = 1240; cv.width = W; cv.height = H;
+  const F = "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+  ctx.fillStyle = "#EDF2F5"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#17456B"; ctx.fillRect(0, 0, W, 150);
+  ctx.fillStyle = "#FFFFFF";
+  for (let x = 24; x < W; x += 88) ctx.fillRect(x, 130, 44, 20);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#FFFFFF"; ctx.font = "800 50" + F; ctx.fillText(titol, 48, 60);
+  ctx.fillStyle = "#CFE0EE"; ctx.font = "600 28" + F; ctx.fillText(subtitol, 48, 106);
+  const x0 = 48, y0 = 186, colE = 186;
+  const colW = (W - x0 * 2 - colE) / 5, rowH = 172, capH = 56;
+  ctx.fillStyle = "#0E2A44"; ctx.font = "800 30" + F; ctx.textAlign = "center";
+  DIES.forEach((d, i) => ctx.fillText(DIES_NOM[d], x0 + colE + colW * i + colW / 2, y0 + capH / 2));
+  ctx.textAlign = "left";
+  FRANGES.forEach((fr, r) => {
+    const y = y0 + capH + r * rowH + 8;
+    ctx.fillStyle = "#6B7D8A"; ctx.font = "800 22" + F; ctx.fillText(fr.tipus.toUpperCase(), x0, y + 28);
+    ctx.fillStyle = "#0E2A44"; ctx.font = "800 38" + F; ctx.fillText(fr.hora, x0, y + 74);
+    DIES.forEach((d, i) => {
+      const c = contingut[fr.id] && contingut[fr.id][d];
+      const cx = x0 + colE + colW * i + 6, cw = colW - 12, ch = rowH - 18;
+      ctx.fillStyle = c ? c.fons : "#FFFFFF";
+      ctx.strokeStyle = c ? c.vora : "#DCE5EC"; ctx.lineWidth = 3;
+      rrCtx(ctx, cx, y, cw, ch, 18); ctx.fill(); ctx.stroke();
+      if (c){
+        const ls = c.linies.slice(0, 3);
+        ctx.fillStyle = c.color; ctx.textAlign = "center";
+        ctx.font = "800 " + (ls.length > 1 ? 26 : 29) + F;
+        ls.forEach((l, li) => ctx.fillText(l, cx + cw / 2, y + ch / 2 + (li - (ls.length - 1) / 2) * 33));
+        ctx.textAlign = "left";
+      }
+    });
+  });
+  ctx.fillStyle = "#8A99A5"; ctx.font = "600 21" + F; ctx.textAlign = "center";
+  ctx.fillText("Cotxes \u00b7 Escola Anoia \u2014 creat per V\u00edctor Quintana", W / 2, H - 32);
+  ctx.textAlign = "left";
+  return cv.toDataURL("image/jpeg", 0.92);
+}
+function baixaJpeg(nom, url){
+  if (!url) return;
+  const a = document.createElement("a"); a.href = url; a.download = nom;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function descarregaHorariNen(){
+  const fid = nenSel.split("|")[0], nid = nenSel.split("|")[1];
+  const fam = doc.families.find(x => x.id === fid);
+  const nen = fam && (fam.nens || []).find(x => x.id === nid);
+  if (!fam || !nen) return;
+  if (nenPendents(fam, nen)){ avis("Encara hi ha trajectes del nen sense conductor assignat."); return; }
+  const cont = {};
+  FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
+    let c = null;
+    if (te(fam.cotxe, fr.id, d)) c = palCel("fam", ["\ud83d\ude97 amb la fam\u00edlia", fam.conductor ? "(" + fam.conductor + ")" : ""]);
+    else if (te(nen.marca, fr.id, d)){ const cf = elPorta(fam.id, nen.id, fr.id, d); c = palCel("ok", ["\ud83d\ude97 el porta"].concat(trosseja(nomConductor(cf), 14))); }
+    else if (te(fam.propi, fr.id, d)) c = palCel("propi", ["\ud83d\udeab pel seu compte"]);
+    if (c) cont[fr.id][d] = c;
+  }); });
+  const url = dibuixaHorariJpeg("Horari de " + nen.nom, "Setmana escolar \u00b7 " + fam.nom, cont);
+  baixaJpeg("horari-" + slug(nen.nom) + ".jpg", url);
+}
+function descarregaHorariConductor(){
+  const f = lameva(); if (!f) return;
+  const cont = {};
+  FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
+    let c = null;
+    if (te(f.cotxe, fr.id, d)){
+      const noms = portaValids(f, fr.id, d).map(r2 => {
+        const ff = doc.families.find(x => x.id === r2.fam);
+        const nn = ff && (ff.nens || []).find(x => x.id === r2.nen);
+        return nn ? nn.nom.trim().split(/\s+/)[0] : null;
+      }).filter(Boolean);
+      c = palCel("ok", noms.length ? ["\ud83d\ude97 portes:"].concat(trosseja(noms.join(", "), 16)) : ["\ud83d\ude97 el teu cotxe", "(sense passatgers)"]);
+    } else if (te(f.propi, fr.id, d)) c = palCel("propi", ["\ud83d\udeab pel vostre compte"]);
+    if (c) cont[fr.id][d] = c;
+  }); });
+  const url = dibuixaHorariJpeg("Horari del conductor \u2014 " + nomConductor(f), "Setmana escolar \u00b7 " + f.nom, cont);
+  baixaJpeg("horari-conductor-" + slug(nomConductor(f)) + ".jpg", url);
+}
+function botonsExport(fam, nen){
+  if (!nen) return "";
+  const pend = nenPendents(fam, nen);
+  const meva = lameva();
+  const condueix = meva && FRANGES.some(fr => DIES.some(d => te(meva.cotxe, fr.id, d)));
+  let h2 = "<div class='targeta' style='margin-top:4px'><div class='p-fila'><span class='p-lab'>\ud83d\udda8\ufe0f Horaris per imprimir<span class='p-sub'>JPEG \u00b7 A4 apa\u00efsat \u00b7 per a la nevera</span></span></div>";
+  h2 += pend
+    ? "<p class='hint'>\u23f3 Quan tots els trajectes de " + esc(nen.nom.trim().split(/\s+/)[0]) + " tinguin conductor (en " + (pend === 1 ? "falta 1" : "falten " + pend) + "), aqu\u00ed podr\u00e0s descarregar el seu horari setmanal.</p>"
+    : "<button class='boto sec' style='width:100%;margin-top:6px' onclick='descarregaHorariNen()'>\ud83d\udcc4 Horari setmanal de " + esc(nen.nom.trim().split(/\s+/)[0]) + "</button>";
+  if (condueix)
+    h2 += "<button class='boto sec' style='width:100%;margin-top:8px' onclick='descarregaHorariConductor()'>\ud83d\udcc4 Horari setmanal del conductor (" + esc(nomConductor(meva)) + ")</button>";
+  h2 += "</div>";
+  return h2;
+}
 function pintaVistaNen(){
   const tots = [];
   famOrd().forEach(f => (f.nens || []).forEach(n => tots.push({ v: f.id + "|" + n.id, nom: n.nom, fam: f })));
@@ -1340,6 +1457,7 @@ function pintaVistaNen(){
     });
     h += res || "<p class='lead'>Aquest nen no t\u00e9 cap trajecte marcat.</p>";
   }
+  h += botonsExport(fam, nen);
   $("#cal-cos").innerHTML = h;
 }
 function selNenCanvia(v){ nenSel = v; pintaVistaNen(); }
