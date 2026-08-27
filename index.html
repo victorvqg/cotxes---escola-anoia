@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#17456B">
 <title>Cotxes · Escola Anoia</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cotxes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#17456B">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
@@ -189,19 +197,68 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
 .qd-sense b{color:#8F2B1C}
 .subtabs .subtab{font-size:14px;padding:9px 4px}
 .r-nens{padding:2px 0 9px 4px;font-size:14.5px;color:#46596A;line-height:1.6;border-bottom:1px solid #F0F4F7}
+/* ── v2.8 · millores visuals (spec markmap) ── */
+.chip-estat{background:#fff;color:#17456B}
+.chip-estat.ok{background:#DCF1E3;color:#1F5C3B}
+.chip-estat.err{background:#BE3D2A;color:#fff}
+.boto{background:#F5B91E;color:#17456B;min-height:48px}
+.boto.sec{background:#fff;color:#17456B;border:1.5px solid #B9CBD7}
+.apila{display:flex;flex-direction:column;gap:10px}
+.apila .input{width:100%;box-sizing:border-box}
+.apila .boto{width:100%}
+.comfun{margin-top:18px;text-align:center}
+.cf-cotxe{font-size:38px;line-height:1}
+.cf-t{font:800 14px 'Baloo 2';letter-spacing:.12em;color:#6B7D8A;margin:6px 0 10px}
+.pas{display:flex;align-items:center;gap:12px;text-align:left;background:#fff;border-radius:12px;padding:11px 13px;margin-top:8px;font-size:15px;color:#17456B;box-shadow:0 2px 8px rgba(23,69,107,.08)}
+.pas-n{flex:none;width:28px;height:28px;border-radius:50%;background:#F5B91E;color:#17456B;font:800 15px 'Baloo 2';display:flex;align-items:center;justify-content:center}
+.targeta,.mapa,.dcard{box-shadow:0 2px 8px rgba(23,69,107,.08)}
+.barra-int{background:#fff;border-top:1.5px solid #D6E0E7;box-shadow:0 -6px 20px rgba(23,69,107,.14)}
+.barra .boto{white-space:nowrap;padding:12px 18px}
+body.amb-barra .credit{display:none}
+.subtabs{display:flex;overflow-x:auto;scrollbar-width:none}
+.subtabs::-webkit-scrollbar{display:none}
+.subtab{flex:1 0 auto;white-space:nowrap}
+.llegenda{position:sticky;top:8px;z-index:6;background:#EDF2F5}
+.cel .c-nom{font-size:13px}
+.m-cel .n1{font-size:20px}
+.m-cel.def .n1{font-size:24px}
+.stepper button{width:44px;height:44px;font-size:20px}
+body.dins h1{font-size:17px}
+body.dins .sub{display:none}
+body.dins .banda{padding:10px 18px 8px;align-items:center}
+h1{font-size:24px}
+.lead{font-size:15px}
+.p-lab{font-size:15px}
+.num{font-size:20px}
+.input{font-size:17px}
+.hint{font-size:13px}
+.enllac{font-size:15px}
+.r-stats b{font-size:24px}
+.mp{font-size:13px}
+.subtab{font-size:13px}
+.zebra{height:14px}
+.subtab,.cel,.dia-b,.m-cel,.boto,.c-item,.cbtn{transition:background .15s,color .15s,border-color .15s,transform .15s}
+.boto:focus-visible,.subtab:focus-visible,.cel:focus-visible,.dia-b:focus-visible,.m-cel:focus-visible,.mini-x:focus-visible,.enllac:focus-visible,.c-item:focus-visible,.stepper button:focus-visible,.cbtn:focus-visible,.cm-x:focus-visible{outline:3px solid #F5B91E;outline-offset:1px}
+.f-grup{font:800 13px 'Baloo 2';letter-spacing:.08em;color:#6B7D8A;margin:14px 2px 4px;text-transform:uppercase}
+.m-tip{font-size:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+.chip-nen{display:flex;align-items:center;gap:6px;background:#F4F7FA;border:1.5px solid #E3ECF4;border-radius:12px;padding:5px 6px 5px 10px}
+.chip-nen .i-nen{border:none;background:none;padding:4px 2px;width:110px;font-size:15.5px}
+.chip-x{background:#F9E2DD;color:#97301F;border:none;border-radius:9px;width:30px;height:30px;font-size:14px;cursor:pointer}
+.avis.ok{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:60;background:#DCF1E3;color:#1F5C3B;border:1.5px solid #9CCDAD;border-radius:12px;padding:10px 16px;box-shadow:0 6px 20px rgba(23,69,107,.18);max-width:88%;text-align:center}
 </style>
 </head>
 <body>
 <div class="tel">
   <header class="banda">
-    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">De Montbui poble a l'Escola Anoia</div></div>
+    <div><h1>Cotxes · Escola Anoia</h1><div class="sub">Montbui → Escola Anoia</div></div>
     <div class="chip-estat" id="estat">—</div>
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.7</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.8</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
-    <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
+    <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
   </div></div>
 </div>
@@ -320,6 +377,14 @@ function elPorta(famId, nenId, slot, dia){
   return doc.families.find(fc => te(fc.cotxe, slot, dia) &&
     portaValids(fc, slot, dia).some(r => r.fam === famId && r.nen === nenId)) || null;
 }
+function normalitzaRols(){
+  if (!doc) return;
+  if (doc.adminPin && !doc.adminFam) doc.adminFam = "quintana-andrevi";
+  (doc.families || []).forEach(x => {
+    if (doc.adminFam && x.id === doc.adminFam) x.rol = "admin";
+    else if (x.rol === "admin") x.rol = "usuari";
+  });
+}
 function respon(f, slot, dia){ return te(f.cotxe, slot, dia) || te(f.propi, slot, dia) || (f.nens || []).some(n => te(n.marca, slot, dia)); }
 function perfilComplet(f){ return !!(f && f.nom && (f.cognomPare || "").trim() && (f.cognomMare || "").trim() && (f.conductor || "").trim() && f.nens && f.nens.length); }
 function celesPendents(f){
@@ -392,14 +457,27 @@ function balanc(slot, dia){
 }
 
 /* ── Estat visual de la capçalera i la barra ── */
-function estat(txt, err){ const e = $("#estat"); e.textContent = txt; e.className = "chip-estat" + (err ? " err" : ""); }
-function avis(txt){
+function estat(txt, mode){ const e = $("#estat"); e.textContent = txt; e.className = "chip-estat" + (mode === true || mode === "err" ? " err" : mode === "ok" ? " ok" : ""); }
+let avisTimer = null;
+function avis(txt, ok){
+  const e = $("#avis");
+  if (avisTimer){ clearTimeout(avisTimer); avisTimer = null; }
+  if (ok){
+    e.className = "avis ok"; e.innerHTML = txt;
+    avisTimer = setTimeout(() => { e.className = "avis"; e.innerHTML = ""; avisTimer = null; }, 2600);
+    return;
+  }
+  e.className = "avis";
+  return avisVell(txt);
+}
+function avisVell(txt){
   const a = $("#avis");
   if (!txt){ a.style.display = "none"; return; }
   a.innerHTML = txt; a.style.display = "block";
   if (typeof a.scrollIntoView === "function"){ try { a.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(e){} }
 }
 function pintaBarra(){
+  document.body.classList.toggle("amb-barra", dirty);
   const tp = $(".targeta.perfil");
   if (tp) tp.classList.toggle("pendent", dirty);
   const ba = $("#barra-avis");
@@ -439,7 +517,8 @@ async function desa(){
     const f = lameva();
     if (f){ f.usuaris = f.usuaris || []; if (f.usuaris.indexOf(usuariId) < 0) f.usuaris.push(usuariId); }
     await ghPut("Horari " + (f ? f.nom : "grup") + " · " + new Date().toLocaleDateString("ca"));
-    dirty = false; pintaBarra(); estat("Desat ✓");
+    dirty = false; pintaBarra(); estat("Desat ✓", "ok");
+    avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
   } catch(e){
     estat("No s'ha desat", true);
     $("#barra-txt").textContent = "No s'ha pogut desar. Comprova la connexió i torna-ho a provar.";
@@ -457,9 +536,9 @@ async function inici(){
   if (!token){ pantallaClau(); return; }
   estat("Connectant…");
   try {
-    const r = await ghGet(); doc = r.doc; sha = r.sha;
+    const r = await ghGet(); doc = r.doc; sha = r.sha; normalitzaRols();
     if (!doc.families) doc.families = [];
-    estat("Connectat ✓");
+    estat("Connectat ✓", "ok");
     if (famId && lameva()){ detectaAvisos(); pantallaApp(); } else { famId = ""; lsDel("cx_fam"); pantallaTria(); }
   } catch(e){
     if (e.tipus === "clau"){ token = ""; lsDel("cx_token"); pantallaClau("La clau no funciona. Revisa que l'hagis copiat sencera o demana la nova al grup."); }
@@ -470,24 +549,30 @@ async function inici(){
 
 /* ── Pantalla: clau del grup ── */
 function pantallaClau(err){
+  document.body.classList.remove("dins");
   estat("Cal la clau");
   $("#pantalla").innerHTML =
     "<div class='targeta'><h2>Clau del grup</h2>" +
     "<p class='lead'>Enganxa la clau que s'ha compartit al grup de famílies (comença per <b>github_pat_</b>). Aquest mòbil la recordarà.</p>" +
     (err ? "<p class='lead' style='color:#8F2B1C'><b>" + esc(err) + "</b></p>" : "") +
-    "<div class='fila'><input class='input' id='inp-clau' type='password' autocomplete='off' placeholder='github_pat_…' onkeydown=\"if(event.key==='Enter')provaClau()\">" +
-    "<button class='boto' onclick='provaClau()'>Entra</button></div></div>";
+    "<div class='apila'><input class='input' id='inp-clau' type='password' autocomplete='off' placeholder='github_pat_…' onkeydown=\"if(event.key==='Enter')provaClau()\">" +
+    "<button class='boto' onclick='provaClau()'>Entra</button></div></div>" +
+    "<div class='comfun'><div class='cf-cotxe'>🚗</div><div class='cf-t'>COM FUNCIONA?</div>" +
+    "<div class='pas'><span class='pas-n'>1</span>Enganxa la clau del grup i toca «Entra»</div>" +
+    "<div class='pas'><span class='pas-n'>2</span>Tria la teva família o crea-la nova</div>" +
+    "<div class='pas'><span class='pas-n'>3</span>Completa el perfil i la graella de la setmana</div></div>";
 }
 async function provaClau(){
   const v = $("#inp-clau").value.trim();
   if (!v) return;
   token = v; estat("Comprovant…");
-  try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; lsSet("cx_token", token); estat("Connectat ✓"); avis(""); if (famId && lameva()){ detectaAvisos(); pantallaApp(); } else { famId = ""; lsDel("cx_fam"); pantallaTria(); } }
+  try { const r = await ghGet(); doc = r.doc; sha = r.sha; normalitzaRols(); if (!doc.families) doc.families = []; lsSet("cx_token", token); estat("Connectat ✓", "ok"); avis(""); if (famId && lameva()){ detectaAvisos(); pantallaApp(); } else { famId = ""; lsDel("cx_fam"); pantallaTria(); } }
   catch(e){ token = ""; pantallaClau(e.tipus === "clau" ? "Aquesta clau no obre el grup." : "No puc connectar. Torna-ho a provar."); }
 }
 
 /* ── Pantalla: tria o crea la família ── */
 function pantallaTria(){
+  document.body.classList.remove("dins");
   if (!esAdmin && !esStaff){
     const jaMeva = doc.families.find(x => x.creadaPer === usuariId);
     if (jaMeva){ triaFam(jaMeva.id); return; }
@@ -501,7 +586,7 @@ function pantallaTria(){
     "<div class='targeta'><h2>Qui sou?</h2>" +
     (fams.length
       ? "<p class='lead'>Tria la teva família al desplegable (hi surten els nens de cadascuna):</p>" +
-        "<div class='fila'><select class='input' id='sel-fam'><option value=''>— Tria la família —</option>" + opcions + "</select>" +
+        "<div class='apila'><select class='input' id='sel-fam'><option value=''>— Tria la família —</option>" + opcions + "</select>" +
         "<button class='boto' onclick=\"entraSel()\">Entra</button></div>"
       : "<p class='lead'>Encara no hi ha cap família. Crea la primera!</p>") +
     "</div>" +
@@ -558,7 +643,7 @@ async function creaFam(){
   })};
   doc.families.push(fam); famId = id;
   estat("Desant…");
-  try { await ghPut("Alta " + nom); lsSet("cx_fam", famId); estat("Desat ✓"); pantallaApp(); }
+  try { await ghPut("Alta " + nom); lsSet("cx_fam", famId); estat("Desat ✓", "ok"); pantallaApp(); }
   catch(e){ doc.families = doc.families.filter(f => f.id !== id); famId = ""; estat("Error", true); avis("No s'ha pogut crear la família. Torna-ho a provar."); }
 }
 function triaFam(id){ famId = id; lsSet("cx_fam", id); pantallaApp(); }
@@ -566,18 +651,19 @@ function entraSel(){ const v = $("#sel-fam").value; if (v) triaFam(v); }
 async function rolFam(id){
   if (!esAdmin) return;
   const fx = doc.families.find(x => x.id === id); if (!fx) return;
-  if (fx.rol === "admin" && fx.creadaPer === usuariId){ avis("Tu ets l'administrador del grup: el teu rol no es toca."); return; }
+  if (doc.adminFam && fx.id === doc.adminFam){ avis("Aquesta \u00e9s la fam\u00edlia de l'administrador: el seu rol \u00e9s fix."); return; }
   const antic = fx.rol;
   const nou = fx.rol === "staff" ? "usuari" : fx.rol === "admin" ? "usuari" : "staff";
   fx.rol = nou;
   estat("Desant\u2026");
-  try { await ghPut("Rol de " + fx.nom + ": " + nou); estat("Desat \u2713"); if (tabAct === "rols") pintaRols(); else pantallaApp(); }
+  try { await ghPut("Rol de " + fx.nom + ": " + nou); estat("Desat \u2713", "ok"); if (tabAct === "rols") pintaRols(); else pantallaApp(); }
   catch(e){ fx.rol = antic; estat("Error", true); avis("No s'ha pogut canviar el rol."); }
 }
 function adminEdita(id){ if (!esAdmin && !esStaff) return; tabAct = "perfil"; triaFam(id); }
 
 /* ── Pantalla principal ── */
 function pantallaApp(){
+  document.body.classList.add("dins");
   const f = lameva();
   if (!["perfil", "graella", "cal", "avisos", "rols"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !esAdmin) tabAct = "graella";
@@ -787,6 +873,7 @@ function treuNen(id){
 function obreAdmin(){ pantallaAdmin(); }
 function tancaAdmin(){ if (famId && lameva()) pantallaApp(); else pantallaTria(); }
 function pantallaAdmin(){
+  document.body.classList.add("dins");
   let cos;
   if (!doc.adminPin){
     cos = "<p class='lead'>Encara no hi ha cap codi d'administrador al grup. Si l'administrador ets tu, estableix-lo ara; la resta de fam\u00edlies no heu de fer res aqu\u00ed.</p>" +
@@ -816,22 +903,23 @@ async function estableixPin(){
   avis(""); doc.adminPin = v;
   const fj = lameva(); if (fj) fj.rol = "admin";
   estat("Desant…");
-  try { await ghPut("Codi d'administrador establert"); dirty = false; pintaBarra(); esAdmin = true; lsSet("cx_admin", "1"); estat("Desat ✓"); tancaAdmin(); }
-  catch(e){ delete doc.adminPin; estat("Error", true); avis("No s'ha pogut desar el codi. Torna-ho a provar."); }
+  doc.adminFam = famId;
+  try { await ghPut("Codi d'administrador establert"); dirty = false; pintaBarra(); esAdmin = true; lsSet("cx_admin", "1"); estat("Desat ✓", "ok"); tancaAdmin(); }
+  catch(e){ delete doc.adminPin; delete doc.adminFam; estat("Error", true); avis("No s'ha pogut desar el codi. Torna-ho a provar."); }
 }
 async function canviaPin(){
   const v = $("#pin-canvi").value.trim();
   if (v.length < 4){ avis("El codi ha de tenir 4 caràcters o més."); return; }
   avis(""); const antic = doc.adminPin; doc.adminPin = v;
   estat("Desant…");
-  try { await ghPut("Codi d'administrador canviat"); dirty = false; pintaBarra(); estat("Desat ✓"); tancaAdmin(); }
+  try { await ghPut("Codi d'administrador canviat"); dirty = false; pintaBarra(); estat("Desat ✓", "ok"); tancaAdmin(); }
   catch(e){ doc.adminPin = antic; estat("Error", true); avis("No s'ha pogut canviar el codi. Torna-ho a provar."); }
 }
 function entraAdmin(){
   const v = $("#pin-admin").value.trim();
   if (doc.adminPin && v === doc.adminPin){
     const fj = lameva();
-    if (fj && fj.rol !== "admin" && doc.families.some(x => x.rol === "admin")){
+    if (doc.adminFam && (!fj || fj.id !== doc.adminFam)){
       avis("Nom\u00e9s la fam\u00edlia de l'administrador pot activar el mode admin.");
       return;
     }
@@ -856,14 +944,14 @@ async function estableixStaff(){
   if (v.length < 4){ avis("El codi de staff ha de tenir 4 car\u00e0cters o m\u00e9s."); return; }
   avis(""); const antic = doc.staffPin; doc.staffPin = v;
   estat("Desant\u2026");
-  try { await ghPut("Codi de staff"); dirty = false; pintaBarra(); estat("Desat \u2713"); pantallaAdmin(); }
+  try { await ghPut("Codi de staff"); dirty = false; pintaBarra(); estat("Desat \u2713", "ok"); pantallaAdmin(); }
   catch(e){ if (antic) doc.staffPin = antic; else delete doc.staffPin; estat("Error", true); avis("No s'ha pogut desar el codi de staff."); }
 }
 async function treuStaff(){
   if (!esAdmin || !doc.staffPin) return;
   const antic = doc.staffPin; delete doc.staffPin;
   estat("Desant\u2026");
-  try { await ghPut("Codi de staff desactivat"); estat("Desat \u2713"); pantallaAdmin(); }
+  try { await ghPut("Codi de staff desactivat"); estat("Desat \u2713", "ok"); pantallaAdmin(); }
   catch(e){ doc.staffPin = antic; estat("Error", true); avis("No s'ha pogut desactivar."); }
 }
 function surtAdmin(){ esAdmin = false; esStaff = false; lsDel("cx_admin"); lsDel("cx_staff"); pantallaAdmin(); }
@@ -891,7 +979,7 @@ function pintaBloqueig(){
 function pintaRols(){
   if (!esAdmin){ triaTab("graella"); return; }
   const files = famOrd().map(x => {
-    const fix = x.rol === "admin" && x.creadaPer === usuariId;
+    const fix = doc.adminFam ? x.id === doc.adminFam : x.rol === "admin";
     const eti = x.rol === "admin" ? "\ud83d\udee1\ufe0f admin" : x.rol === "staff" ? "\ud83d\udee0\ufe0f staff" : "usuari";
     return "<div class='dir-fila'><b>" + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" +
       (fix ? "<span class='rolbt fixe'>" + eti + "</span>" : "<button class='enllac rolbt' onclick=\"rolFam('" + x.id + "')\">" + eti + "</button>") + "</div>";
@@ -933,7 +1021,7 @@ async function esborraFam(){
   if (!confirm("Segur que vols esborrar " + f.nom + " del grup? Aquesta acció es desa a l'instant.")) return;
   doc.families = doc.families.filter(x => x.id !== famId);
   estat("Desant…");
-  try { await ghPut("Baixa " + f.nom); dirty = false; pintaBarra(); famId = ""; lsDel("cx_fam"); estat("Desat ✓"); pantallaTria(); }
+  try { await ghPut("Baixa " + f.nom); dirty = false; pintaBarra(); famId = ""; lsDel("cx_fam"); estat("Desat ✓", "ok"); pantallaTria(); }
   catch(e){ doc.families.push(f); estat("Error", true); avis("No s'ha pogut esborrar. Torna-ho a provar."); }
 }
 function canviaClau(){
@@ -948,7 +1036,7 @@ let nenSel = "";
 async function pintaCalendari(){
   // agafa l'ultima versio abans de pintar (sense trepitjar canvis locals no desats)
   if (!dirty){
-    try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; if (!lameva()){ famId = ""; lsDel("cx_fam"); pantallaTria(); return; } } catch(e){}
+    try { const r = await ghGet(); doc = r.doc; sha = r.sha; normalitzaRols(); if (!doc.families) doc.families = []; if (!lameva()){ famId = ""; lsDel("cx_fam"); pantallaTria(); return; } } catch(e){}
   }
   renderCal();
 }
@@ -1031,7 +1119,9 @@ function selDiaChip(d){ diaSel = d; pintaVistaDia(); }
 function pintaDia(){
   const meva = lameva();
   let h = "";
-  FRANGES.forEach(fr => {
+  FRANGES.forEach((fr, fi) => {
+    if (fi === 0 || FRANGES[fi - 1].tipus !== fr.tipus)
+      h += "<div class='f-grup'>" + (fr.tipus === "Entrada" ? "🌅 Entrada" : "🎒 Recollida") + "</div>";
     const b = balanc(fr.id, diaSel);
     const t = fr.tipus === "Entrada" ? "e" : "r";
     let badge;
@@ -1178,7 +1268,7 @@ function obreDiaDes(d){ vistaCal = "dia"; diaSel = d; renderCal(); }
 /* \u2500\u2500 Pestanya: resum final del grup \u2500\u2500 */
 async function pintaResum(){
   if (!dirty){
-    try { const r = await ghGet(); doc = r.doc; sha = r.sha; if (!doc.families) doc.families = []; if (!lameva()){ famId = ""; lsDel("cx_fam"); pantallaTria(); return; } } catch(e){}
+    try { const r = await ghGet(); doc = r.doc; sha = r.sha; normalitzaRols(); if (!doc.families) doc.families = []; if (!lameva()){ famId = ""; lsDel("cx_fam"); pantallaTria(); return; } } catch(e){}
   }
   const defs = [], justs = [], marges = [];
   let buides = 0, totPlaces = 0, totNens = 0;
