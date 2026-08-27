@@ -186,6 +186,8 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .barra-avis{background:#FBE9E5;color:#8F2B1C;border:1.5px solid #E8B3A8;border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.45;margin:0 0 8px;text-align:left}
 .credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px;line-height:1.5}
 .credit .versio{font-size:11.5px;color:#A5B2BC}
+.marca-ico{width:28px;height:28px;border-radius:8px;margin-right:10px;flex:0 0 auto}
+.hero-ico{display:block;width:min(44vw,170px);height:auto;margin:2px auto 14px;border-radius:24px;box-shadow:0 8px 22px rgba(14,42,68,.22)}
 .peu-stats{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;font-size:12px;color:#8A99A5;padding:8px 12px 2px}
 .peu-stats span{white-space:nowrap}
 .rolbt{flex:none;font-size:13px;border:1.5px solid #C7D3DC;border-radius:99px;padding:1px 9px;text-decoration:none}
@@ -296,13 +298,14 @@ h1{font-size:24px}
 <body>
 <div class="tel">
   <header class="banda">
+    <img class="marca-ico" src="android-chrome-192x192.png" alt="" onerror="this.style.display='none'">
     <div><h1>Cotxes · Escola Anoia</h1><div class="sub">Montbui → Escola Anoia</div></div>
     <div class="chip-estat" id="estat">—</div>
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.29</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.30</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -616,6 +619,7 @@ function pantallaClau(err){
   document.body.classList.remove("dins");
   estat("Cal la clau");
   $("#pantalla").innerHTML =
+    "<img class='hero-ico' src='android-chrome-192x192.png' alt='' onerror=\"this.style.display='none'\">" +
     "<div class='targeta'><h2>Clau del grup</h2>" +
     "<p class='lead'>Enganxa la clau que s'ha compartit al grup de famílies (comença per <b>github_pat_</b>). Aquest mòbil la recordarà.</p>" +
     (err ? "<p class='lead' style='color:#8F2B1C'><b>" + esc(err) + "</b></p>" : "") +
@@ -648,6 +652,7 @@ function pantallaTria(){
     return "<option value='" + f.id + "'>" + esc(f.nom) + (noms ? " — " + esc(noms) : "") + "</option>";
   }).join("");
   $("#pantalla").innerHTML =
+    "<img class='hero-ico' src='android-chrome-192x192.png' alt='' onerror=\"this.style.display='none'\">" +
     "<div class='targeta'><h2>Qui sou?</h2>" +
     (fams.length
       ? "<p class='lead'>Tria la teva família al desplegable (hi surten els nens de cadascuna):</p>" +
