@@ -146,6 +146,8 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .barra-avis{background:#FBE9E5;color:#8F2B1C;border:1.5px solid #E8B3A8;border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.45;margin:0 0 8px;text-align:left}
 .credit{font-size:12.5px;color:#7A8B97;text-align:center;padding:16px 0 4px;line-height:1.5}
 .credit .versio{font-size:11.5px;color:#A5B2BC}
+.peu-stats{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;font-size:12px;color:#8A99A5;padding:8px 12px 2px}
+.peu-stats span{white-space:nowrap}
 .rolbt{flex:none;font-size:13px;border:1.5px solid #C7D3DC;border-radius:99px;padding:1px 9px;text-decoration:none}
 .rolbt.fixe{color:#6B7D8A;border-color:#E3ECF4;background:#F1F5F8}
 .dir-fila span{color:#6B7D8A;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -259,7 +261,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.17</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.19</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -479,8 +481,26 @@ function avisVell(txt){
   a.innerHTML = txt; a.style.display = "block";
   if (typeof a.scrollIntoView === "function"){ try { a.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(e){} }
 }
+function pintaPeuStats(){
+  const el = $("#peu-stats"); if (!el) return;
+  if (!doc || !doc.families || !doc.families.length){ el.innerHTML = ""; return; }
+  const pl = (n, s, p) => n + " " + (n === 1 ? s : p);
+  let nens = 0, viatges = 0, compartides = 0;
+  doc.families.forEach(f => {
+    nens += (f.nens || []).length;
+    FRANGES.forEach(fr => DIES.forEach(d => {
+      if (te(f.cotxe, fr.id, d)){ viatges++; compartides += portaValids(f, fr.id, d).length; }
+    }));
+  });
+  el.innerHTML =
+    "<span>\ud83d\udc6a " + pl(doc.families.length, "fam\u00edlia", "fam\u00edlies") + "</span>" +
+    "<span>\ud83e\uddd2 " + pl(nens, "nen", "nens") + "</span>" +
+    "<span>\ud83d\ude97 " + pl(viatges, "viatge en cotxe", "viatges en cotxe") + "/setmana</span>" +
+    "<span>\ud83e\udd1d " + pl(compartides, "pla\u00e7a compartida", "places compartides") + "</span>";
+}
 function pintaBarra(){
   document.body.classList.toggle("amb-barra", dirty);
+  pintaPeuStats();
   const tp = $(".targeta.perfil");
   if (tp) tp.classList.toggle("pendent", dirty);
   const ba = $("#barra-avis");
@@ -520,7 +540,7 @@ async function desa(){
     const f = lameva();
     if (f){ f.usuaris = f.usuaris || []; if (f.usuaris.indexOf(usuariId) < 0) f.usuaris.push(usuariId); }
     await ghPut("Horari " + (f ? f.nom : "grup") + " · " + new Date().toLocaleDateString("ca"));
-    dirty = false; pintaBarra(); estat("Desat ✓", "ok");
+    dirty = false; pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
     avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
   } catch(e){
     estat("No s'ha desat", true);
@@ -576,6 +596,7 @@ async function provaClau(){
 /* ── Pantalla: tria o crea la família ── */
 function pantallaTria(){
   document.body.classList.remove("dins");
+  setTimeout(pintaPeuStats, 0);
   if (!esAdmin && !esStaff){
     const jaMeva = doc.families.find(x => x.creadaPer === usuariId || (x.usuaris || []).includes(usuariId));
     if (jaMeva){ triaFam(jaMeva.id); return; }
@@ -685,6 +706,7 @@ function adminEdita(id){ if (!esAdmin && !esStaff) return; tabAct = "perfil"; tr
 /* ── Pantalla principal ── */
 function pantallaApp(){
   document.body.classList.add("dins");
+  setTimeout(pintaPeuStats, 0);
   const f = lameva();
   if (!["perfil", "graella", "cal", "avisos", "rols"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
@@ -701,9 +723,9 @@ function pantallaApp(){
     "<div class='captab'><span class='cap-titol' id='cap-titol'></span></div>" +
     "<div id='tab-cos'></div>" +
     "<details class='conf'><summary>\ud83d\udc65 Les fam\u00edlies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>" +
-    ((esAdmin || !doc.adminPin || (doc.adminFam && f.id === doc.adminFam)) ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "\ud83d\udee1\ufe0f Administrador \u00b7 gestiona" : "\ud83d\udee1\ufe0f Acc\u00e9s administrador") + "</button></p>" :
+    (!doc.adminPin ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>\ud83d\udee1\ufe0f Acc\u00e9s administrador</button></p>" :
      esStaff ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>\ud83d\udee0\ufe0f Staff \u00b7 gestiona</button></p>" :
-     f.rol === "staff" ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>\ud83d\udee0\ufe0f Activa el mode staff</button></p>" : "") +
+     f.rol === "staff" && !(doc.adminFam && f.id === doc.adminFam) ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>\ud83d\udee0\ufe0f Activa el mode staff</button></p>" : "") +
     "<div id='vel' class='vel' onclick='tancaMenu()'></div><nav id='calaix' class='calaix'></nav>" +
     "<div id='cel-vel' class='vel' onclick='tancaCasella()'></div><div id='cel-menu' class='cmenu'></div>";
   pintaMenu();
@@ -723,6 +745,7 @@ function pintaMenu(){
     it("graella", "\ud83d\uddd3\ufe0f", "Graella", graellaCompleta(f) ? "" : "<span class='c-lock'>\u26a0</span>") +
     it("cal", "\ud83d\udcc5", "Calendaris", bloc ? "<span class='c-lock'>\ud83d\udd12</span>" : "") +
     it("avisos", "\ud83d\udd14", "Avisos", n ? "<span class='c-bad'>" + n + "</span>" : "") +
+    (doc.adminFam && f.id === doc.adminFam ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee1\ufe0f Admin</button>" : "") +
     (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
     "<div class='c-sep'></div>" +
     "<p class='hint' style='padding:0 12px'>Perfil i Graella complets desbloquegen els Calendaris.</p>";
@@ -960,6 +983,7 @@ function obreAdmin(){ pantallaAdmin(); }
 function tancaAdmin(){ if (famId && lameva()) pantallaApp(); else pantallaTria(); }
 function pantallaAdmin(){
   document.body.classList.add("dins");
+  setTimeout(pintaPeuStats, 0);
   let cos;
   if (!doc.adminPin){
     cos = "<p class='lead'>Encara no hi ha cap codi d'administrador al grup. Si l'administrador ets tu, estableix-lo ara; la resta de fam\u00edlies no heu de fer res aqu\u00ed.</p>" +
