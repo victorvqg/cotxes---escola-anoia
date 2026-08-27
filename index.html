@@ -122,6 +122,14 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
+.cmenu{position:fixed;left:0;right:0;bottom:-100%;background:#fff;z-index:42;border-radius:18px 18px 0 0;box-shadow:0 -6px 24px rgba(14,42,68,.22);padding:14px 16px calc(16px + env(safe-area-inset-bottom));transition:bottom .18s;max-width:560px;margin:0 auto}
+.cmenu.obert{bottom:0}
+.cm-cap{display:flex;align-items:center;gap:8px;font:800 18px 'Baloo 2';color:#0E2A44;margin-bottom:10px}
+.cm-tip{font:700 13px 'Baloo 2';color:#6B7D8A}
+.cm-x{margin-left:auto;background:none;border:none;font-size:17px;color:#6B7D8A;padding:4px 8px;cursor:pointer}
+.cbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#F4F7FA;border:1.5px solid #E3ECF4;border-radius:12px;padding:11px 12px;font:700 15.5px 'Baloo 2';color:#17456B;margin-top:7px;cursor:pointer}
+.cbtn.on{background:#DCF1E3;border-color:#9CCDAD;color:#1F5C3B}
+.cb-ok{margin-left:auto;font-weight:800}
 .nomgran{font:800 22px 'Baloo 2';color:#0E2A44;margin:2px 0 8px}
 .barra-avis.info{background:#FFF6DD;color:#7A5A00;border-color:#EAD289}
 .barra-avis{background:#FBE9E5;color:#8F2B1C;border:1.5px solid #E8B3A8;border-radius:12px;padding:9px 12px;font-size:14px;line-height:1.45;margin:0 0 8px;text-align:left}
@@ -191,7 +199,7 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.6</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.7</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Tens canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -587,7 +595,8 @@ function pantallaApp(){
     "<div id='tab-cos'></div>" +
     "<details class='conf'><summary>\ud83d\udc65 Les fam\u00edlies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>" +
     "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "\ud83d\udee1\ufe0f Administrador \u00b7 gestiona" : esStaff ? "\ud83d\udee0\ufe0f Staff \u00b7 gestiona" : "\ud83d\udee1\ufe0f Acc\u00e9s administrador") + "</button></p>" +
-    "<div id='vel' class='vel' onclick='tancaMenu()'></div><nav id='calaix' class='calaix'></nav>";
+    "<div id='vel' class='vel' onclick='tancaMenu()'></div><nav id='calaix' class='calaix'></nav>" +
+    "<div id='cel-vel' class='vel' onclick='tancaCasella()'></div><div id='cel-menu' class='cmenu'></div>";
   pintaMenu();
   triaTab(tabAct);
 }
@@ -660,21 +669,12 @@ function pintaPerfil(){
 
 function pintaGraellaTab(){
   const f = lameva();
-  if (pinzell !== "cotxe" && pinzell !== "propi" && pinzell !== "esborra" && !f.nens.some(n => n.id === pinzell)) pinzell = "cotxe";
-  const pinzells =
-    "<div class='pinzells'>" +
-    "<button class='pz " + (pinzell === "cotxe" ? "actiu" : "") + "' onclick=\"triaPinzell('cotxe')\">\ud83d\ude97 El cotxe (" + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ")</button>" +
-    f.nens.map(n => "<button class='pz " + (pinzell === n.id ? "actiu" : "") + "' onclick=\"triaPinzell('" + n.id + "')\">\ud83d\ude4b " + esc(n.nom) + "</button>").join("") +
-    "<button class='pz " + (pinzell === "propi" ? "actiu" : "") + "' onclick=\"triaPinzell('propi')\">\ud83d\udeab Pel nostre compte</button>" +
-    "<button class='pz " + (pinzell === "esborra" ? "actiu" : "") + "' onclick=\"triaPinzell('esborra')\">Esborra</button>" +
-    "</div>";
   const pend = celesPendents(f);
   const estatG = pend.length
     ? "<div class='g-estat mal'>\u26a0 Falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab). Primera: " + esc(pend[0]) + ".</div>"
     : "<div class='g-estat be'>\u2713 Setmana completa \u2014 els Calendaris estan oberts.</div>";
   $("#tab-cos").innerHTML =
-    pinzells +
-    "<p class='lead' style='margin:2px 0 6px'>1. Tria qu\u00e8 marques \u00b7 2. Toca les caselles. \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte \u00b7 \ud83d\ude4b nen que necessita pla\u00e7a. Cada nen entra a les 8.00 <b>o</b> a les 9.00: marcar una hora li desmarca l'altra.</p>" +
+    "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. Cada nen entra a les 8.00 <b>o</b> a les 9.00: marcar-li una li treu l'altra.</p>" +
     estatG +
     "<div class='graella' id='graella'></div>";
   pintaGraella();
@@ -683,6 +683,30 @@ function pintaGraellaTab(){
 function pintaHorariComplet(){ if (tabAct === "perfil") pintaPerfil(); else pintaGraellaTab(); }
 function triaPinzell(p){ pinzell = p; pintaHorariComplet(); }
 
+let celObert = null;
+function obreCasella(slot, dia){ celObert = { slot: slot, dia: dia }; pintaCasella(); }
+function tancaCasella(){ celObert = null; const m = $("#cel-menu"), v = $("#cel-vel"); if (m) m.classList.remove("obert"); if (v) v.classList.remove("obert"); }
+function pintaCasella(){
+  if (!celObert) return;
+  const f = lameva(); const s = celObert.slot, d = celObert.dia;
+  const fr = FRANGES.find(x => x.id === s) || {};
+  const btn = (on, txt, ac) => "<button class='cbtn" + (on ? " on" : "") + "' onclick=\"celAccio('" + ac + "')\">" + txt + (on ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>";
+  let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
+  h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 oferim " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
+  f.nens.forEach(n => { h += btn(te(n.marca, s, d), "\ud83d\ude4b " + esc(n.nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a", "nen:" + n.id); });
+  h += btn(te(f.propi, s, d), "\ud83d\udeab Anem pel nostre compte", "propi");
+  h += btn(false, "Buida la casella", "esborra");
+  h += "<button class='boto' style='width:100%;margin-top:10px' onclick='tancaCasella()'>Fet</button>";
+  const m = $("#cel-menu"), v = $("#cel-vel");
+  if (!m || !v) return;
+  m.innerHTML = h; m.classList.add("obert"); v.classList.add("obert");
+}
+function celAccio(ac){
+  if (!celObert) return;
+  triaPinzell(ac.indexOf("nen:") === 0 ? ac.slice(4) : ac);
+  pinta(celObert.slot, celObert.dia);
+  pintaCasella();
+}
 function pintaGraella(){
   const f = lameva();
   let h = "<div></div>" + DIES.map(d => "<div class='g-dia'>" + DIES_LBL[d] + "</div>").join("");
@@ -703,7 +727,7 @@ function pintaGraella(){
         const inicialsNen = x => x.nom.trim().split(/\s+/).map(p => p[0].toUpperCase()).slice(0, 2).join("");
         cont = "<span class='c-ico'>🙋</span><span class='c-nom'>" + marcats.slice(0, 2).map(x => esc(inicialsNen(x))).join("·") + (marcats.length > 2 ? "+" : "") + "</span>";
       }
-      h += "<button class='cel " + cls + "' onclick=\"pinta('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
+      h += "<button class='cel " + cls + "' onclick=\"obreCasella('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
   });
   $("#graella").innerHTML = h;
@@ -711,7 +735,7 @@ function pintaGraella(){
 
 function pinta(slot, dia){
   const f = lameva(); if (!f) return;
-  const k = slot + "-" + dia, ara = Date.now();
+  const k = slot + "-" + dia + "|" + pinzell, ara = Date.now();
   if (ultimToc.k === k && ara - ultimToc.t < 350) return; // escut anti-tocs dobles
   ultimToc = { k: k, t: ara };
   if (!f.propi) f.propi = {};
