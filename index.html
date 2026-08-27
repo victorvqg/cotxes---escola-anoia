@@ -126,6 +126,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .g-estat{border-radius:12px;padding:9px 12px;font-size:14.5px;margin:0 0 10px;line-height:1.4}
 .g-estat.mal{background:#FBE9E5;color:#8F2B1C;border:1.5px solid #E8B3A8}
 .g-estat.be{background:#DCF1E3;color:#1F5C3B;border:1.5px solid #9CCDAD}
+.av-sec{font:800 13px 'Baloo 2';letter-spacing:.08em;color:#6B7D8A;margin:12px 2px 2px;text-transform:uppercase}
 .av-fila{display:flex;gap:10px;padding:8px 0;border-top:1px solid #F0F4F7;font-size:15px;line-height:1.45;align-items:flex-start}
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
@@ -215,6 +216,7 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
 .barra-int{background:#fff;border-top:1.5px solid #D6E0E7;box-shadow:0 -6px 20px rgba(23,69,107,.14)}
 .barra .boto{white-space:nowrap;padding:12px 18px}
 body.amb-barra .credit{display:none}
+body.amb-barra .cal-actualitza{display:none}
 .subtabs{display:flex;overflow-x:auto;scrollbar-width:none}
 .subtabs::-webkit-scrollbar{display:none}
 .subtab{flex:1 0 auto;white-space:nowrap}
@@ -256,7 +258,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.8</span></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 2.9</span></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -680,7 +682,7 @@ function pantallaApp(){
     "<div class='captab'><span class='cap-titol' id='cap-titol'></span></div>" +
     "<div id='tab-cos'></div>" +
     "<details class='conf'><summary>\ud83d\udc65 Les fam\u00edlies del grup (" + doc.families.length + ")</summary><div class='targeta' style='margin-top:8px'>" + dirHtml + "</div></details>" +
-    "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "\ud83d\udee1\ufe0f Administrador \u00b7 gestiona" : esStaff ? "\ud83d\udee0\ufe0f Staff \u00b7 gestiona" : "\ud83d\udee1\ufe0f Acc\u00e9s administrador") + "</button></p>" +
+    ((esAdmin || esStaff || f.rol === "staff" || !doc.adminPin || (doc.adminFam && f.id === doc.adminFam)) ? "<p style='text-align:center;margin:10px 0 4px'><button class='enllac' onclick='obreAdmin()'>" + (esAdmin ? "\ud83d\udee1\ufe0f Administrador \u00b7 gestiona" : esStaff ? "\ud83d\udee0\ufe0f Staff \u00b7 gestiona" : "\ud83d\udee1\ufe0f Acc\u00e9s administrador") + "</button></p>" : "") +
     "<div id='vel' class='vel' onclick='tancaMenu()'></div><nav id='calaix' class='calaix'></nav>" +
     "<div id='cel-vel' class='vel' onclick='tancaCasella()'></div><div id='cel-menu' class='cmenu'></div>";
   pintaMenu();
@@ -778,7 +780,7 @@ function pintaCasella(){
   const fr = FRANGES.find(x => x.id === s) || {};
   const btn = (on, txt, ac) => "<button class='cbtn" + (on ? " on" : "") + "' onclick=\"celAccio('" + ac + "')\">" + txt + (on ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>";
   let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
-  h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 oferim " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
+  h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 els nens v\u00e9nen amb nosaltres i oferim " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
   f.nens.forEach(n => { h += btn(te(n.marca, s, d), "\ud83d\ude4b " + esc(n.nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a", "nen:" + n.id); });
   h += btn(te(f.propi, s, d), "\ud83d\udeab Anem pel nostre compte", "propi");
   h += btn(false, "Buida la casella", "esborra");
@@ -833,9 +835,9 @@ function pinta(slot, dia){
   }).filter(Boolean) : [];
   const meusPre = f.nens.filter(n => te(n.marca, slot, dia) && elPorta(f.id, n.id, slot, dia)).map(n => ({ id: n.id, nom: n.nom.trim().split(/\s+/)[0] }));
   if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); treu(f.propi, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); if (f.porta) delete f.porta[cel]; }
-  else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (!te(f.cotxe, slot, dia) && f.porta) delete f.porta[cel]; }
+  else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (te(f.cotxe, slot, dia)) f.nens.forEach(n => treu(n.marca, slot, dia)); else if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
-  else { const n = f.nens.find(x => x.id === pinzell); if (!n){ pinzell = "cotxe"; pintaGraellaTab(); return; } treu(f.propi, slot, dia); commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
+  else { const n = f.nens.find(x => x.id === pinzell); if (!n){ pinzell = "cotxe"; pintaGraellaTab(); return; } treu(f.propi, slot, dia); if (te(f.cotxe, slot, dia)){ treu(f.cotxe, slot, dia); if (f.porta) delete f.porta[cel]; } commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
   dirty = true; pintaBarra(); pintaGraella();
   const hhFr = (FRANGES.find(x => x.id === slot) || {}).hora || "";
   const araCond = te(f.cotxe, slot, dia);
@@ -991,13 +993,17 @@ function pintaRols(){
 }
 function pintaAvisos(){
   const f = lameva();
-  const reg = avisosMeus();
+  const reg = avisosMeus().slice().sort((a, b) => b.t - a.t);
+  const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10);
   lsSet("cx_avisos_vist_" + f.id, String(Date.now()));
   pintaMenu();
+  const fila = a => { const dt = new Date(a.t); const hh = dt.toLocaleDateString("ca") + " " + dt.toTimeString().slice(0, 5); return "<div class='av-fila'><span class='av-quan'>" + hh + "</span><span>" + a.m + "</span></div>"; };
+  const nous = reg.filter(a => a.t > dar), vells = reg.filter(a => a.t <= dar);
   $("#tab-cos").innerHTML =
     "<div class='targeta'><h2>\ud83d\udd14 Avisos de la teva fam\u00edlia</h2>" +
     (reg.length
-      ? reg.map(a => { const dt = new Date(a.t); const hh = dt.toLocaleDateString("ca") + " " + dt.toTimeString().slice(0, 5); return "<div class='av-fila'><span class='av-quan'>" + hh + "</span><span>" + a.m + "</span></div>"; }).join("")
+      ? (nous.length ? "<div class='av-sec'>\U0001f195 Nous (" + nous.length + ")</div>" + nous.map(fila).join("") : "") +
+        (vells.length ? "<div class='av-sec'>Llegits</div>" + vells.map(fila).join("") : "")
       : "<p class='lead'>Encara no hi ha cap av\u00eds. Aqu\u00ed veur\u00e0s els canvis que afecten els teus nens: qui els agafa o els deixa el cotxe, amb dia i franja.</p>") +
     "<p class='hint' style='margin-top:8px'>Els avisos es detecten en aquest m\u00f2bil cada cop que l'app carrega les dades del grup.</p></div>";
 }
@@ -1067,7 +1073,7 @@ function renderCal(){
     "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
     "<div class='mapa'>" + mapa + "</div>" +
     "<div id='cal-cos'></div>" +
-    "<button class='boto sec' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
+    "<button class='boto sec cal-actualitza' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
   if (vistaCal === "quadre") pintaQuadre(); else if (vistaCal === "set") pintaSetmana(); else if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else pintaVistaNen();
 }
 function triaVistaCal(v){ vistaCal = v; renderCal(); }
@@ -1319,7 +1325,6 @@ async function pintaResum(){
   if (justs.length) h += "<div class='targeta t-just'><h2 style='color:#6E4E00'>Va just (sense marge)</h2>" + justs.map(it => filaDet(it, "just")).join("") + "</div>";
   if (marges.length) h += "<div class='targeta t-ok'><h2 style='color:#1F5C3B'>On sobren places</h2>" + marges.map(it => filaDet(it, "ok")).join("") + "<p class='hint' style='margin:8px 2px 0'>Toca una línia per veure els cotxes i les seves places.</p></div>";
   if (buides) h += "<p class='hint' style='text-align:center'>" + buides + " franges sense ning\u00fa apuntat.</p>";
-  h += "<button class='boto sec' style='width:100%' onclick='pintaResum()'>\u21bb Actualitza</button>";
   $("#cal-cos").innerHTML = h;
 }
 
