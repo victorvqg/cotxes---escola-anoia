@@ -28,13 +28,16 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.1", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.1"));
+  T("lema i peu amb versió 3.2", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.2"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
+  // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
+  const sql = fs.readFileSync(path.join(__dirname, "supabase-fase1.sql"), "utf-8");
+  T("SQL: claim_family exigeix el codi de la família (p_token)", /claim_family\(p_family uuid, p_token text\)/.test(sql) && sql.includes("Codi de la família incorrecte"));
+  T("SQL: can_touch_family (staff no toca l'admin) + límits 100/5", sql.includes("can_touch_family") && sql.includes("limita_families") && sql.includes("limita_nens"));
   T("la URL del projecte Supabase és al CONFIG", html.includes("https://jbfjrgddsywpmwabvbtb.supabase.co"));
   T("la llibreria supabase-js es carrega per CDN", html.includes("@supabase/supabase-js"));
   // Regressió: a create_group, l'override del trigger de rols ha d'anar ABANS de l'insert de la família
-  const sql = fs.readFileSync(path.join(__dirname, "supabase-fase1.sql"), "utf-8");
   const cg = sql.slice(sql.indexOf("function create_group"), sql.indexOf("$$ language", sql.indexOf("function create_group")));
   T("SQL: create_group posa l'admin_override ABANS d'inserir la família", cg.indexOf("admin_override") > -1 && cg.indexOf("admin_override") < cg.indexOf("insert into families"));
 }
@@ -61,7 +64,8 @@ const socMembre = () => { const p = meu(); return !!(p && p.status === "aprovat"
 const rolMeu = () => { const f = famPerId(mevaFamId()); return f ? f.role : "usuari"; };
 const socAdmin = () => socMembre() && rolMeu() === "admin";
 const socStaffAdmin = () => socMembre() && (rolMeu() === "admin" || rolMeu() === "staff");
-const potTocarFam = fid => fid === mevaFamId() || socStaffAdmin();
+const potTocarFam = fid => fid === mevaFamId() || socAdmin() || (socStaffAdmin() && (famPerId(fid) || {}).role !== "admin");
+const codiDeFam = f => String(f.invite_token || "").replace(/-/g, "").slice(0, 8).toUpperCase();
 function logBD(gid, accio, famId, detalls){
   DB.activity_log.push({ id: randomUUID(), group_id: gid, actor_id: currentUserId, family_id: famId || null, affected_family_id: null, action: accio, details: detalls || "", created_at: new Date().toISOString() });
 }
@@ -96,6 +100,7 @@ function execQuery(q){
       }
       if (t === "families"){
         if (!socMembre() || row.group_id !== grupMeu()) return err("families: fora del teu grup");
+        if (DB.families.filter(x => x.group_id === row.group_id).length >= 100) return err("Aquest grup ja ha arribat al màxim de 100 famílies");
         if (row.role && row.role !== "usuari" && !socAdmin()) row.role = "usuari"; // trigger protect_family_role
         const r = Object.assign({ id: randomUUID(), cognom2: "", phone: "", phone_visible: true, seats: 3, role: "usuari", invite_token: randomUUID(), created_at: new Date().toISOString() }, row);
         if (r.seats < 0 || r.seats > 6) return err("seats fora de rang");
@@ -103,6 +108,7 @@ function execQuery(q){
       }
       if (t === "children"){
         if (!potTocarFam(row.family_id)) return err("children: no és la teva família");
+        if (DB.children.filter(c => c.family_id === row.family_id).length >= 5) return err("Màxim 5 fills per família");
         const r = Object.assign({ id: randomUUID() }, row);
         DB.children.push(r); out.push(r); continue;
       }
@@ -113,7 +119,7 @@ function execQuery(q){
         DB.weekly_marks.push(r); out.push(r); continue;
       }
       if (t === "assignments"){
-        if (!(row.driver_family_id === mevaFamId() || socStaffAdmin())) return err("assignments: no és el teu cotxe");
+        if (!potTocarFam(row.driver_family_id)) return err("assignments: no és el teu cotxe");
         // trigger validate_assignment
         const child = DB.children.find(c => c.id === row.child_id);
         if (!child) return err("Nen inexistent");
@@ -168,7 +174,7 @@ function execQuery(q){
       if (!q.filters.every(f => f(row))) return true;
       if (t === "children" && !potTocarFam(row.family_id)) return true;
       if (t === "weekly_marks" && !potTocarFam(row.family_id)) return true;
-      if (t === "assignments" && !(row.driver_family_id === mevaFamId() || socStaffAdmin())) return true;
+      if (t === "assignments" && !potTocarFam(row.driver_family_id)) return true;
       return false;
     });
     return dades(null);
@@ -218,6 +224,7 @@ function rpc(nom, p){
   if (nom === "claim_family"){
     const f = famPerId(p.p_family);
     if (!f) return err("Família inexistent");
+    if (codiDeFam(f) !== String(p.p_token || "").trim().toUpperCase()) return err("Codi de la família incorrecte");
     if (DB.profiles.filter(x => x.family_id === f.id).length >= 2) return err("Aquesta família ja té 2 comptes");
     const pr = meu();
     if (pr && pr.family_id) return err("Aquest compte ja té família");
@@ -350,6 +357,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   console.log("1 · LOGIN I CONSENTIMENT RGPD");
   T("arrenca a la pantalla de login (correu + 3 passos)", pant().includes("Entra a l'app") && pant().includes("COM FUNCIONA"));
   T("el login no ofereix cap alternativa de Google", !pant().includes("Continua amb Google") && !pant().includes("Google") && typeof w.fesGoogle === "undefined");
+  T("mode per defecte: només «Entra» (el registre no es veu)", pant().includes('onclick="fesLogin()"') && !pant().includes('onclick="fesRegistre()"'));
+  w.loginA("registre"); await tic();
+  T("mode registre: només «Crea el compte»", pant().includes("Crea el teu compte") && pant().includes('onclick="fesRegistre()"') && !pant().includes('onclick="fesLogin()"'));
+  w.loginA("entra"); await tic();
+  T("es pot tornar al mode Entra", pant().includes('onclick="fesLogin()"'));
   await ompleLogin("admin@test.cat", "malament");
   await w.fesLogin(); await tic(10);
   T("compte inexistent o contrasenya dolenta → refusat amb missatge", pant().includes("incorrectes"));
@@ -564,7 +576,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("6c · AVISOS ENTRE COMPTES (el pare i la mare ho veuen)");
   await surtIentra("grau@test.cat", "grau123");
-  T("en entrar, les assignacions noves han generat avisos", w.avisosNous() >= 1 && w.avisosMeus().some(a => a.m.includes("el porta Marta VP")));
+  T("en entrar, les assignacions noves han generat avisos", w.avisosNous() >= 1 && w.avisosMeus().some(a => a.m.includes("el porta Marta Vila Prat")));
   w.triaTab("avisos"); await tic();
   T("la pàgina d'avisos llista qui porta els nens", cos().includes("Nous (") && cos().includes("Bru") && cos().includes("Dilluns 17.00"));
   T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
@@ -576,7 +588,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await surtIentra("grau@test.cat", "grau123");
   T("canvi detectat en entrar: en Bru ha perdut el cotxe", w.avisosNous() >= 1 && w.avisosMeus().some(a => a.m.includes("ja no t\u00e9 cotxe")), JSON.stringify(w.avisosMeus().slice(0,3)));
   w.triaTab("avisos"); await tic();
-  T("la pàgina d'avisos: secció Nous, amb nom, dia i franja", cos().includes("Nous (") && cos().includes("Bru") && cos().includes("ja no té cotxe") && cos().includes("abans Marta VP") && cos().includes("Dilluns 17.00"), cos().slice(0, 400));
+  T("la pàgina d'avisos: secció Nous, amb nom, dia i franja", cos().includes("Nous (") && cos().includes("Bru") && cos().includes("ja no té cotxe") && cos().includes("abans Marta Vila Prat") && cos().includes("Dilluns 17.00"), cos().slice(0, 400));
   T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
   const cliUsuari = fakeSupabaseClient(); // RLS: en Grau (rol usuari), directe contra la BD
   await cliUsuari.from("weekly_marks").delete().eq("family_id", idVila);
@@ -650,20 +662,28 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await w.creaFam(); await tic(30);
   T("l'admin SÍ pot crear una família per a altres (sense compte)", DB.families.length === 6 && famDB("Ajudada Extra") && !DB.profiles.some(p => p.family_id === famDB("Ajudada Extra").id));
 
-  console.log("8 · SEGON COMPTE A LA MATEIXA FAMÍLIA (màxim 2)");
+  console.log("8 · SEGON COMPTE A LA MATEIXA FAMÍLIA (màxim 2 + CODI DE FAMÍLIA)");
   afegeixUsuari("c@test.cat", "ccc123");
   await surtIentra("c@test.cat", "ccc123");
   await acceptaConsentiment();
   await uneixAmbCodi(CODI);
   T("la família sense compte apareix com a reclamable", (d.querySelector("#sel-fam") || { innerHTML: "" }).innerHTML.includes("Ajudada Extra"));
+  T("i el formulari demana el codi de la família", !!d.querySelector("#sel-codi"));
+  const codiAjudada = () => codiDeFam(famDB("Ajudada Extra"));
   d.querySelector("#sel-fam").value = famDB("Ajudada Extra").id;
+  d.querySelector("#sel-codi").value = "ZZZZZZZZ";
+  await w.entraSel(); await tic(20);
+  T("codi de família INCORRECTE: rebutjat amb avís", d.querySelector("#avis").textContent.includes("Codi de la família incorrecte") && !DB.profiles.find(p => p.email === "c@test.cat").family_id);
+  d.querySelector("#sel-fam").value = famDB("Ajudada Extra").id;
+  d.querySelector("#sel-codi").value = codiAjudada();
   await w.entraSel(); await tic(30);
-  T("reclamar vincula el compte a la família", pant().includes("Hola") && pant().includes("Ajudada Extra") && DB.profiles.find(p => p.email === "c@test.cat").status === "aprovat");
+  T("amb el codi BO, reclamar vincula el compte a la família", pant().includes("Hola") && pant().includes("Ajudada Extra") && DB.profiles.find(p => p.email === "c@test.cat").status === "aprovat");
   afegeixUsuari("d2@test.cat", "ddd123");
   await surtIentra("d2@test.cat", "ddd123");
   await acceptaConsentiment();
   await uneixAmbCodi(CODI);
   d.querySelector("#sel-fam").value = famDB("Ajudada Extra").id;
+  d.querySelector("#sel-codi").value = codiAjudada();
   await w.entraSel(); await tic(30);
   T("segon compte admès (pare i mare)", DB.profiles.filter(p => p.family_id === famDB("Ajudada Extra").id).length === 2);
   afegeixUsuari("e@test.cat", "eee123");
@@ -671,7 +691,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await acceptaConsentiment();
   await uneixAmbCodi(CODI);
   T("amb 2 comptes, la família ja NO surt com a reclamable", !(d.querySelector("#sel-fam") || { innerHTML: "" }).innerHTML.includes("Ajudada Extra"));
-  const r3 = await fakeSupabaseClient().rpc("claim_family", { p_family: famDB("Ajudada Extra").id });
+  const r3 = await fakeSupabaseClient().rpc("claim_family", { p_family: famDB("Ajudada Extra").id, p_token: codiAjudada() });
   T("i el servidor rebutja el tercer compte encara que ho intenti per codi", !!r3.error && r3.error.message.includes("2 comptes"));
 
   console.log("9 · BAIXA D'UNA FAMÍLIA (cascada + comptes desvinculats)");
@@ -735,6 +755,40 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("la sincronització recarrega els canvis fets per un altre compte", w.doc.families.find(x => x.id === grauF.id).nens.some(n => w.te(n.marca, slotCond, diaCond)));
   w.selDia(diaCond); await tic(30);
   T("la vista dia avisa dels nens pendents de pujar al meu cotxe", cos().includes("demana pla\u00e7a") || cos().includes("demanen pla\u00e7a"));
+
+  console.log("10c · NOVETATS v3.2 (tel/curs, codi família, El teu cotxe, límits, staff↛admin, self-heal)");
+  const menuHtml2 = d.querySelector("#calaix").innerHTML;
+  T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
+  w.triaTab("perfil"); await tic();
+  T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
+  w.renomTel("600111222"); w.triaCurs("3r ESO"); await tic();
+  await w.desa(); await tic(30);
+  T("telèfon i curs es desen a la BD", famDB("Vila Puig").phone === "600111222" && famDB("Vila Puig").curs === "3r ESO");
+  w.triaTab("families"); await tic();
+  T("a Famílies es veu el rol de cadascuna (+curs i telèfon)", cos().includes("· admin") && cos().includes("· staff") && cos().includes("3r ESO") && cos().includes("600111222"));
+  w.triaTab("cotxe"); await tic();
+  T("«El teu cotxe» llista els nens que hi puc carregar, amb caselles", cos().includes("Qui puges al teu cotxe?") && (cos().includes("demana pla") || cos().includes("demanen pla")));
+  await w.copiaSeguretat(); await tic();
+  T("la còpia de seguretat (ara també amb logs) no peta", true);
+  const gId = famDB("Grau").id;
+  while (DB.children.filter(c => c.family_id === gId).length < 5)
+    DB.children.push({ id: randomUUID(), family_id: gId, name: "Extra" + DB.children.filter(c => c.family_id === gId).length });
+  const rNen6 = await fakeSupabaseClient().from("children").insert({ family_id: gId, name: "Sisè" });
+  T("límit de 5 fills per família (BD)", !!rNen6.error && rNen6.error.message.includes("5 fills"));
+  await surtIentra("grau@test.cat", "grau123");
+  const rTocaAdmin = await fakeSupabaseClient().from("families").update({ driver: "Intrús" }).eq("id", famDB("Vila Puig").id);
+  T("l'staff NO pot editar la família de l'admin ni per codi", !!rTocaAdmin.error && famDB("Vila Puig").driver !== "Intrús");
+  const rNenAdmin = await fakeSupabaseClient().from("children").insert({ family_id: famDB("Vila Puig").id, name: "Intrús" });
+  T("ni afegir-hi fills", !!rNenAdmin.error);
+  afegeixUsuari("f@test.cat", "fff123");
+  await surtIentra("f@test.cat", "fff123");
+  await acceptaConsentiment();
+  await uneixAmbCodi(CODI);
+  const pfHeal = DB.profiles.find(p => p.email === "f@test.cat"); // alta quedada a mitges (la RPC va vincular, la app no ho va saber)
+  pfHeal.family_id = famDB("Grau").id; pfHeal.requested_group = famDB("Grau").group_id; pfHeal.status = "aprovat";
+  ompleFamForm("Test", "Mitges", "", ["X"]);
+  await w.creaFam(); await tic(30);
+  T("«Aquest compte ja té família» es repara sol: entra a la família vinculada", pant().includes("Hola") && pant().includes("Grau"), d.querySelector("#avis").textContent + " || " + pant().slice(0, 200));
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
