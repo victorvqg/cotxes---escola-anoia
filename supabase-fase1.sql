@@ -436,12 +436,18 @@ begin
     values (my_group(), auth.uid(), my_family(), p_family, 'canvi de rol', 'administració transferida');
 end $$ language plpgsql security definer;
 
--- ── 7 · TEMPS REAL (sincronització viu; l'app ho farà servir a la Fase 2) ──
+-- ── 7 · TEMPS REAL (sincronització en viu entre comptes, v3.1) ──
 alter publication supabase_realtime add table weekly_marks;
 alter publication supabase_realtime add table assignments;
 alter publication supabase_realtime add table notifications;
 alter publication supabase_realtime add table families;
 alter publication supabase_realtime add table groups;
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'children') then
+    alter publication supabase_realtime add table children;
+  end if;
+end $$;
 
 -- ── 8 · VERIFICACIÓ: ha de llistar les funcions creades ─────────────
 select proname from pg_proc where proname in
