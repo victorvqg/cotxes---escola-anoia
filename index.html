@@ -367,7 +367,7 @@ function msgNeta(e){
   const m = (e && (e.message || e.msg)) || "";
   if (!m) return "error desconegut";
   if (/row-level security/i.test(m)) return "La base de dades ho ha bloquejat (permisos). Si ho creus un error, avisa l'administrador.";
-  if (/invalid login credentials/i.test(m)) return "Correu o contrasenya incorrectes. Si t'acabes de registrar, potser has de confirmar el correu primer (mira la bústia i l'spam).";
+  if (/invalid login credentials/i.test(m)) return "Correu o contrasenya incorrectes. Si és la primera vegada que hi entres, prem «Crea un compte nou» (el botó de sota), no «Entra».";
   if (/email not confirmed/i.test(m)) return "Has de confirmar el correu: t'hem enviat un enllaç (mira també l'spam).";
   if (/user already registered/i.test(m)) return "Aquest correu ja té compte: prem «Entra» en lloc de crear-ne un de nou.";
   return m;
