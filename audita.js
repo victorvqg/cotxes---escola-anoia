@@ -32,6 +32,10 @@ console.log("0 · CABLEJAT ESTÀTIC");
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("la URL del projecte Supabase és al CONFIG", html.includes("https://jbfjrgddsywpmwabvbtb.supabase.co"));
   T("la llibreria supabase-js es carrega per CDN", html.includes("@supabase/supabase-js"));
+  // Regressió: a create_group, l'override del trigger de rols ha d'anar ABANS de l'insert de la família
+  const sql = fs.readFileSync(path.join(__dirname, "supabase-fase1.sql"), "utf-8");
+  const cg = sql.slice(sql.indexOf("function create_group"), sql.indexOf("$$ language", sql.indexOf("function create_group")));
+  T("SQL: create_group posa l'admin_override ABANS d'inserir la família", cg.indexOf("admin_override") > -1 && cg.indexOf("admin_override") < cg.indexOf("insert into families"));
 }
 
 /* ══ Supabase simulat (taules + RLS bàsica + triggers + rpc) ══ */
@@ -189,6 +193,7 @@ function rpc(nom, p){
     const codi = randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
     DB.groups.push({ id: gid, name: p.p_name, invite_code: codi, status: "actiu", notice: "", created_by: currentUserId, created_at: new Date().toISOString() });
     const fid = randomUUID();
+    // Emula trg_protect_family_role: l'override va ABANS de l'insert (si no, el rol cau a 'usuari')
     DB.families.push({ id: fid, group_id: gid, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "admin", invite_token: randomUUID(), created_at: new Date().toISOString() });
     const pr = meu();
     if (pr){ pr.family_id = fid; pr.requested_group = gid; pr.status = "aprovat"; }

@@ -298,6 +298,8 @@ create or replace function create_group(p_name text, p_cognom1 text, p_cognom2 t
 returns uuid as $$
 declare v_gid uuid; v_fid uuid;
 begin
+  -- l'override ha d'anar ABANS de l'insert: el trigger protect_family_role el comprova
+  perform set_config('app.admin_override', 'on', true);
   insert into groups (name, invite_code, created_by)
     values (p_name, upper(substr(replace(gen_random_uuid()::text,'-',''),1,6)), auth.uid())
     returning id into v_gid;
@@ -305,7 +307,6 @@ begin
     values (v_gid, p_cognom1, coalesce(p_cognom2,''),
             trim(p_cognom1 || ' ' || coalesce(p_cognom2,'')), p_driver, coalesce(p_seats,3), 'admin')
     returning id into v_fid;
-  perform set_config('app.admin_override', 'on', true);
   insert into profiles (id, email, family_id, requested_group, status, consent_at)
     values (auth.uid(), (select email from auth.users where id = auth.uid()), v_fid, v_gid, 'aprovat', now())
     on conflict (id) do update set family_id = v_fid, requested_group = v_gid, status = 'aprovat';
