@@ -298,6 +298,8 @@ create or replace function create_group(p_name text, p_cognom1 text, p_cognom2 t
 returns uuid as $$
 declare v_gid uuid; v_fid uuid;
 begin
+  -- l'override ha d'anar ABANS de l'insert: el trigger protect_family_role el comprova
+  perform set_config('app.admin_override', 'on', true);
   insert into groups (name, invite_code, created_by)
     values (p_name, upper(substr(replace(gen_random_uuid()::text,'-',''),1,6)), auth.uid())
     returning id into v_gid;
@@ -305,7 +307,6 @@ begin
     values (v_gid, p_cognom1, coalesce(p_cognom2,''),
             trim(p_cognom1 || ' ' || coalesce(p_cognom2,'')), p_driver, coalesce(p_seats,3), 'admin')
     returning id into v_fid;
-  perform set_config('app.admin_override', 'on', true);
   insert into profiles (id, email, family_id, requested_group, status, consent_at)
     values (auth.uid(), (select email from auth.users where id = auth.uid()), v_fid, v_gid, 'aprovat', now())
     on conflict (id) do update set family_id = v_fid, requested_group = v_gid, status = 'aprovat';
@@ -435,12 +436,18 @@ begin
     values (my_group(), auth.uid(), my_family(), p_family, 'canvi de rol', 'administració transferida');
 end $$ language plpgsql security definer;
 
--- ── 7 · TEMPS REAL (sincronització viu; l'app ho farà servir a la Fase 2) ──
+-- ── 7 · TEMPS REAL (sincronització en viu entre comptes, v3.1) ──
 alter publication supabase_realtime add table weekly_marks;
 alter publication supabase_realtime add table assignments;
 alter publication supabase_realtime add table notifications;
 alter publication supabase_realtime add table families;
 alter publication supabase_realtime add table groups;
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'children') then
+    alter publication supabase_realtime add table children;
+  end if;
+end $$;
 
 -- ── 8 · VERIFICACIÓ: ha de llistar les funcions creades ─────────────
 select proname from pg_proc where proname in

@@ -28,17 +28,22 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.0", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.0"));
+  T("lema i peu amb versió 3.1", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.1"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
+  T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   T("la URL del projecte Supabase és al CONFIG", html.includes("https://jbfjrgddsywpmwabvbtb.supabase.co"));
   T("la llibreria supabase-js es carrega per CDN", html.includes("@supabase/supabase-js"));
+  // Regressió: a create_group, l'override del trigger de rols ha d'anar ABANS de l'insert de la família
+  const sql = fs.readFileSync(path.join(__dirname, "supabase-fase1.sql"), "utf-8");
+  const cg = sql.slice(sql.indexOf("function create_group"), sql.indexOf("$$ language", sql.indexOf("function create_group")));
+  T("SQL: create_group posa l'admin_override ABANS d'inserir la família", cg.indexOf("admin_override") > -1 && cg.indexOf("admin_override") < cg.indexOf("insert into families"));
 }
 
 /* ══ Supabase simulat (taules + RLS bàsica + triggers + rpc) ══ */
 const DB = {
   users: {}, groups: [], profiles: [], families: [], children: [],
   weekly_marks: [], assignments: [], notifications: [], notification_reads: [],
-  activity_log: [], join_requests: []
+  activity_log: [], join_requests: [], _canals: []
 };
 let currentUserId = null;
 const authCbs = [];
@@ -74,7 +79,10 @@ function execQuery(q){
     else if (t === "assignments") rows = socMembre() ? DB.assignments.filter(r => r.group_id === grupMeu()) : [];
     else if (t === "activity_log") rows = socAdmin() ? DB.activity_log.filter(r => r.group_id === grupMeu()) : [];
     else if (t === "notifications") rows = DB.notifications.filter(r => r.family_id === mevaFamId() || socStaffAdmin());
-    return dades(filtra(rows));
+    let res = filtra(rows);
+    if (q.ordre) res = res.slice().sort((a, b2) => (String(a[q.ordre.c] || "") < String(b2[q.ordre.c] || "") ? -1 : 1) * (q.ordre.asc ? 1 : -1));
+    if (q.limitN != null) res = res.slice(0, q.limitN);
+    return dades(res);
   }
   if (q.op === "insert"){
     const out = [];
@@ -169,11 +177,13 @@ function execQuery(q){
 }
 
 function qb(t){
-  const q = { t: t, op: "select", filters: [], rows: null, obj: null, volFiles: false };
+  const q = { t: t, op: "select", filters: [], rows: null, obj: null, volFiles: false, ordre: null, limitN: null };
   const api = {
     select(){ if (q.op !== "select") q.volFiles = true; return api; },
     eq(c, v){ q.filters.push(r => r[c] === v); return api; },
     in(c, arr){ q.filters.push(r => (arr || []).indexOf(r[c]) >= 0); return api; },
+    order(c, o){ q.ordre = { c: c, asc: !(o && o.ascending === false) }; return api; },
+    limit(n){ q.limitN = n; return api; },
     insert(rows){ q.op = "insert"; q.rows = Array.isArray(rows) ? rows : [rows]; return api; },
     update(obj){ q.op = "update"; q.obj = obj; return api; },
     delete(){ q.op = "delete"; return api; },
@@ -189,6 +199,7 @@ function rpc(nom, p){
     const codi = randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
     DB.groups.push({ id: gid, name: p.p_name, invite_code: codi, status: "actiu", notice: "", created_by: currentUserId, created_at: new Date().toISOString() });
     const fid = randomUUID();
+    // Emula trg_protect_family_role: l'override va ABANS de l'insert (si no, el rol cau a 'usuari')
     DB.families.push({ id: fid, group_id: gid, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "admin", invite_token: randomUUID(), created_at: new Date().toISOString() });
     const pr = meu();
     if (pr){ pr.family_id = fid; pr.requested_group = gid; pr.status = "aprovat"; }
@@ -249,6 +260,14 @@ function fakeSupabaseClient(){
   return {
     from: qb,
     rpc: async (n, p) => rpc(n, p),
+    channel(nom){
+      const c = { nom: nom, subs: [],
+        on(t, f, cb){ c.subs.push({ table: f && f.table, cb: cb }); return c; },
+        subscribe(){ DB._canals.push(c); return c; },
+        unsubscribe(){ return c; } };
+      return c;
+    },
+    removeChannel(c){ DB._canals = DB._canals.filter(x => x !== c); return Promise.resolve(); },
     auth: {
       getSession: async () => dades({ session: currentUserId ? { user: DB.users[currentUserId] } : null }),
       signInWithPassword: async ({ email, password }) => {
@@ -329,7 +348,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   }
 
   console.log("1 · LOGIN I CONSENTIMENT RGPD");
-  T("arrenca a la pantalla de login (correu + Google + 3 passos)", pant().includes("Entra a l'app") && pant().includes("Continua amb Google") && pant().includes("COM FUNCIONA"));
+  T("arrenca a la pantalla de login (correu + 3 passos)", pant().includes("Entra a l'app") && pant().includes("COM FUNCIONA"));
+  T("el login no ofereix cap alternativa de Google", !pant().includes("Continua amb Google") && !pant().includes("Google") && typeof w.fesGoogle === "undefined");
   await ompleLogin("admin@test.cat", "malament");
   await w.fesLogin(); await tic(10);
   T("compte inexistent o contrasenya dolenta → refusat amb missatge", pant().includes("incorrectes"));
@@ -603,6 +623,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("i queda al registre d'activitat", DB.activity_log.some(l => l.action === "canvi de rol" && l.details.includes("staff")));
   await surtIentra("grau@test.cat", "grau123");
   T("el rol ve de la BD, no de cap codi: surt al costat de la salutació", pant().includes("· staff"));
+  w.triaTab("families"); await tic();
   T("el staff té «canvia» i «edita» (a totes menys a la de l'admin)", pant().includes(">canvia<") && (pant().match(/>edita</g) || []).length === 4);
   w.adminEdita(famDoc("Vila Puig").id); await tic();
   T("el staff NO pot entrar a la família de l'admin", d.querySelector("#avis").textContent.includes("només la gestiona l'administrador"));
@@ -673,9 +694,52 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const marqAltres = await fakeSupabaseClient().from("families").select("*");
   T("però tothom del grup hi veu les famílies del seu grup", marqAltres.data.length === 5);
 
+  console.log("10b · NOVETATS v3.1 (menú, Famílies, conductor, admin, realtime)");
+  await surtIentra("admin@test.cat", "admin123");
+  await tic(20);
+  w.obreMenu(); await tic();
+  const menuHtml = d.querySelector("#calaix").innerHTML;
+  T("el menú té «Tanca sessió» i el calendari duu el nom del grup", menuHtml.includes("Tanca sessió") && menuHtml.includes("Grup · EA 25/26"));
+  T("el menú té l'apartat Famílies", menuHtml.includes("Famílies"));
+  T("la app se subscriu als canvis en viu del grup (realtime)", DB._canals.length === 1 && DB._canals[0].subs.some(s => s.table === "weekly_marks") && DB._canals[0].subs.some(s => s.table === "children"));
+  w.triaTab("families"); await tic();
+  T("la pestanya Famílies llista totes les famílies del grup", cos().includes("Les famílies del grup") && (cos().match(/dir-fila/g) || []).length === 5);
+  T("…i el directori ja NO penja a sota de la pantalla principal", !pant().includes("<details class='conf'><summary>"));
+  w.triaTab("perfil"); await tic();
+  T("sense canvis no hi ha botó Desa dins del perfil", !cos().includes("Desa els canvis"));
+  w.canviaPlaces(1); await tic();
+  T("amb canvis pendents, el perfil ofereix «Desa els canvis»", cos().includes("Desa els canvis"));
+  await w.desa(); await tic(30);
+  w.triaTab("perfil"); await tic();
+  T("en desar, el botó Desa del perfil desapareix", !cos().includes("Desa els canvis"));
+  w.canviaPlaces(-1); await w.desa(); await tic(30);  // tornem a deixar 3 places
+  w.triaTab("descarrega"); await tic();
+  T("Descarrega explica cada viatge del conductor (quants nens i places lliures)", cos().includes("Horari del conductor") && /portes <b>\d+ nen/.test(cos()) && cos().includes("lliure"));
+  w.obreAdmin(); await tic();
+  T("el panell admin té logs i còpia de seguretat", pant().includes("Mostra els logs") && pant().includes("seguretat (JSON)"));
+  await w.mostraLogs(); await tic(20);
+  T("els logs es llisten amb família, acció i detall", d.querySelector("#logs-box").innerHTML.includes("canvi de rol") || d.querySelector("#logs-box").innerHTML.includes("alta fam"));
+  w.copiaSeguretat(); await tic();
+  T("la còpia de seguretat no peta ni tan sols sense createObjectURL (jsdom)", true);
+  w.tancaAdmin(); await tic();
+  // Sincronització: un altre compte (p. ex. la parella) demana plaça on l'admin condueix
+  const fVila = famDoc("Vila Puig");
+  const slotCond = Object.keys(fVila.cotxe)[0];
+  const diaCond = fVila.cotxe[slotCond][0];
+  const grauF = famDB("Grau");
+  const nenG = DB.children.find(c => c.family_id === grauF.id);
+  const rowM = DB.weekly_marks.find(m => m.family_id === grauF.id && m.slot === slotCond && m.day === diaCond);
+  if (rowM){ if (rowM.type !== "request"){ rowM.type = "request"; rowM.children_ids = []; } if (!rowM.children_ids.includes(nenG.id)) rowM.children_ids.push(nenG.id); }
+  else DB.weekly_marks.push({ id: randomUUID(), family_id: grauF.id, slot: slotCond, day: diaCond, type: "request", children_ids: [nenG.id], seats_override: null, updated_by: currentUserId, updated_at: new Date().toISOString() });
+  await w.sincronitza(); await tic(30);
+  T("la sincronització recarrega els canvis fets per un altre compte", w.doc.families.find(x => x.id === grauF.id).nens.some(n => w.te(n.marca, slotCond, diaCond)));
+  w.selDia(diaCond); await tic(30);
+  T("la vista dia avisa dels nens pendents de pujar al meu cotxe", cos().includes("demana pla\u00e7a") || cos().includes("demanen pla\u00e7a"));
+
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
   T("tancar la sessió torna a la pantalla de login", pant().includes("Entra a l'app"));
+  T("…i desconnecta la sincronització en viu", DB._canals.length === 0);
   const rAnon = await fakeSupabaseClient().from("families").select("*");
   T("sense sessió no es llegeix res (RLS)", rAnon.data.length === 0);
 
