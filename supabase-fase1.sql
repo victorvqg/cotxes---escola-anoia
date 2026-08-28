@@ -28,6 +28,7 @@ create table families (
   driver text not null,
   phone text default '',
   phone_visible boolean default true,
+  curs text not null default '',
   seats int not null default 3 check (seats between 0 and 6),
   role text not null default 'usuari' check (role in ('usuari','staff','admin')),
   invite_token uuid default gen_random_uuid(),
@@ -140,6 +141,14 @@ create or replace function is_member() returns boolean as $$
   select exists (select 1 from profiles where id = auth.uid() and status = 'aprovat' and family_id is not null)
 $$ language sql security definer stable;
 
+-- Qui pot modificar una família: ella mateixa, l'admin (totes), o staff (totes LLEVAT de la de l'admin)
+create or replace function can_touch_family(p_family uuid) returns boolean as $$
+  select p_family = my_family()
+    or (is_admin() and exists (select 1 from families f where f.id = p_family and f.group_id = my_group()))
+    or (is_staff_or_admin() and not is_admin()
+        and exists (select 1 from families f where f.id = p_family and f.group_id = my_group() and f.role <> 'admin'));
+$$ language sql security definer stable;
+
 -- ── 3 · RLS: activació ──────────────────────────────────────────────
 
 alter table groups enable row level security;
@@ -173,34 +182,34 @@ create policy families_select on families for select to authenticated
 create policy families_insert on families for insert to authenticated
   with check (group_id = my_group());
 create policy families_update on families for update to authenticated
-  using (id = my_family() or (is_staff_or_admin() and group_id = my_group()));
+  using (can_touch_family(id));
 create policy families_delete on families for delete to authenticated
   using (id = my_family() or is_admin());
 
 create policy children_select on children for select to authenticated
   using (exists (select 1 from families f where f.id = children.family_id and f.group_id = my_group()) and is_member());
 create policy children_write on children for insert to authenticated
-  with check (family_id = my_family() or is_staff_or_admin());
+  with check (can_touch_family(family_id));
 create policy children_update on children for update to authenticated
-  using (family_id = my_family() or is_staff_or_admin());
+  using (can_touch_family(family_id));
 create policy children_delete on children for delete to authenticated
-  using (family_id = my_family() or is_staff_or_admin());
+  using (can_touch_family(family_id));
 
 create policy marks_select on weekly_marks for select to authenticated
   using (exists (select 1 from families f where f.id = weekly_marks.family_id and f.group_id = my_group()) and is_member());
 create policy marks_insert on weekly_marks for insert to authenticated
-  with check (family_id = my_family() or is_staff_or_admin());
+  with check (can_touch_family(family_id));
 create policy marks_update on weekly_marks for update to authenticated
-  using (family_id = my_family() or is_staff_or_admin());
+  using (can_touch_family(family_id));
 create policy marks_delete on weekly_marks for delete to authenticated
-  using (family_id = my_family() or is_staff_or_admin());
+  using (can_touch_family(family_id));
 
 create policy assig_select on assignments for select to authenticated
   using (group_id = my_group() and is_member());
 create policy assig_insert on assignments for insert to authenticated
-  with check (group_id = my_group() and (driver_family_id = my_family() or is_staff_or_admin()));
+  with check (group_id = my_group() and can_touch_family(driver_family_id));
 create policy assig_delete on assignments for delete to authenticated
-  using (driver_family_id = my_family() or is_staff_or_admin());
+  using (can_touch_family(driver_family_id));
 
 create policy notif_select on notifications for select to authenticated
   using (family_id = my_family() or is_staff_or_admin());
@@ -332,11 +341,14 @@ returns table(id uuid, name text) as $$
 $$ language sql security definer stable;
 
 -- Reclamar una família existent (màxim 2 comptes per família)
-create or replace function claim_family(p_family uuid) returns void as $$
-declare v_accounts int; v_group uuid; v_nom text;
+create or replace function claim_family(p_family uuid, p_token text) returns void as $$
+declare v_accounts int; v_group uuid; v_nom text; v_token uuid;
 begin
-  select group_id, name into v_group, v_nom from families where id = p_family;
+  select group_id, name, invite_token into v_group, v_nom, v_token from families where id = p_family;
   if v_group is null then raise exception 'Família inexistent'; end if;
+  if upper(left(replace(v_token::text, '-', ''), 8)) <> upper(trim(coalesce(p_token, ''))) then
+    raise exception 'Codi de la família incorrecte: demana-l''o a algú d''aquella família (el veu al seu Perfil)';
+  end if;
   select count(*) into v_accounts from profiles where family_id = p_family;
   if v_accounts >= 2 then raise exception 'Aquesta família ja té 2 comptes'; end if;
   if exists (select 1 from profiles where id = auth.uid() and family_id is not null) then
@@ -436,8 +448,28 @@ begin
     values (my_group(), auth.uid(), my_family(), p_family, 'canvi de rol', 'administració transferida');
 end $$ language plpgsql security definer;
 
--- ── 7 · TEMPS REAL (sincronització en viu entre comptes, v3.1) ──
-alter publication supabase_realtime add table weekly_marks;
+-- ── 6b · LÍMITS: 100 famílies per grup · 5 fills per família (v3.2) ──
+create or replace function limita_families() returns trigger as $$
+begin
+  if (select count(*) from families where group_id = new.group_id) >= 100 then
+    raise exception 'Aquest grup ja ha arribat al màxim de 100 famílies';
+  end if;
+  return new;
+end $$ language plpgsql;
+drop trigger if exists trg_max_families on families;
+create trigger trg_max_families before insert on families for each row execute function limita_families();
+
+create or replace function limita_nens() returns trigger as $$
+begin
+  if (select count(*) from children where family_id = new.family_id) >= 5 then
+    raise exception 'Màxim 5 fills per família';
+  end if;
+  return new;
+end $$ language plpgsql;
+drop trigger if exists trg_max_nens on children;
+create trigger trg_max_nens before insert on children for each row execute function limita_nens();
+
+-- ── 7 · TEMPS REAL (sincronització en viu entre comptes, v3.1) ──alter publication supabase_realtime add table weekly_marks;
 alter publication supabase_realtime add table assignments;
 alter publication supabase_realtime add table notifications;
 alter publication supabase_realtime add table families;

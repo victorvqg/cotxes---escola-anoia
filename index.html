@@ -306,7 +306,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.1</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.2</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -323,6 +323,7 @@ const CONFIG = {
 };
 
 const DIES = ["dl","dt","dc","dj","dv"];
+const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
 const DIES_NOM = {dl:"Dilluns",dt:"Dimarts",dc:"Dimecres",dj:"Dijous",dv:"Divendres"};
 const FRANGES = [
@@ -375,7 +376,12 @@ function msgNeta(e){
 
 async function sbGet(){
   // Carrega tot el grup i munta el `doc` clàssic
-  const gid = grupActiu ? grupActiu.id : (perfil && perfil.requested_group);
+  let gid = grupActiu ? grupActiu.id : (perfil && perfil.requested_group);
+  if (!gid && perfil && perfil.family_id){
+    // Self-heal: compte amb família però sense requested_group (alta quedada a mitges)
+    const rf0 = await sb.from("families").select("group_id").eq("id", perfil.family_id);
+    if (rf0.data && rf0.data[0]) gid = rf0.data[0].group_id;
+  }
   if (!gid) throw { tipus: "sense-grup" };
   const rf = await sb.from("families").select("*").eq("group_id", gid);
   if (rf.error) throw { tipus: "xarxa", err: rf.error };
@@ -391,6 +397,7 @@ async function sbGet(){
     cognomPare: row.cognom1 || "", cognomMare: row.cognom2 || "",
     conductor: row.driver || "", places: row.seats == null ? 3 : row.seats,
     phone: row.phone || "", phoneVisible: row.phone_visible !== false,
+    curs: row.curs || "", codiFam: String(row.invite_token || "").replace(/-/g, "").slice(0, 8).toUpperCase(),
     cotxe: {}, propi: {}, nens: [], porta: {}
   }));
   const perId = {}; fams.forEach(x => perId[x.id] = x);
@@ -430,7 +437,7 @@ async function sbDesaFamilia(f){
   let r = await sb.from("families").update({
     name: f.nom, cognom1: f.cognomPare || "", cognom2: f.cognomMare || "",
     driver: f.conductor || "", seats: Math.min(6, Math.max(0, f.places || 0)),
-    phone: f.phone || "", phone_visible: f.phoneVisible !== false
+    phone: f.phone || "", phone_visible: f.phoneVisible !== false, curs: f.curs || ""
   }).eq("id", f.id);
   if (r.error) throw r.error;
   // 2 · fills: diff per conservar els ids (les assignacions els referencien)
@@ -593,8 +600,8 @@ function detectaAvisos(){
     const nous = [];
     Object.keys(ara).forEach(k => {
       const v = ara[k], o = abans[k] || "";
-      if (v && v !== o){ const c = doc.families.find(x => x.id === v); nous.push("\ud83d\ude97 " + et(k) + " \u2192 el porta " + (c ? nomConductor(c) : "un cotxe del grup")); }
-      else if (!v && o){ const c = doc.families.find(x => x.id === o); nous.push("\u23f3 " + et(k) + " \u2192 ja no t\u00e9 cotxe" + (c ? " (abans " + nomConductor(c) + ")" : "")); }
+      if (v && v !== o){ const c = doc.families.find(x => x.id === v); nous.push("\ud83d\ude97 " + et(k) + " \u2192 el porta " + (c ? nomConductorComplet(c) : "un cotxe del grup")); }
+      else if (!v && o){ const c = doc.families.find(x => x.id === o); nous.push("\u23f3 " + et(k) + " \u2192 ja no t\u00e9 cotxe" + (c ? " (abans " + nomConductorComplet(c) + ")" : "")); }
     });
     if (nous.length){
       let reg = []; try { reg = JSON.parse(lsGet("cx_avisos_" + f.id) || "[]"); } catch(e){}
@@ -614,6 +621,11 @@ function nomConductor(f){
     return f.conductor.trim().split(/\s+/)[0] + " " + inis;
   }
   return f.nom;
+}
+function nomConductorComplet(f){
+  if (!f) return "";
+  const cond = (f.conductor || "").trim().split(/\s+/)[0];
+  return cond ? cond + " " + f.nom : f.nom;
 }
 function balanc(slot, dia){
   const conds = doc.families.filter(f => te(f.cotxe, slot, dia));
@@ -778,20 +790,28 @@ async function entraApp(){
   }
 }
 
-/* ── Pantalla: login (correu i contrasenya) ── */
+/* ── Pantalla: login (correu i contrasenya) — dos modes: Entra / Crea compte ── */
+let loginMode = "entra";
+function loginA(m){ loginMode = m; pantallaLogin(); }
 function pantallaLogin(err){
   document.body.classList.remove("dins");
-  estat("Entra al grup");
+  const reg = loginMode === "registre";
+  estat(reg ? "Crea el compte" : "Entra al grup");
   $("#pantalla").innerHTML =
     "<img class='hero-ico' src='android-chrome-192x192.png' alt='' onerror=\"this.style.display='none'\">" +
-    "<div class='targeta'><h2>Entra a l'app dels cotxes</h2>" +
-    "<p class='lead'>Cada pare o mare entra amb el <b>seu compte</b> (ja no hi ha clau compartida). Si és la primera vegada, crea'l aquí mateix.</p>" +
+    "<div class='targeta'><h2>" + (reg ? "Crea el teu compte" : "Entra a l'app dels cotxes") + "</h2>" +
+    "<p class='lead'>" + (reg
+      ? "Només cal el correu i una contrasenya (mínim 6 caràcters). Després et demanarà el codi del grup."
+      : "Cada pare o mare entra amb el <b>seu compte</b> (ja no hi ha clau compartida).") + "</p>" +
     (err ? "<p class='lead' style='color:#8F2B1C'><b>" + esc(err) + "</b></p>" : "") +
     "<div class='apila'>" +
     "<input class='input' id='li-email' type='email' autocomplete='email' placeholder='El teu correu electrònic'>" +
-    "<input class='input' id='li-pass' type='password' autocomplete='current-password' placeholder='Contrasenya (mínim 6 caràcters)' onkeydown=\"if(event.key==='Enter')fesLogin()\">" +
-    "<button class='boto' onclick='fesLogin()'>Entra</button>" +
-    "<button class='boto sec' onclick='fesRegistre()'>Crea un compte nou</button>" +
+    "<input class='input' id='li-pass' type='password' autocomplete='" + (reg ? "new-password" : "current-password") + "' placeholder='Contrasenya (mínim 6 caràcters)' onkeydown=\"if(event.key==='Enter')" + (reg ? "fesRegistre()" : "fesLogin()") + "\">" +
+    (reg
+      ? "<button class='boto' onclick='fesRegistre()'>Crea el compte</button>" +
+        "<p style='text-align:center;margin:2px 0 0'><button class='enllac' onclick='loginA(\"entra\")'>Ja tens compte? Entra</button></p>"
+      : "<button class='boto' onclick='fesLogin()'>Entra</button>" +
+        "<p style='text-align:center;margin:2px 0 0'><button class='enllac' onclick='loginA(\"registre\")'>Primera vegada? Crea un compte nou</button></p>") +
     "</div></div>" +
     "<div class='comfun'><div class='cf-cotxe'>🚗</div><div class='cf-t'>COM FUNCIONA?</div>" +
     "<div class='pas'><span class='pas-n'>1</span>Entra amb el teu correu i contrasenya</div>" +
@@ -856,6 +876,8 @@ function pantallaGrup(){
     "<div class='fila' style='align-items:flex-start'><input class='input' id='nf-cpare' placeholder='1r cognom' maxlength='20'><input class='input' id='nf-cmare' placeholder='2n cognom (opcional)' maxlength='20'></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment</span></div>" +
     "<input class='input' id='nf-cond' placeholder='ex: Marta' maxlength='20'>" +
+    "<div class='fila' style='margin-top:6px;align-items:flex-start'><div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Tel\u00e8fon m\u00f2bil</span></div><input class='input' id='nf-tel' type='tel' placeholder='ex: 600 123 456' maxlength='15'></div>" +
+    "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' id='nf-curs'><option value=''>\u2014</option>" + CURSOS.map(c => "<option>" + c + "</option>").join("") + "</select></div></div>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
@@ -886,6 +908,7 @@ async function creaGrup(){
   if (pr.data && pr.data[0]) perfil = pr.data[0];
   try { await insereixNens(perfil.family_id, dades.nens); }
   catch(e){ avis("El grup s'ha creat però no s'han pogut afegir els nens: afegeix-los des del Perfil."); }
+  await desaTelCurs(perfil.family_id, dades);
   await entraApp();
 }
 function llegeixFormFam(){
@@ -893,10 +916,17 @@ function llegeixFormFam(){
   const cmare = $("#nf-cmare") ? $("#nf-cmare").value.trim() : "";
   const nom = (cpare + " " + cmare).trim();
   const cond = $("#nf-cond") ? $("#nf-cond").value.trim() : "";
+  const tel = $("#nf-tel") ? $("#nf-tel").value.trim() : "";
+  const curs = $("#nf-curs") ? $("#nf-curs").value : "";
   const nens = nfNens.map(s => s.trim()).filter(Boolean);
   if (!cpare){ avis("Posa el primer cognom de la família."); return null; }
   if (!nens.length){ avis("Afegeix com a mínim un nen."); return null; }
-  return { cpare: cpare, cmare: cmare, nom: nom, cond: cond, places: nfPl, nens: nens };
+  return { cpare: cpare, cmare: cmare, nom: nom, cond: cond, places: nfPl, nens: nens, tel: tel, curs: curs };
+}
+async function desaTelCurs(famIdDest, dades){
+  // Telèfon i curs viatgen fora de les RPC: update normal (RLS: la pròpia família / admin)
+  if (!famIdDest || (!dades.tel && !dades.curs)) return;
+  try { await sb.from("families").update({ phone: dades.tel || "", curs: dades.curs || "" }).eq("id", famIdDest); } catch(e){}
 }
 
 /* ── Pantalla: tria o crea la família ── */
@@ -922,8 +952,9 @@ async function pantallaTria(){
     "<img class='hero-ico' src='android-chrome-192x192.png' alt='' onerror=\"this.style.display='none'\">" +
     "<div class='targeta'><h2>Qui sou?</h2>" + cap +
     (opcions.length
-      ? "<p class='lead'>" + (socMembre ? "Tria una família per entrar-hi:" : "Si la teva família ja és al grup (per exemple, l'ha creat la teva parella o ve per la importació de dades), tria-la i quedarà vinculada al teu compte:") + "</p>" +
+      ? "<p class='lead'>" + (socMembre ? "Tria una família per entrar-hi:" : "Si la teva família ja és al grup (per exemple, l'ha creat la teva parella o ve per la importació de dades), tria-la i escriu el <b>codi de la família</b> (t'el ha de passar algú d'aquella família: el veu al seu Perfil):") + "</p>" +
         "<div class='apila'><select class='input' id='sel-fam'><option value=''>— Tria la família —</option>" + ops + "</select>" +
+        (socMembre ? "" : "<input class='input' id='sel-codi' placeholder='Codi de la família (8 lletres/xifres)' maxlength='8' style='text-transform:uppercase'>") +
         "<button class='boto' onclick=\"entraSel()\">Entra</button></div>"
       : (!socMembre ? "<p class='lead'>Encara no hi ha cap família reclamable. Crea la teva aquí sota.</p>" : "<p class='lead'>No hi ha cap família al grup.</p>")) +
     (socMembre ? "<div class='fila' style='margin-top:8px'><button class='boto sec' style='margin-left:auto' onclick=\"triaFam(perfil.family_id)\">Torna a la meva</button></div>" : "") +
@@ -934,6 +965,8 @@ async function pantallaTria(){
     "<div class='fila' style='align-items:flex-start'><input class='input' id='nf-cpare' placeholder='1r cognom' maxlength='20'><input class='input' id='nf-cmare' placeholder='2n cognom (opcional)' maxlength='20'></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>opcional — el nom del pare o mare al volant</span></span></div>" +
     "<input class='input' id='nf-cond' placeholder='ex: Marta' maxlength='20'>" +
+    "<div class='fila' style='margin-top:6px;align-items:flex-start'><div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Tel\u00e8fon m\u00f2bil</span></div><input class='input' id='nf-tel' type='tel' placeholder='ex: 600 123 456' maxlength='15'></div>" +
+    "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' id='nf-curs'><option value=''>\u2014</option>" + CURSOS.map(c => "<option>" + c + "</option>").join("") + "</select></div></div>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies — els vostres no hi compten</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
@@ -950,16 +983,18 @@ function pintaNfNens(){
     "<div class='fila' style='margin-bottom:6px'><input class='input' value=\"" + esc(v) + "\" placeholder='Nom del nen o nena' maxlength='20' oninput='nfNens[" + i + "]=this.value'>" +
     (nfNens.length > 1 ? "<button class='mini-x' onclick='nfTreuNen(" + i + ")'>esborra</button>" : "") + "</div>").join("");
 }
-function nfAfegeixNen(){ if (nfNens.length < 6) nfNens.push(""); pintaNfNens(); }
+function nfAfegeixNen(){ if (nfNens.length < 5) nfNens.push(""); pintaNfNens(); }
 function nfTreuNen(i){ nfNens.splice(i,1); pintaNfNens(); }
 
 async function creaFam(){
   const socMembre = !!(perfil && perfil.family_id);
   if (socMembre && esStaff && !esAdmin){ avis("El rol de staff pot corregir famílies, però no crear-ne."); return; }
-  if (socMembre && !esAdmin){ avis("Aquest compte ja té una família. Si la vols canviar, parla amb l'administrador."); return; }
+  if (socMembre && !esAdmin){ avis("Aquest compte ja té una família: hi entrem directament."); await entraApp(); return; }
   const dades = llegeixFormFam(); if (!dades) return;
+  if (dades.nens.length > 5){ avis("Màxim 5 fills per família."); return; }
   if (socMembre && esAdmin){
     // L'admin crea una família per a altres (sense compte vinculat)
+    if (doc.families.length >= 100){ avis("Aquest grup ja ha arribat al màxim de 100 famílies."); return; }
     if (doc.families.some(x => slug(x.nom) === slug(dades.nom))){
       avis("Ja existeix una família que es diu «" + dades.nom + "». Si de debò és una família diferent, canvia-li una mica el nom.");
       return;
@@ -967,7 +1002,8 @@ async function creaFam(){
     avis(""); estat("Creant la família…");
     const ins = await sb.from("families").insert({
       group_id: grupActiu.id, cognom1: dades.cpare, cognom2: dades.cmare,
-      name: dades.nom, driver: dades.cond, seats: dades.places, role: "usuari"
+      name: dades.nom, driver: dades.cond, seats: dades.places, role: "usuari",
+      phone: dades.tel || "", curs: dades.curs || ""
     }).select();
     if (ins.error){ estat("Error", true); avis("No s'ha pogut crear la família: " + esc(msgNeta(ins.error))); return; }
     const nouId = ins.data[0].id;
@@ -980,14 +1016,25 @@ async function creaFam(){
   // Compte nou que s'uneix al grup amb codi d'invitació
   avis(""); estat("Creant la família…");
   const r = await sb.rpc("join_group_crea", { p_code: codiInvitacio, p_cognom1: dades.cpare, p_cognom2: dades.cmare, p_driver: dades.cond, p_seats: dades.places });
-  if (r.error){ estat("Error", true); avis("No s'ha pogut crear la família: " + esc(msgNeta(r.error))); return; }
+  if (r.error){
+    if (/ja té família/i.test((r.error && r.error.message) || "") && await recuperaSiJaTeFamilia()) return;
+    estat("Error", true); avis("No s'ha pogut crear la família: " + esc(msgNeta(r.error))); return;
+  }
   const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
   if (pr.data && pr.data[0]) perfil = pr.data[0];
   try { await insereixNens(perfil.family_id, dades.nens); }
   catch(e){ avis("La família s'ha creada però no s'han pogut afegir els nens: afegeix-los des del Perfil."); }
+  await desaTelCurs(perfil.family_id, dades);
   await entraApp();
 }
 function triaFam(id){ famId = id; pantallaApp(); }
+async function recuperaSiJaTeFamilia(){
+  // Si una alta anterior va quedar a mitges (p. ex. va fallar afegir els nens),
+  // el compte ja té família a la BD: en lloc d'error, entrem directament.
+  const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
+  if (pr.data && pr.data[0] && pr.data[0].family_id){ perfil = pr.data[0]; await entraApp(); return true; }
+  return false;
+}
 async function entraSel(){
   const v = $("#sel-fam").value; if (!v) return;
   const socMembre = !!(perfil && perfil.family_id);
@@ -995,10 +1042,15 @@ async function entraSel(){
     if (esStaff && !esAdmin && doc.adminFam && v === doc.adminFam){ avis("La família de l'administrador només la gestiona l'administrador."); return; }
     triaFam(v); return;
   }
-  // Compte nou que reclama una família existent
+  // Compte nou que reclama una família existent: cal el codi de la família
+  const codiF = $("#sel-codi") ? $("#sel-codi").value.trim().toUpperCase() : "";
+  if (!codiF){ avis("Escriu el codi de la família: t'l'ha de passar algú d'aquella família (el veu al seu Perfil)."); return; }
   avis(""); estat("Vinculant…");
-  const r = await sb.rpc("claim_family", { p_family: v });
-  if (r.error){ estat("Error", true); avis("No s'ha pogut vincular: " + esc(msgNeta(r.error))); return; }
+  const r = await sb.rpc("claim_family", { p_family: v, p_token: codiF });
+  if (r.error){
+    if (/ja té família/i.test((r.error && r.error.message) || "") && await recuperaSiJaTeFamilia()) return;
+    estat("Error", true); avis("No s'ha pogut vincular: " + esc(msgNeta(r.error))); return;
+  }
   const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
   if (pr.data && pr.data[0]) perfil = pr.data[0];
   await entraApp();
@@ -1027,7 +1079,7 @@ function pantallaApp(){
   document.body.classList.add("dins");
   setTimeout(pintaPeuStats, 0);
   const f = lameva();
-  if (!["perfil", "graella", "cal", "avisos", "descarrega", "families", "rols"].includes(tabAct)) tabAct = "graella";
+  if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
   $("#pantalla").innerHTML =
@@ -1055,6 +1107,7 @@ function pintaMenu(){
     "<div class='c-cap'>Cotxes \u00b7 Escola Anoia</div>" +
     it("perfil", "\u2699\ufe0f", "Perfil", perfilComplet(f) ? "" : "<span class='c-lock'>\u26a0</span>") +
     it("graella", "\ud83d\uddd3\ufe0f", "Graella", graellaCompleta(f) ? "" : "<span class='c-lock'>\u26a0</span>") +
+    it("cotxe", "\ud83d\ude97", "El teu cotxe") +
     it("cal", "\ud83d\udcc5", "Grup · " + (doc.grupNom || ""), bloc ? "<span class='c-lock'>\ud83d\udd12</span>" : "") +
     it("avisos", "\ud83d\udd14", "Avisos", n ? "<span class='c-bad'>" + n + "</span>" : "") +
     it("descarrega", "\ud83d\udda8\ufe0f", "Descarrega") +
@@ -1070,11 +1123,13 @@ function tancaMenu(){ const v = $("#vel"), c = $("#calaix"); if (v) v.classList.
 
 function triaTab(t){
   tabAct = t; tancaMenu();
-  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", families: "👥 Famílies del grup", rols: "\ud83d\udee1\ufe0f Rols del grup" };
-  const el = $("#cap-titol"); if (el) el.textContent = tit[t] || "";
+  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cotxe: "🚗 El teu cotxe · qui hi puja", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", families: "👥 Famílies del grup", rols: "\ud83d\udee1\ufe0f Rols del grup" };
+  const el = $("#cap-titol");
+  if (el) el.innerHTML = esc(tit[t] || "") + (t === "cal" && doc && doc.grupNom ? "<br><span style='font-size:13px;font-weight:400;opacity:.75'>Grup " + esc(doc.grupNom) + "</span>" : "");
   pintaMenu();
   if (t === "perfil") pintaPerfil();
   else if (t === "graella") pintaGraellaTab();
+  else if (t === "cotxe") pintaCotxe();
   else if (t === "avisos") pintaAvisos();
   else if (t === "descarrega") pintaDescarrega();
   else if (t === "families") pintaFamilies();
@@ -1085,7 +1140,7 @@ function triaTab(t){
 
 function pintaFamilies(){
   const dirHtml = famOrd().map(x =>
-    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "🛡️ " : x.rol === "staff" ? "🛠️ " : "") + esc(x.nom) + "</b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + "</span>" + ((esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam))) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
+    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "🛡️ " : x.rol === "staff" ? "🛠️ " : "") + esc(x.nom) + " <span class='rolet'>· " + esc(x.rol || "usuari") + "</span></b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + (x.curs ? " · " + esc(x.curs) : "") + (x.phone && x.phoneVisible ? " · 📞 " + esc(x.phone) : "") + "</span>" + ((esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam))) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
   ).join("");
   $("#tab-cos").innerHTML =
     "<div class='targeta'><div class='p-fila'><span class='p-lab'>Les famílies del grup «" + esc(doc.grupNom || "") + "» (" + doc.families.length + ")<span class='p-sub'>qui forma part del grup" + ((esAdmin || esStaff) ? " · amb «edita» hi entres a corregir" : "") + "</span></span></div>" +
@@ -1113,6 +1168,8 @@ function pintaPerfil(){
     "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>2n cognom<span class='p-sub'>opcional</span></span></div><input class='input' value=\"" + esc(f.cognomMare || "") + "\" maxlength='20' placeholder='ex: Prat' onchange=\"renomCognomMare(this.value)\"></div></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>surt als Calendaris i als avisos</span></span></div>" +
     "<input class='input' value=\"" + esc(f.conductor || "") + "\" placeholder='ex: Marta' maxlength='20' onchange=\"renomConductor(this.value)\">" +
+    "<div class='fila' style='margin-top:6px;align-items:flex-start'><div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Tel\u00e8fon m\u00f2bil<span class='p-sub'>el veuran les fam\u00edlies del grup</span></span></div><input class='input' type='tel' value=\"" + esc(f.phone || "") + "\" maxlength='15' placeholder='ex: 600 123 456' onchange=\"renomTel(this.value)\"></div>" +
+    "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' onchange='triaCurs(this.value)'><option value=''>\u2014</option>" + CURSOS.map(c => "<option" + (f.curs === c ? " selected" : "") + ">" + c + "</option>").join("") + "</select></div></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOM\u00c9S per a nens d'altres fam\u00edlies \u2014 els vostres no hi compten</span></span>" +
     "<span class='stepper'><button onclick='canviaPlaces(-1)'>\u2212</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
     "<p class='hint' style='margin:2px 0 6px'>\ud83d\ude97 Amb " + (f.nens.length === 1 ? "el vostre nen" : "els vostres " + f.nens.length + " nens") + " + " + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ", al cotxe hi " + ((f.nens.length + f.places) === 1 ? "va 1 nen" : "van " + (f.nens.length + f.places) + " nens") + ".</p>" +
@@ -1121,6 +1178,8 @@ function pintaPerfil(){
     "<div class='fila'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
     (dirty ? "<div style='margin-top:12px'><button class='boto' style='width:100%' onclick='desa()'>💾 Desa els canvis</button></div>" : "") +
+    (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa'l a l'altre progenitor: el necessitar\u00e0 per vincular el seu compte a la vostra fam\u00edlia</span></span></div>" +
+    "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
     "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la fam\u00edlia del grup</button><br>" +
     "<button class='enllac' onclick='tancaSessio()'>Tanca la sessi\u00f3 en aquest dispositiu</button></div>" +
     "</div>";
@@ -1293,7 +1352,7 @@ function canviaPlaces(d){
 }
 function afegeixNen(){
   const f = lameva(); const v = $("#nou-nen").value.trim();
-  if (!v || f.nens.length >= 6) return;
+  if (!v || f.nens.length >= 5){ if (f.nens.length >= 5) avis("Màxim 5 fills per família."); return; }
   let nid = slug(v) || "nen"; while (f.nens.some(n => n.id === nid)) nid += "-2";
   f.nens.push({ id: nid, nom: v, marca: {} });
   if (pinzell !== "cotxe" && pinzell !== "esborra" && !f.nens.some(n => n.id === pinzell)) pinzell = "cotxe";
@@ -1348,9 +1407,14 @@ async function mostraLogs(){
   }).join("");
   box.innerHTML = files || "<p class='hint'>Encara no hi ha activitat registrada.</p>";
 }
-function copiaSeguretat(){
+async function copiaSeguretat(){
   if (!esAdmin || !doc) return;
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.1", families: doc.families };
+  let logs = [];
+  try {
+    const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
+    if (!r.error) logs = r.data || [];
+  } catch(e){}
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.2", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -1505,6 +1569,14 @@ function pintaAvisos(){
       : "<p class='lead'>Encara no hi ha cap av\u00eds. Aqu\u00ed veur\u00e0s els canvis que afecten els teus nens: qui els agafa o els deixa el cotxe, amb dia i franja.</p>") +
     "<p class='hint' style='margin-top:8px'>Els avisos es detecten en aquest m\u00f2bil cada cop que l'app carrega les dades del grup.</p></div>";
 }
+function renomTel(v){
+  const f = lameva(); if (!f) return;
+  f.phone = v.trim(); dirty = true; pintaBarra();
+}
+function triaCurs(v){
+  const f = lameva(); if (!f) return;
+  f.curs = v; dirty = true; pintaBarra();
+}
 function renomConductor(v){
   const f = lameva(); if (!f) return;
   const nou = v.trim();
@@ -1539,6 +1611,7 @@ async function tancaSessio(senseDretes){
   desconnectaRealtime();
   try { await sb.auth.signOut(); } catch(e){}
   sessio = null; perfil = null; doc = null; famId = ""; grupActiu = null; grupTrobat = null;
+  loginMode = "entra";
   esAdmin = esStaff = false;
   pantallaLogin();
 }
@@ -1696,6 +1769,45 @@ function pintaDia(){
   dEl.innerHTML = h;
 }
 
+/* ── Pestanya: El teu cotxe (assignar nens a tots els teus viatges d'un cop d'ull) ── */
+function pintaCotxe(){
+  const meva = lameva(); if (!meva) return;
+  let h = "";
+  let pendTotals = 0;
+  DIES.forEach(d => {
+    let diaHtml = "";
+    FRANGES.forEach(fr => {
+      if (!te(meva.cotxe, fr.id, d)) return;
+      const b = balanc(fr.id, d);
+      const refs = portaValids(meva, fr.id, d);
+      const cand = b.nens.filter(n => !n.portadaPerId || n.portadaPerId === meva.id);
+      pendTotals += cand.filter(n => !refs.some(r => r.fam === n.famId && r.nen === n.nenId)).length;
+      const estatN = refs.length > meva.places ? "def" : refs.length === meva.places ? "just" : "ok";
+      diaHtml += "<div class='f-linia' style='margin-top:8px'><b>" + fr.hora + "</b> · tens <b>" + refs.length + "/" + meva.places + "</b> places ocupades</div>";
+      if (cand.length){
+        diaHtml += "<div class='assigna'><div class='a-cap'>Qui puges al teu cotxe? <span class='mp " + estatN + "'>" + refs.length + "/" + meva.places + "</span></div>" +
+          cand.map(n => {
+            const meu = refs.some(r => r.fam === n.famId && r.nen === n.nenId);
+            return "<label class='a-fila'><input type='checkbox' " + (meu ? "checked " : "") +
+              "onchange=\"assigna('" + fr.id + "','" + d + "','" + n.famId + "','" + n.nenId + "', this.checked)\"> " +
+              esc(n.nom) + "</label>";
+          }).join("") + "</div>";
+      } else {
+        diaHtml += "<p class='hint' style='margin:2px 2px 0'>Cap nen demana plaça en aquest viatge.</p>";
+      }
+    });
+    if (diaHtml) h += "<div class='targeta franja'><div class='f-cap'><span class='f-hora'>" + DIES_NOM[d] + "</span></div>" + diaHtml + "</div>";
+  });
+  if (!h){
+    $("#tab-cos").innerHTML = "<div class='targeta'><p class='lead'>Aquesta setmana no conduïu cap viatge. Marqueu 🚗 a la Graella i aquí us apareixeran, dia per dia, els nens que demanen plaça per pujar al vostre cotxe.</p></div>";
+    return;
+  }
+  $("#tab-cos").innerHTML =
+    (pendTotals ? "<div class='targeta' style='border-left:4px solid #d64545;margin-bottom:10px'><b>⚠ " + pendTotals + (pendTotals === 1 ? " nen demana" : " nens demanen") + " plaça als teus viatges</b><br><span class='hint'>Marca la seva casella i prem «Desa els canvis».</span></div>"
+                : "<p class='hint' style='margin:0 2px 10px'>Tots els nens que demanen plaça als teus viatges ja hi són assignats. ✓</p>") + h;
+}
+function repintaCotxe(){ if (tabAct === "cotxe") pintaCotxe(); else pintaDia(); }
+
 function assigna(slot, dia, famRef, nenRef, posar){
   const f = lameva();
   if (!f || !te(f.cotxe, slot, dia)) return;
@@ -1705,14 +1817,14 @@ function assigna(slot, dia, famRef, nenRef, posar){
   if (posar){
     if (refs.length >= f.places){
       avis("El teu cotxe ja \u00e9s ple (" + f.places + " " + (f.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "). Treu-ne un o puja les places al panell \u2699\ufe0f.");
-      pintaDia(); return;
+      repintaCotxe(); return;
     }
     if (!refs.some(r => r.fam === famRef && r.nen === nenRef)) refs.push({ fam: famRef, nen: nenRef });
   } else {
     refs = refs.filter(r => !(r.fam === famRef && r.nen === nenRef));
   }
   if (refs.length) f.porta[cel] = refs; else delete f.porta[cel];
-  dirty = true; pintaBarra(); pintaDia();
+  dirty = true; pintaBarra(); repintaCotxe();
 }
 
 function nenPendents(fam, nen){
