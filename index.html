@@ -319,7 +319,8 @@ h1{font-size:24px}
 /* ── CONFIGURACIÓ Supabase: la URL ja hi és; falta enganxar la anon public key ── */
 const CONFIG = {
   SUPABASE_URL: "https://jbfjrgddsywpmwabvbtb.supabase.co",
-  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs",  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
+  GOOGLE_OAUTH: false  // posa'l a true NOMÉS quan el proveïdor Google estigui activat a Supabase (guia pas 6b)
 };
 
 const DIES = ["dl","dt","dc","dj","dv"];
@@ -367,6 +368,9 @@ function msgNeta(e){
   const m = (e && (e.message || e.msg)) || "";
   if (!m) return "error desconegut";
   if (/row-level security/i.test(m)) return "La base de dades ho ha bloquejat (permisos). Si ho creus un error, avisa l'administrador.";
+  if (/invalid login credentials/i.test(m)) return "Correu o contrasenya incorrectes. Si t'acabes de registrar, potser has de confirmar el correu primer (mira la bústia i l'spam).";
+  if (/email not confirmed/i.test(m)) return "Has de confirmar el correu: t'hem enviat un enllaç (mira també l'spam).";
+  if (/user already registered/i.test(m)) return "Aquest correu ja té compte: prem «Entra» en lloc de crear-ne un de nou.";
   return m;
 }
 
@@ -757,10 +761,10 @@ function pantallaLogin(err){
     "<input class='input' id='li-pass' type='password' autocomplete='current-password' placeholder='Contrasenya (mínim 6 caràcters)' onkeydown=\"if(event.key==='Enter')fesLogin()\">" +
     "<button class='boto' onclick='fesLogin()'>Entra</button>" +
     "<button class='boto sec' onclick='fesRegistre()'>Crea un compte nou</button>" +
-    "<button class='boto sec' onclick='fesGoogle()'>Continua amb Google</button>" +
+    (CONFIG.GOOGLE_OAUTH ? "<button class='boto sec' onclick='fesGoogle()'>Continua amb Google</button>" : "") +
     "</div></div>" +
     "<div class='comfun'><div class='cf-cotxe'>🚗</div><div class='cf-t'>COM FUNCIONA?</div>" +
-    "<div class='pas'><span class='pas-n'>1</span>Entra amb el teu compte (correu o Google)</div>" +
+    "<div class='pas'><span class='pas-n'>1</span>Entra amb el teu compte (correu" + (CONFIG.GOOGLE_OAUTH ? " o Google" : "") + ")</div>" +
     "<div class='pas'><span class='pas-n'>2</span>Uneix-te al grup amb el codi que t'ha passat l'administrador</div>" +
     "<div class='pas'><span class='pas-n'>3</span>Tria la teva família o crea-la, i completa la graella de la setmana</div></div>";
 }
@@ -769,7 +773,7 @@ async function fesLogin(){
   if (!email || !pass){ pantallaLogin("Escriu el correu i la contrasenya."); return; }
   estat("Entrant…");
   const r = await sb.auth.signInWithPassword({ email: email, password: pass });
-  if (r.error){ pantallaLogin("Correu o contrasenya incorrectes."); estat("Entra al grup"); return; }
+  if (r.error){ pantallaLogin(msgNeta(r.error)); estat("Entra al grup"); return; }
   sessio = r.data.session;
   await carregaPerfilIRuta();
 }

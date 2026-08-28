@@ -329,7 +329,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   }
 
   console.log("1 · LOGIN I CONSENTIMENT RGPD");
-  T("arrenca a la pantalla de login (correu + Google + 3 passos)", pant().includes("Entra a l'app") && pant().includes("Continua amb Google") && pant().includes("COM FUNCIONA"));
+  T("arrenca a la pantalla de login (correu + 3 passos)", pant().includes("Entra a l'app") && pant().includes("COM FUNCIONA"));
+  T("el botó de Google queda amagat mentre no estigui activat a Supabase", !pant().includes("Continua amb Google"));
   await ompleLogin("admin@test.cat", "malament");
   await w.fesLogin(); await tic(10);
   T("compte inexistent o contrasenya dolenta → refusat amb missatge", pant().includes("incorrectes"));
