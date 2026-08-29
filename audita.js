@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.8", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.8"));
+  T("lema i peu amb versió 3.9", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.9"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -259,21 +259,34 @@ function rpc(nom, p){
     const pr = meu();
     return dades(pr ? [Object.assign({}, pr)] : []);
   }
-  if (nom === "claim_family"){
-    // v3.8: idempotent (ja vinculat a p_family → acaba bé) i clar (diu a quina família estàs)
+  // v3.9: cos ÚNIC de vinculació (idempotent, nom si és una altra, màxim 2 comptes)
+  const vinculaAFamilia = (f, via) => {
     const pr = meu();
-    if (pr && pr.family_id === p.p_family) return dades(null);
+    if (pr && pr.family_id === f.id) return dades(null);
     if (pr && pr.family_id){
       const fm = famPerId(pr.family_id);
       return err("Aquest compte ja està vinculat a la família " + (fm ? fm.name : "(desconeguda)"));
     }
-    const f = famPerId(p.p_family);
-    if (!f) return err("Família inexistent");
-    if (codiDeFam(f) !== String(p.p_token || "").trim().toUpperCase()) return err("Codi de la família incorrecte");
     if (DB.profiles.filter(x => x.family_id === f.id).length >= 2) return err("Aquesta família ja té 2 comptes");
     pr.family_id = f.id; pr.requested_group = f.group_id; pr.status = "aprovat";
-    logBD(f.group_id, "aprovació d'accés", f.id, "Compte vinculat a " + f.name);
+    logBD(f.group_id, "aprovació d'accés", f.id, "Compte vinculat a " + f.name + (via || ""));
     return dades(null);
+  };
+  if (nom === "claim_family"){
+    const pr = meu();
+    if (pr && pr.family_id === p.p_family) return dades(null);   // idempotent ABANS del codi
+    const f = famPerId(p.p_family);
+    if (!f) return err("Família inexistent");
+    if (pr && !pr.family_id && codiDeFam(f) !== String(p.p_token || "").trim().toUpperCase()) return err("Codi de la família incorrecte");
+    return vinculaAFamilia(f, "");
+  }
+  if (nom === "claim_family_per_codi"){
+    const codi = String(p.p_token || "").trim().toUpperCase();
+    const f = DB.families.find(x => codiDeFam(x) === codi && (DB.groups.find(g => g.id === x.group_id) || {}).status === "actiu");
+    if (!f) return err("Cap família amb aquest codi. Demana'l a algú de la família: el veu al seu Perfil.");
+    const r = vinculaAFamilia(f, " · via codi de família");
+    if (r.error) return r;
+    return dades([{ family_id: f.id, nom: f.name }]);
   }
   if (nom === "desvincula_compte"){
     const pr = meu();
@@ -967,8 +980,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("10h · NOVETATS v3.7 (fulls: nom del conductor a la casella, grup a la capçalera, print CSS)");
   const mp = html.slice(html.indexOf("@media print"), html.indexOf("@page"));
-  T("print: fora la regla que amagava el full (body > *{display:none})", !mp.includes("body > *"));
-  T("print: el full s'imprimeix per visibilitat (no depèn de l'arbre .tel > .cos)", mp.includes("visibility:hidden") && mp.includes("#full-horari, #full-horari *") && mp.includes("visibility:visible"));
+  T("print v3.9: #full-horari és FILL DIRECTE de <body> (l'espai de la resta s'allibera)", /<\/div>\s*(<!--[^]*?-->\s*)?<div id="full-horari"[^>]*><\/div>\s*<script>/.test(html) && mp.includes("body > *:not(#full-horari){display:none"));
+  T("print v3.9: colors forçats (print-color-adjust:exact) i cap `vh` al bloc print", mp.includes("print-color-adjust:exact") && mp.includes("-webkit-print-color-adjust:exact") && !/[0-9]vh/.test(mp));
+  T("print v3.9: el full fa exactament l'A4 útil i el cos es reparteix en grid", mp.includes("width:281mm") && mp.includes("height:194mm") && mp.includes("grid-template-rows:auto auto auto 1fr auto auto") && html.includes("fh-cos"));
   const fCond = famDoc("Vila Puig");
   fCond.nens.push({ id: "tmp-nen-full", nom: "Bet", curs: "3r ESO", marca: {} });   // segon nen (mateix curs que Janot), per provar la nota amb 2 noms
   w.commuta(fCond.cotxe, "e8", "dl");   // 3r/4t entren a les 8.00
@@ -1041,6 +1055,38 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("…i NO toca cap altre perfil", DB.profiles.filter(x => x.email !== "atomic@test.cat").map(x => x.family_id).join("|") === abansAltres);
   T("…i queda al registre d'activitat", DB.activity_log.some(l => l.action === "desvinculació"));
   await fakeSupabaseClient().rpc("esborra_familia", { p_family: (DB.families.find(x => x.name === "Atomic") || {}).id });
+  await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10j · NOVETATS v3.9 (el codi de família sol vincula; una casella per als dos codis)");
+  afegeixUsuari("codi8@test.cat", "codi8123");
+  await surtIentra("codi8@test.cat", "codi8123");
+  await acceptaConsentiment();
+  T("la pantalla d'unió explica els DOS codis (grup 6 · família 8) en una sola casella", pant().includes("6 car") && pant().includes("8 car") && !!d.querySelector("#gg-codi"));
+  await uneixAmbCodi("SETLLET");   // 7 caràcters
+  T("7 caràcters → missatge de llargada", d.querySelector("#avis").textContent.includes("6 caràcters") && d.querySelector("#avis").textContent.includes("Revisa quin t'han passat"));
+  await uneixAmbCodi("AAAAAAAA");  // 8 caràcters inexistents
+  T("8 caràcters inexistents → missatge de família", d.querySelector("#avis").textContent.includes("Cap família amb aquest codi"));
+  await uneixAmbCodi(codiDeFam(famDB("Família Nova")));   // 8 caràcters bons
+  T("8 caràcters correctes → vincula i ENTRA, sense passar per «Qui sou?»", pant().includes("Hola") && !pant().includes("Qui sou?") && DB.profiles.find(x => x.email === "codi8@test.cat").family_id === famDB("Família Nova").id);
+  T("…amb l'avís «Vinculat a la família X ✓» i el log «via codi de família»", d.querySelector("#avis").textContent.includes("Vinculat a la família") && DB.activity_log.some(l => (l.details || "").includes("via codi de família")));
+  // tercer compte a la mateixa família → «ja té 2 comptes»
+  afegeixUsuari("codi8b@test.cat", "codi8123");
+  await surtIentra("codi8b@test.cat", "codi8123");
+  await acceptaConsentiment();
+  await uneixAmbCodi(codiDeFam(famDB("Família Nova")));   // 2n compte: entra
+  T("el segon compte també hi entra pel codi de família", DB.profiles.find(x => x.email === "codi8b@test.cat").family_id === famDB("Família Nova").id);
+  afegeixUsuari("codi8c@test.cat", "codi8123");
+  await surtIentra("codi8c@test.cat", "codi8123");
+  await acceptaConsentiment();
+  await uneixAmbCodi(codiDeFam(famDB("Família Nova")));
+  T("el TERCER compte és rebutjat: «ja té 2 comptes»", d.querySelector("#avis").textContent.includes("ja té 2 comptes") && DB.profiles.find(x => x.email === "codi8c@test.cat").family_id === null);
+  await uneixAmbCodi(CODI);   // 6 caràcters: el flux del grup, intacte
+  T("6 caràcters → el flux del grup segueix igual (arriba a «Qui sou?»)", pant().includes("Qui sou?"));
+  await surtIentra("grau@test.cat", "grau123");   // usuari normal, membre del grup
+  const rTok = await fakeSupabaseClient().from("families").select("*");
+  T("un usuari normal NO pot llegir invite_token (la cerca per codi va dins del security definer)", (rTok.data || []).length > 0 && rTok.data.every(x => !("invite_token" in x)));
+  const sql38 = fs.readFileSync(path.join(__dirname, "supabase-v38.sql"), "utf-8");
+  T("SQL v38: cos únic de vinculació privat + claim_family_per_codi dins security definer", sql38.includes("vincula_compte_a_familia") && sql38.includes("revoke execute on function public.vincula_compte_a_familia") && sql38.includes("claim_family_per_codi") && sql38.includes("security definer"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("11 · TANCA LA SESSIÓ");
