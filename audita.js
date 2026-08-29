@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.5", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.5"));
+  T("lema i peu amb versió 3.6", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.6"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -80,7 +80,8 @@ function execQuery(q){
     let rows = [];
     if (t === "profiles") rows = DB.profiles.filter(r => r.id === currentUserId);
     else if (t === "groups") rows = DB.groups.slice();
-    else if (t === "families") rows = socMembre() ? DB.families.filter(r => r.group_id === grupMeu()) : [];
+    else if (t === "families") rows = (socMembre() ? DB.families.filter(r => r.group_id === grupMeu()) : [])
+      .map(r => { const c = Object.assign({}, r); delete c.invite_token; return c; });
     else if (t === "children"){ const g = grupMeu(); rows = socMembre() ? DB.children.filter(r => { const f = famPerId(r.family_id); return f && f.group_id === g; }) : []; }
     else if (t === "weekly_marks"){ const g = grupMeu(); rows = socMembre() ? DB.weekly_marks.filter(r => { const f = famPerId(r.family_id); return f && f.group_id === g; }) : []; }
     else if (t === "assignments") rows = socMembre() ? DB.assignments.filter(r => r.group_id === grupMeu()) : [];
@@ -224,6 +225,29 @@ function rpc(nom, p){
       .map(f => ({ id: f.id, name: f.name, driver: f.driver || "", seats: f.seats, curs: f.curs || "",
                    nens: DB.children.filter(c => c.family_id === f.id).map(c => c.name).join(", ") }));
     return dades(r);
+  }
+  if (nom === "codi_familia"){
+    const f = famPerId(p.p_family);
+    if (!f) return err("Família inexistent");
+    if (!(f.id === mevaFamId() || socAdmin())) return err("Sense permís");
+    return dades(codiDeFam(f));
+  }
+  if (nom === "codis_families"){
+    if (!socAdmin()) return err("Només l'administrador");
+    const g = grupMeu();
+    const r = DB.families.filter(f => f.group_id === g)
+      .map(f => ({ id: f.id, nom: f.name, codi: codiDeFam(f),
+                   n_comptes: DB.profiles.filter(x => x.family_id === f.id).length }))
+      .sort((a, b) => (a.nom < b.nom ? -1 : 1));
+    return dades(r);
+  }
+  if (nom === "regenera_codi"){
+    if (!socAdmin()) return err("Només l'administrador");
+    const f = famPerId(p.p_family);
+    if (!f || f.group_id !== grupMeu()) return err("Família inexistent");
+    f.invite_token = randomUUID();
+    logBD(f.group_id, "codi regenerat", f.id, "Codi d'accés regenerat per a " + f.name);
+    return dades(codiDeFam(f));
   }
   if (nom === "claim_family"){
     const f = famPerId(p.p_family);
@@ -478,6 +502,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.renomConductor("Pere"); await tic();
   const vg = famDoc("Grau");
   const idArlet = nenDoc("Grau", "Arlet").id, idBru = nenDoc("Grau", "Bru").id;
+  // v3.6: el perfil no és complet sense el curs de cada nen
+  w.triaCursNen(idArlet, "2n ESO"); w.triaCursNen(idBru, "2n ESO"); await tic();
+  // 2n ESO: dimarts i dimecres l'entrada és a les 8.00
+  ["dt", "dc"].forEach(dd => { if (!w.respon(vg, "e8", dd)) w.commuta(vg.propi, "e8", dd); });
   w.commuta(vg.nens.find(n => n.id === idArlet).marca, "r17", "dl");
   w.commuta(vg.nens.find(n => n.id === idBru).marca, "r17", "dl");
   for (const dd of ["dl", "dt", "dc", "dj", "dv"])
@@ -632,7 +660,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("7b · ROLS: admin i staff sense codis PIN");
   w.obreAdmin(); await tic();
-  T("el panell de l'admin explica el codi d'invitació i la importació", pant().includes("Codi d'invitació del grup") && pant().includes("Importa les dades antigues") && pant().includes("dades.json"));
+  T("el panell de l'admin explica els codis d'accés i la importació", pant().includes("Codis d'accés") && pant().includes("Importa les dades antigues") && pant().includes("dades.json"));
   w.tancaAdmin(); await tic();
   await w.rolFam(famDoc("Grau").id); await tic(20);
   T("l'admin puja una família a staff: desat a la BD", famDB("Grau").role === "staff");
@@ -753,7 +781,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.tancaAdmin(); await tic();
   // Sincronització: un altre compte (p. ex. la parella) demana plaça on l'admin condueix
   const fVila = famDoc("Vila Puig");
-  const slotCond = Object.keys(fVila.cotxe)[0];
+  // v3.6: es tria un torn que segueixi existint per als cursos d'ambdues famílies (la 8.00 és només de 1r/2n dt/dc)
+  const slotCond = Object.keys(fVila.cotxe).find(s => s !== "e8") || Object.keys(fVila.cotxe)[0];
   const diaCond = fVila.cotxe[slotCond][0];
   const grauF = famDB("Grau");
   const nenG = DB.children.find(c => c.family_id === grauF.id);
@@ -771,6 +800,14 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
   w.renomTel("600111222"); w.triaCurs("3r ESO"); await tic();
+  // v3.6: canviar el curs pot deixar caselles noves per respondre (l'entrada passa a les 9.00); es reomplen
+  const ompleForats = fx => ["e8", "e9", "r13", "e15", "r17"].forEach(s => ["dl", "dt", "dc", "dj", "dv"].forEach(dd => {
+    if (w.estatCasella(fx, s, dd) !== "normal" || w.respon(fx, s, dd)) return;
+    if (s === "e9" && w.estatCasella(fx, "e8", dd) === "normal" && w.respon(fx, "e8", dd)) return;
+    if (s === "e8" && w.estatCasella(fx, "e9", dd) === "normal" && w.respon(fx, "e9", dd)) return;
+    w.commuta(fx.propi, s, dd);
+  }));
+  ompleForats(famDoc("Vila Puig"));
   await w.desa(); await tic(30);
   T("telèfon i curs es desen a la BD", famDB("Vila Puig").phone === "600111222" && famDB("Vila Puig").curs === "3r ESO");
   w.triaTab("families"); await tic();
@@ -808,6 +845,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el perfil mostra el grup i el seu codi d'invitació", cos().includes("El vostre grup") && cos().includes(CODI));
   const nenPerCurs = famDoc("Vila Puig").nens[0];
   w.triaCursNen(nenPerCurs.id, "1r ESO"); await tic();
+  // v3.6: amb 1r ESO canvien les caselles vàlides (8.00 dt/dc, tardes de nou); es reomplen les noves
+  ompleForats(famDoc("Vila Puig"));
   await w.desa(); await tic(30);
   T("el curs per nen es desa a la BD (children.curs)", nenDB(idVila, nenPerCurs.nom).curs === "1r ESO");
   w.triaTab("families"); await tic();
@@ -835,6 +874,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await surtIentra("admin@test.cat", "admin123");
   w.triaTab("perfil"); await tic();
   w.triaCursNen(idJan(), "3r ESO"); await tic();
+  ompleForats(famDoc("Vila Puig"));   // v3.6: amb 3r ESO l'entrada torna a les 9.00
   await w.desa(); await tic(30);
   T("el curs del nen s'actualitza a la BD", nenDB(idVila, "Janot").curs === "3r ESO");
   // Família de 4t ESO sense cap marca: la llista de pendents n'és la prova neta
@@ -869,6 +909,24 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("però dilluns no (1r/2n entren a les 9.00)", !d.querySelector("#cel-menu").classList.contains("obert"));
   w.triaTab("perfil"); await tic();
   await w.desa(); await tic(30);
+
+  console.log("10g · NOVETATS v3.6 (esborrar tota la graella: confirmació, BD, repintat i doble toc)");
+  w.triaTab("graella"); await tic();
+  T("la graella té el botó d'esborrar-ho tot", cos().includes("Esborra tota la graella"));
+  w.esborraGraella(); await tic(10);
+  T("abans d'esborrar demana confirmació, amb el nom de la família", (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("Esborrar tota la graella") && d.querySelector("#conf-box").textContent.includes("Vila Puig"));
+  d.querySelector("#conf-no").click(); await tic(10);
+  T("si cancel·les, les marques segueixen a la BD", DB.weekly_marks.some(m => m.family_id === idVila));
+  w.esborraGraella(); await tic(10);
+  d.querySelector("#conf-si").click(); await tic(40);
+  T("en confirmar, s'esborren marques i assignacions de la BD", !DB.weekly_marks.some(m => m.family_id === idVila) && !DB.assignments.some(a => a.driver_family_id === idVila));
+  T("la graella es repinta buida a pantalla (i s'avisa)", !cos().includes("cel on") && d.querySelector("#avis").textContent.includes("Graella esborrada"));
+  T("l'esborrat queda al registre d'activitat", DB.activity_log.some(l => l.action === "esborrat graella"));
+  // doble toc: mentre s'esborra, el botó no obre una segona confirmació
+  const pEsb = w.esborraGraellaDeDebò(famDoc("Vila Puig"));
+  w.esborraGraella();
+  T("el doble toc queda bloquejat mentre s'esborra", !d.querySelector("#conf-box"));
+  await pEsb; await tic(30);
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
