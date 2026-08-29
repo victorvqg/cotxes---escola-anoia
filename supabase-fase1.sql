@@ -48,7 +48,8 @@ create table profiles (
 create table children (
   id uuid primary key default gen_random_uuid(),
   family_id uuid not null references families(id) on delete cascade,
-  name text not null
+  name text not null,
+  curs text not null default ''   -- v3.3: curs per nen (1r–4t ESO)
 );
 
 create table weekly_marks (
