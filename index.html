@@ -230,6 +230,9 @@ details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padd
 .a-fila{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:15px;cursor:pointer}
 .a-fila input{width:21px;height:21px;accent-color:#2C7A4B;flex:none}
 .a-fila.apagat{opacity:.55}
+.a-sub{font-size:12.5px;color:#7A8894;font-weight:400}
+details.fam-det{margin-top:0;border-top:1px solid #F0F4F7}
+details.fam-det:first-of-type{border-top:0}
 .a-fam{color:#6B7D8A;font-size:13px}
 .a-ok{color:#1F5C3B;font-weight:700}
 .a-pend{color:#8F2B1C;font-weight:700}
@@ -306,7 +309,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.2</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.3</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -402,7 +405,7 @@ async function sbGet(){
   }));
   const perId = {}; fams.forEach(x => perId[x.id] = x);
   const nenFam = {}; (rc.data || []).forEach(r => nenFam[r.id] = r.family_id);
-  (rc.data || []).forEach(r => { const F = perId[r.family_id]; if (F) F.nens.push({ id: r.id, nom: r.name, marca: {} }); });
+  (rc.data || []).forEach(r => { const F = perId[r.family_id]; if (F) F.nens.push({ id: r.id, nom: r.name, curs: r.curs || "", marca: {} }); });
   (rm.data || []).forEach(r => {
     const F = perId[r.family_id]; if (!F) return;
     if (r.type === "drive") posa(F.cotxe, r.slot, r.day);
@@ -425,9 +428,11 @@ async function sbGet(){
   };
 }
 
-async function insereixNens(famDest, noms){
-  for (const n of noms){
-    const r = await sb.from("children").insert({ family_id: famDest, name: n });
+async function insereixNens(famDest, nens){
+  for (const n of nens){
+    const nom = typeof n === "string" ? n : n.nom;
+    const curs = typeof n === "string" ? "" : (n.curs || "");
+    const r = await sb.from("children").insert({ family_id: famDest, name: nom, curs: curs });
     if (r.error) throw r.error;
   }
 }
@@ -441,7 +446,7 @@ async function sbDesaFamilia(f){
   }).eq("id", f.id);
   if (r.error) throw r.error;
   // 2 · fills: diff per conservar els ids (les assignacions els referencien)
-  r = await sb.from("children").select("id,name").eq("family_id", f.id);
+  r = await sb.from("children").select("id,name,curs").eq("family_id", f.id);
   if (r.error) throw r.error;
   const antics = r.data || [];
   for (const x of antics){
@@ -452,11 +457,11 @@ async function sbDesaFamilia(f){
   for (const n of f.nens){
     const ant = antics.find(x => x.id === n.id);
     if (!ant){
-      const ins = await sb.from("children").insert({ family_id: f.id, name: n.nom }).select();
+      const ins = await sb.from("children").insert({ family_id: f.id, name: n.nom, curs: n.curs || "" }).select();
       if (ins.error) throw ins.error;
       n.id = ins.data[0].id;   // uuid definitiu
-    } else if (ant.name !== n.nom){
-      const up = await sb.from("children").update({ name: n.nom }).eq("id", n.id);
+    } else if (ant.name !== n.nom || (ant.curs || "") !== (n.curs || "")){
+      const up = await sb.from("children").update({ name: n.nom, curs: n.curs || "" }).eq("id", n.id);
       if (up.error) throw up.error;
     }
   }
@@ -880,11 +885,11 @@ function pantallaGrup(){
     "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' id='nf-curs'><option value=''>\u2014</option>" + CURSOS.map(c => "<option>" + c + "</option>").join("") + "</select></div></div>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
-    "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
+    "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>nom i curs de cada nen</span></span></div>" +
     "<div id='nf-nens'></div>" +
     "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
     "<button class='boto' style='margin-left:auto' onclick='creaGrup()'>Crea el grup</button></div></div></details>";
-  nfNens = [""]; nfPl = 3; pintaNfNens();
+  nfNens = [{ nom: "", curs: "" }]; nfPl = 3; pintaNfNens();
 }
 async function buscaGrup(){
   const v = $("#gg-codi").value.trim().toUpperCase();
@@ -918,7 +923,7 @@ function llegeixFormFam(){
   const cond = $("#nf-cond") ? $("#nf-cond").value.trim() : "";
   const tel = $("#nf-tel") ? $("#nf-tel").value.trim() : "";
   const curs = $("#nf-curs") ? $("#nf-curs").value : "";
-  const nens = nfNens.map(s => s.trim()).filter(Boolean);
+  const nens = nfNens.map(x => ({ nom: (x.nom || "").trim(), curs: x.curs || curs })).filter(x => x.nom);
   if (!cpare){ avis("Posa el primer cognom de la família."); return null; }
   if (!nens.length){ avis("Afegeix com a mínim un nen."); return null; }
   return { cpare: cpare, cmare: cmare, nom: nom, cond: cond, places: nfPl, nens: nens, tel: tel, curs: curs };
@@ -969,21 +974,22 @@ async function pantallaTria(){
     "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' id='nf-curs'><option value=''>\u2014</option>" + CURSOS.map(c => "<option>" + c + "</option>").join("") + "</select></div></div>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies — els vostres no hi compten</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
-    "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>pel nom, un per línia</span></span></div>" +
+    "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>nom i curs de cada nen</span></span></div>" +
     "<div id='nf-nens'></div>" +
     "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
     "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>" + (esAdmin ? "</details>" : "") +
     "<p style='text-align:center;margin-top:2px'><button class='enllac' onclick='obreAdmin()'>🛡️ Zona d'administració</button></p>";
-  nfNens = [""]; nfPl = 3; pintaNfNens();
+  nfNens = [{ nom: "", curs: "" }]; nfPl = 3; pintaNfNens();
 }
-let nfNens = [""], nfPl = 3;
+let nfNens = [{ nom: "", curs: "" }], nfPl = 3;
 function nfPlaces(d){ nfPl = Math.min(6, Math.max(0, nfPl + d)); $("#nf-pl").textContent = nfPl; }
 function pintaNfNens(){
   $("#nf-nens").innerHTML = nfNens.map((v,i) =>
-    "<div class='fila' style='margin-bottom:6px'><input class='input' value=\"" + esc(v) + "\" placeholder='Nom del nen o nena' maxlength='20' oninput='nfNens[" + i + "]=this.value'>" +
+    "<div class='fila' style='margin-bottom:6px;align-items:center'><input class='input' style='flex:1;min-width:0' value=\"" + esc(v.nom) + "\" placeholder='Nom del nen o nena' maxlength='20' oninput='nfNens[" + i + "].nom=this.value'>" +
+    "<select class='input' style='width:92px;flex:none;padding:8px 6px' title='Curs' onchange='nfNens[" + i + "].curs=this.value'><option value=''>curs\u2026</option>" + CURSOS.map(c => "<option" + (v.curs === c ? " selected" : "") + ">" + c + "</option>").join("") + "</select>" +
     (nfNens.length > 1 ? "<button class='mini-x' onclick='nfTreuNen(" + i + ")'>esborra</button>" : "") + "</div>").join("");
 }
-function nfAfegeixNen(){ if (nfNens.length < 5) nfNens.push(""); pintaNfNens(); }
+function nfAfegeixNen(){ if (nfNens.length < 5) nfNens.push({ nom: "", curs: "" }); pintaNfNens(); }
 function nfTreuNen(i){ nfNens.splice(i,1); pintaNfNens(); }
 
 async function creaFam(){
@@ -1139,9 +1145,21 @@ function triaTab(t){
 }
 
 function pintaFamilies(){
-  const dirHtml = famOrd().map(x =>
-    "<div class='dir-fila'><b>" + (x.rol === "admin" ? "🛡️ " : x.rol === "staff" ? "🛠️ " : "") + esc(x.nom) + " <span class='rolet'>· " + esc(x.rol || "usuari") + "</span></b><span>" + esc((x.nens || []).map(n => n.nom).join(", ")) + (x.curs ? " · " + esc(x.curs) : "") + (x.phone && x.phoneVisible ? " · 📞 " + esc(x.phone) : "") + "</span>" + ((esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam))) ? "<button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button>" : "") + "</div>"
-  ).join("");
+  const dirHtml = famOrd().map(x => {
+    const potEditar = esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam));
+    const nensDet = (x.nens || []).length
+      ? (x.nens || []).map(n => esc(n.nom) + (n.curs ? " · " + esc(n.curs) : "")).join("<br>")
+      : "—";
+    return "<details class='conf fam-det'><summary>" + (x.rol === "admin" ? "🛡️ " : x.rol === "staff" ? "🛠️ " : "👤 ") + "<b>" + esc(x.nom) + "</b> <span class='rolet'>· " + esc(x.rol || "usuari") + "</span></summary>" +
+      "<div style='padding:2px 2px 8px'>" +
+      "<div class='f-linia'>🧒 Nens:<br>" + nensDet + "</div>" +
+      (x.curs ? "<div class='f-linia'>🎓 Curs de la família: " + esc(x.curs) + "</div>" : "") +
+      (x.conductor ? "<div class='f-linia'>🚗 Condueix: " + esc(x.conductor) + "</div>" : "") +
+      "<div class='f-linia'>🪑 Places lliures al cotxe: <b>" + x.places + "</b></div>" +
+      (x.phone && x.phoneVisible ? "<div class='f-linia'>📞 " + esc(x.phone) + "</div>" : "") +
+      (potEditar ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button></div>" : "") +
+      "</div></details>";
+  }).join("");
   $("#tab-cos").innerHTML =
     "<div class='targeta'><div class='p-fila'><span class='p-lab'>Les famílies del grup «" + esc(doc.grupNom || "") + "» (" + doc.families.length + ")<span class='p-sub'>qui forma part del grup" + ((esAdmin || esStaff) ? " · amb «edita» hi entres a corregir" : "") + "</span></span></div>" +
     (dirHtml || "<p class='hint'>Encara no hi ha cap família.</p>") + "</div>";
@@ -1156,8 +1174,10 @@ function canviaFam(){
 }
 function pintaPerfil(){
   const f = lameva();
-  const chipsNens = f.nens.map(n =>
-    "<span class='chip-nen'><input class='input i-nen' value=\"" + esc(n.nom) + "\" maxlength='20' onchange=\"renomNen('" + n.id + "', this.value)\"><button class='chip-x' onclick=\"treuNen('" + n.id + "')\">\u2715</button></span>"
+  const filesNens = f.nens.map(n =>
+    "<div class='fila' style='margin:4px 0;align-items:center'><input class='input' style='flex:1;min-width:0' value=\"" + esc(n.nom) + "\" maxlength='20' onchange=\"renomNen('" + n.id + "', this.value)\">" +
+    "<select class='input' style='width:92px;flex:none;padding:8px 6px' title='Curs del nen' onchange=\"triaCursNen('" + n.id + "', this.value)\"><option value=''>curs\u2026</option>" + CURSOS.map(c => "<option" + (n.curs === c ? " selected" : "") + ">" + c + "</option>").join("") + "</select>" +
+    "<button class='chip-x' style='flex:none' onclick=\"treuNen('" + n.id + "')\">\u2715</button></div>"
   ).join("");
   const okP = perfilComplet(f);
   $("#tab-cos").innerHTML =
@@ -1174,12 +1194,14 @@ function pintaPerfil(){
     "<span class='stepper'><button onclick='canviaPlaces(-1)'>\u2212</button><span class='num' id='pl-num'>" + f.places + "</span><button onclick='canviaPlaces(1)'>+</button></span></div>" +
     "<p class='hint' style='margin:2px 0 6px'>\ud83d\ude97 Amb " + (f.nens.length === 1 ? "el vostre nen" : "els vostres " + f.nens.length + " nens") + " + " + f.places + " " + (f.places === 1 ? "lliure" : "lliures") + ", al cotxe hi " + ((f.nens.length + f.places) === 1 ? "va 1 nen" : "van " + (f.nens.length + f.places) + " nens") + ".</p>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Els vostres nens<span class='p-sub'>nom + 1r cognom (ex: Jan Vila)</span></span></div>" +
-    "<div class='chips'>" + chipsNens + "</div>" +
+    "<div>" + filesNens + "</div>" +
     "<div class='fila'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
     (dirty ? "<div style='margin-top:12px'><button class='boto' style='width:100%' onclick='desa()'>💾 Desa els canvis</button></div>" : "") +
     (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa'l a l'altre progenitor: el necessitar\u00e0 per vincular el seu compte a la vostra fam\u00edlia</span></span></div>" +
     "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
+    "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup<span class='p-sub'>codi d'invitaci\u00f3 del grup: passa'l a les fam\u00edlies que s'hi vulguin unir</span></span></div>" +
+    "<div class='nomgran' style='text-align:center'>" + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + " \u00b7 <span style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span></div>" +
     "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la fam\u00edlia del grup</button><br>" +
     "<button class='enllac' onclick='tancaSessio()'>Tanca la sessi\u00f3 en aquest dispositiu</button></div>" +
     "</div>";
@@ -1354,7 +1376,7 @@ function afegeixNen(){
   const f = lameva(); const v = $("#nou-nen").value.trim();
   if (!v || f.nens.length >= 5){ if (f.nens.length >= 5) avis("Màxim 5 fills per família."); return; }
   let nid = slug(v) || "nen"; while (f.nens.some(n => n.id === nid)) nid += "-2";
-  f.nens.push({ id: nid, nom: v, marca: {} });
+  f.nens.push({ id: nid, nom: v, curs: "", marca: {} });
   if (pinzell !== "cotxe" && pinzell !== "esborra" && !f.nens.some(n => n.id === pinzell)) pinzell = "cotxe";
   dirty = true; pintaBarra(); pintaHorariComplet();
 }
@@ -1414,7 +1436,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.2", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.3", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -1577,6 +1599,12 @@ function triaCurs(v){
   const f = lameva(); if (!f) return;
   f.curs = v; dirty = true; pintaBarra();
 }
+function triaCursNen(id, v){
+  const f = lameva(); if (!f) return;
+  const n = f.nens.find(x => x.id === id);
+  if (!n) return;
+  n.curs = v; dirty = true; pintaBarra();
+}
 function renomConductor(v){
   const f = lameva(); if (!f) return;
   const nou = v.trim();
@@ -1703,13 +1731,13 @@ function pintaVistaDia(){
     pendMeu += b.nens.filter(n => !n.portadaPerId || n.portadaPerId === mevaV.id).length;
   });
   const targetaPend = pendMeu
-    ? "<div class='targeta' style='border-left:4px solid #d64545;margin-bottom:10px'><b>\u26a0 " + (pendMeu === 1 ? "1 nen demana pla\u00e7a" : pendMeu + " nens demanen pla\u00e7a") + " i encara no puja al teu cotxe</b><br><span class='hint'>A cada viatge d'aqu\u00ed sota tens \u00abQui puges al teu cotxe?\u00bb: marca la casella dels nens que recollir\u00e0s.</span></div>"
+    ? "<div class='targeta' style='border-left:4px solid #d64545;margin-bottom:10px'><b>\u26a0 " + (pendMeu === 1 ? "1 nen demana pla\u00e7a" : pendMeu + " nens demanen pla\u00e7a") + " i encara no puja al teu cotxe</b><br><span class='hint'>Ves a la pestanya \u00ab\ud83d\ude97 El teu cotxe\u00bb del men\u00fa i marca qui recollir\u00e0s.</span></div>"
     : "";
   $("#cal-cos").innerHTML =
     targetaPend +
     "<div class='dies-sel'>" + DIES.map(d => "<button class='dia-b " + (diaSel === d ? "actiu" : "") + "' onclick=\"selDiaChip('" + d + "')\">" + DIES_LBL[d] + "</button>").join("") + "</div>" +
     "<h2 style='margin:2px 2px 10px'>" + DIES_NOM[diaSel] + "</h2>" +
-    "<p class='hint' style='margin:0 2px 10px'>\ud83d\ude97 Aquesta \u00e9s la vista dels conductors: si aquell dia condu\u00efu, a la vostra targeta hi surt \u00abQui puges al teu cotxe?\u00bb amb caselles per marcar els nens que recollireu.</p>" +
+    "<p class='hint' style='margin:0 2px 10px'>\ud83d\udc40 Vista de consulta: aqu\u00ed nom\u00e9s ho mires. Qui condueix tria els nens que recull des de la pestanya \u00ab\ud83d\ude97 El teu cotxe\u00bb del men\u00fa.</p>" +
     "<div id='dia-detall'></div>";
   pintaDia();
 }
@@ -1735,18 +1763,14 @@ function pintaDia(){
         (seus ? " \u00b7 amb " + esc(seus) : "") +
         " \u00b7 <b>" + f.places + " " + (f.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</b></div>";
       if (meva && f.id === meva.id){
+        // Vista de consulta: s'hi veu qui puja al teu cotxe, per\u00f2 s'assigna a \u00abEl teu cotxe\u00bb
         const refs = portaValids(f, fr.id, diaSel);
-        const cand = b.nens.filter(n => !n.portadaPerId || n.portadaPerId === f.id);
-        if (cand.length){
-          const estatN = refs.length > f.places ? "def" : refs.length === f.places ? "just" : "ok";
-          linia += "<div class='assigna'><div class='a-cap'>Qui puges al teu cotxe? <span class='mp " + estatN + "'>" + refs.length + "/" + f.places + "</span></div>" +
-            cand.map(n => {
-              const meu = refs.some(r => r.fam === n.famId && r.nen === n.nenId);
-              return "<label class='a-fila'><input type='checkbox' " + (meu ? "checked " : "") +
-                "onchange=\"assigna('" + fr.id + "','" + diaSel + "','" + n.famId + "','" + n.nenId + "', this.checked)\"> " +
-                esc(n.nom) + "</label>";
-            }).join("") + "</div>";
-        }
+        const nomsR = refs.map(r => {
+          const ff = doc.families.find(x => x.id === r.fam);
+          const nn = ff ? (ff.nens || []).find(x => x.id === r.nen) : null;
+          return nn ? nn.nom : "";
+        }).filter(Boolean);
+        linia += "<div class='f-linia'>\ud83e\uddd2 Al teu cotxe: <b>" + (nomsR.length ? esc(nomsR.join(", ")) : "cap nen assignat") + "</b> (" + refs.length + "/" + f.places + ") \u00b7 <span class='hint'>es canvia a \u00ab\ud83d\ude97 El teu cotxe\u00bb</span></div>";
       }
       return linia;
     }).join("");
@@ -1759,7 +1783,7 @@ function pintaDia(){
     const propisHtml = b.propis.length ? "<div class='f-linia'>\ud83d\udeab Pel seu compte: " + b.propis.map(f => esc(f.nom)).join(", ") + "</div>" : "";
     const socCond = meva && b.conds.some(x => x.id === meva.id);
     const pista = (!socCond && b.nens.some(n => !n.portadaPer))
-      ? "<p class='hint' style='margin:4px 2px 0'>\ud83d\udca1 Els nens pendents els assigna qui condueix, des del seu m\u00f2bil: en aquesta mateixa targeta li surt \u00abQui puges al teu cotxe?\u00bb amb caselles.</p>"
+      ? "<p class='hint' style='margin:4px 2px 0'>\ud83d\udca1 Els nens pendents els assigna qui condueix, des de la pestanya \u00ab\ud83d\ude97 El teu cotxe\u00bb del seu men\u00fa.</p>"
       : "";
     h += "<div class='targeta franja'><div class='f-cap'><span class='f-hora'>" + fr.hora + "</span>" +
          "<span class='m-tip " + t + "'>" + fr.tipus + "</span>" + badge + "</div>" +
@@ -1788,9 +1812,14 @@ function pintaCotxe(){
         diaHtml += "<div class='assigna'><div class='a-cap'>Qui puges al teu cotxe? <span class='mp " + estatN + "'>" + refs.length + "/" + meva.places + "</span></div>" +
           cand.map(n => {
             const meu = refs.some(r => r.fam === n.famId && r.nen === n.nenId);
+            const ff = doc.families.find(x => x.id === n.famId);
+            const nn = ff ? (ff.nens || []).find(x => x.id === n.nenId) : null;
+            const extra = (ff ? esc(ff.nom) : "") +
+              (nn && nn.curs ? " · " + esc(nn.curs) : ff && ff.curs ? " · " + esc(ff.curs) : "") +
+              (ff && ff.phone && ff.phoneVisible ? " · 📞 " + esc(ff.phone) : "");
             return "<label class='a-fila'><input type='checkbox' " + (meu ? "checked " : "") +
               "onchange=\"assigna('" + fr.id + "','" + d + "','" + n.famId + "','" + n.nenId + "', this.checked)\"> " +
-              esc(n.nom) + "</label>";
+              "<span>" + esc(n.nom) + (extra ? "<br><span class='a-sub'>" + extra + "</span>" : "") + "</span></label>";
           }).join("") + "</div>";
       } else {
         diaHtml += "<p class='hint' style='margin:2px 2px 0'>Cap nen demana plaça en aquest viatge.</p>";
@@ -2142,7 +2171,7 @@ function pintaQuadre(){
       : "<span class='badge be'>\u2713 tot quadrat</span>";
     h += "<div class='targeta dcard'><div class='d-cap qd-cap' onclick=\"obreDiaDes('" + d + "')\"><h3>" + DIES_NOM[d] + "</h3>" + chip + "</div>" +
          (linies || "<p class='hint' style='margin:2px 0 4px'>Cap trajecte marcat.</p>") +
-         (hiHa ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"obreDiaDes('" + d + "')\">veure i assignar \u2192</button></div>" : "") +
+         (hiHa ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"obreDiaDes('" + d + "')\">veure el detall \u2192</button></div>" : "") +
          "</div>";
   });
   $("#cal-cos").innerHTML = h;

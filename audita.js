@@ -28,13 +28,16 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.2", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.2"));
+  T("lema i peu amb versió 3.3", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.3"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
   const sql = fs.readFileSync(path.join(__dirname, "supabase-fase1.sql"), "utf-8");
   T("SQL: claim_family exigeix el codi de la família (p_token)", /claim_family\(p_family uuid, p_token text\)/.test(sql) && sql.includes("Codi de la família incorrecte"));
   T("SQL: can_touch_family (staff no toca l'admin) + límits 100/5", sql.includes("can_touch_family") && sql.includes("limita_families") && sql.includes("limita_nens"));
+  // v3.3: curs per nen, tant a fase1 (instal·lacions noves) com al patch v33 (la BD actual)
+  const sql33 = fs.readFileSync(path.join(__dirname, "supabase-v33.sql"), "utf-8");
+  T("SQL: curs per nen a children (fase1 + patch v33)", /curs text not null default ''/.test(sql) && /alter table public\.children[\s\S]*add column if not exists curs/.test(sql33));
   T("la URL del projecte Supabase és al CONFIG", html.includes("https://jbfjrgddsywpmwabvbtb.supabase.co"));
   T("la llibreria supabase-js es carrega per CDN", html.includes("@supabase/supabase-js"));
   // Regressió: a create_group, l'override del trigger de rols ha d'anar ABANS de l'insert de la família
@@ -494,15 +497,15 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("5 · CALENDARIS (lectura del grup sencer des de Supabase)");
   await w.pintaCalendari(); await tic(30);
-  T("el Quadre (qui porta qui) s'obre per defecte", cos().includes(">Quadre<") && cos().includes("veure i assignar"));
+  T("el Quadre (qui porta qui) s'obre per defecte", cos().includes(">Quadre<") && cos().includes("veure el detall"));
   T("els subtabs són a dalt de tot, abans del mapa", cos().indexOf(">Quadre<") < cos().indexOf("llegenda"));
   w.triaVistaCal("set"); await tic(20);
   T("la vista de setmana segueix disponible", cos().includes("dcard"));
   T("el dèficit surt al mapa i a la setmana (−3 dl 17.00)", cos().includes("−3"));
   w.triaTab("cal"); await tic(30);
   w.selDia("dl"); await tic(20);
-  T("detall del dia: explicació de recollida i cada nen amb el seu estat", cos().includes("recollireu") && cos().includes("Arlet") && cos().includes("Bru") && cos().includes("pendent"));
-  T("si no condueixes, la targeta t'explica qui assigna", cos().includes("Qui puges al teu cotxe?» amb caselles"));
+  T("detall del dia: vista de consulta i cada nen amb el seu estat", cos().includes("Vista de consulta") && cos().includes("Arlet") && cos().includes("Bru") && cos().includes("pendent"));
+  T("si no condueixes, la targeta t'explica qui assigna i on", cos().includes("els assigna qui condueix") && cos().includes("El teu cotxe"));
   T("detall del dia: badge de falten 3", cos().includes("falten 3"));
   T("línia de conductor completa: qui condueix, amb qui i places lliures", cos().includes("condueix Marta") && cos().includes("amb Jan i Mia") && cos().includes("places lliures"));
 
@@ -723,7 +726,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el menú té l'apartat Famílies", menuHtml.includes("Famílies"));
   T("la app se subscriu als canvis en viu del grup (realtime)", DB._canals.length === 1 && DB._canals[0].subs.some(s => s.table === "weekly_marks") && DB._canals[0].subs.some(s => s.table === "children"));
   w.triaTab("families"); await tic();
-  T("la pestanya Famílies llista totes les famílies del grup", cos().includes("Les famílies del grup") && (cos().match(/dir-fila/g) || []).length === 5);
+  T("la pestanya Famílies llista totes les famílies del grup", cos().includes("Les famílies del grup") && (cos().match(/fam-det/g) || []).length >= 5);
   T("…i el directori ja NO penja a sota de la pantalla principal", !pant().includes("<details class='conf'><summary>"));
   w.triaTab("perfil"); await tic();
   T("sense canvis no hi ha botó Desa dins del perfil", !cos().includes("Desa els canvis"));
@@ -789,6 +792,22 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   ompleFamForm("Test", "Mitges", "", ["X"]);
   await w.creaFam(); await tic(30);
   T("«Aquest compte ja té família» es repara sol: entra a la família vinculada", pant().includes("Hola") && pant().includes("Grau"), d.querySelector("#avis").textContent + " || " + pant().slice(0, 200));
+
+  console.log("10d · NOVETATS v3.3 (Dia només lectura, curs per nen, famílies desplegables, codi de grup al perfil)");
+  await surtIentra("admin@test.cat", "admin123");
+  w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
+  T("la vista Dia ja NO té caselles: és només de consulta", !cos().includes('type="checkbox"') && cos().includes("Vista de consulta"));
+  T("el propi cotxe es veu amb comptador i s'assigna a «El teu cotxe»", cos().includes("Al teu cotxe") && cos().includes("/3"));
+  w.triaTab("perfil"); await tic();
+  T("el perfil mostra el grup i el seu codi d'invitació", cos().includes("El vostre grup") && cos().includes(CODI));
+  const nenPerCurs = famDoc("Vila Puig").nens[0];
+  w.triaCursNen(nenPerCurs.id, "1r ESO"); await tic();
+  await w.desa(); await tic(30);
+  T("el curs per nen es desa a la BD (children.curs)", nenDB(idVila, nenPerCurs.nom).curs === "1r ESO");
+  w.triaTab("families"); await tic();
+  T("Famílies: cada família és un desplegable amb nens, curs, conductor, places i telèfon", cos().includes("fam-det") && cos().includes("Places lliures") && cos().includes("Condueix") && cos().includes("1r ESO"));
+  w.triaTab("cotxe"); await tic();
+  T("«El teu cotxe» mostra la família de cada nen sota el nom", cos().includes("a-sub") && cos().includes("Grau"), cos().slice(0, 300));
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
