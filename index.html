@@ -112,16 +112,31 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .dir-fila .enllac{flex:none;font-size:13.5px}
 .adm-banner{background:#FCEBB8;border:1.5px solid #E0B84A;color:#6E4E00;border-radius:12px;padding:8px 12px;font-size:14.5px;line-height:1.4;margin-bottom:10px}
 .adm-banner .enllac{font-size:14px}
+.prog-banner{background:#E3ECF4;border:1.5px solid #B9CBD7;border-left:5px solid #17456B;color:#1F3B52;border-radius:12px;padding:9px 12px;font-size:14.5px;line-height:1.45;margin-bottom:10px}
+.prog-banner b{color:#0E2A44}
+.fam-card{border-top:1px solid #F0F4F7;padding:9px 0}
+.fam-card:first-of-type{border-top:0}
+.fam-card details.fam-det{border-top:0;margin-top:2px}
+.fam-cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fam-cap b{color:#17456B;font-family:'Baloo 2';font-size:16.5px}
+.fam-cap .mp{margin-left:auto}
+.fam-contacte{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:7px 0 2px}
+.fam-tel{font-size:14px;color:#5B6E7C}
+.fam-bt{display:inline-flex;align-items:center;gap:5px;text-decoration:none;font:700 13.5px 'Baloo 2';padding:7px 12px;border-radius:10px;background:#E3ECF4;color:#17456B;border:1.5px solid #C2D7EC}
+.fam-bt.wa{background:#DCF1E3;color:#1F5C3B;border-color:#9CCDAD}
+.fam-bt:active{transform:scale(.97)}
+.fam-sensetel{font-size:13px;color:#8A99A5;margin:6px 0 2px}
+.rolet.prog{background:#17456B;color:#fff;border-radius:99px;padding:1px 8px;font-weight:700}
 .rolet{font-size:12.5px;color:#6B7D8A}
 .hamb{background:none;border:none;font-size:24px;color:#17456B;padding:2px 10px 2px 0;cursor:pointer}
 .captab{margin:2px 0 10px}
 .cap-titol{font:800 20px 'Baloo 2';color:#0E2A44}
 .vel{display:none;position:fixed;inset:0;background:rgba(14,42,68,.45);z-index:40}
 .vel.obert{display:block}
-.calaix{position:fixed;top:0;left:-290px;width:264px;height:100%;background:#fff;z-index:41;box-shadow:4px 0 18px rgba(14,42,68,.18);transition:left .2s;padding:18px 12px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px}
+.calaix{position:fixed;top:0;left:-290px;width:264px;height:100%;background:#fff;z-index:41;box-shadow:4px 0 18px rgba(14,42,68,.18);transition:left .2s;padding:18px 12px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .calaix.obert{left:0}
 .c-cap{font:800 19px 'Baloo 2';color:#0E2A44;padding:2px 12px 10px}
-.c-item{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;font:700 17px 'Baloo 2';color:#17456B;background:none;border:none;text-align:left;width:100%;cursor:pointer}
+.c-item{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;font:700 17px 'Baloo 2';color:#17456B;background:none;border:none;text-align:left;width:100%;cursor:pointer;flex:none}
 .c-item.actiu{background:#E3ECF4}
 .c-bad{margin-left:auto;background:#8F2B1C;color:#fff;border-radius:99px;font:800 12.5px 'Baloo 2';padding:2px 8px}
 .c-lock{margin-left:auto;font-size:15px}
@@ -339,7 +354,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.9</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.0</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -432,6 +447,8 @@ let famId = "";                // família que s'edita ara (la meva o, admin/sta
 var doc = null;
 let pinzell = "cotxe", dirty = false;
 let esAdmin = false, esStaff = false;   // deriven del rol de la MEVA família a la BD
+let esProgenitor = false;      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
+let conflicteCurs = null;      // {nens:[], caiguts:[], nous:n} quan un canvi de curs desquadra la graella
 let confObert = false;
 let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
 let tabAct = "graella";
@@ -472,6 +489,13 @@ async function sbGet(){
   // invite_token NO viatja: només es llegeix via RPC codi_familia / codis_families
   const rf = await sb.from("families").select("id,group_id,name,cognom1,cognom2,driver,seats,phone,phone_visible,curs,role,created_at").eq("group_id", gid);
   if (rf.error) throw { tipus: "xarxa", err: rf.error };
+  // owner_id va a banda: si encara no s'ha executat el SQL v39 la columna no hi és,
+  // la consulta falla i tothom queda com a titular (el comportament d'abans).
+  const owners = {};
+  try {
+    const ro = await sb.from("families").select("id,owner_id").eq("group_id", gid);
+    if (!ro.error) (ro.data || []).forEach(r => { if (r.owner_id) owners[r.id] = r.owner_id; });
+  } catch(e){}
   const ids = (rf.data || []).map(r => r.id);
   const rg = await sb.from("groups").select("*").eq("id", gid);
   const rc = ids.length ? await sb.from("children").select("*").in("family_id", ids) : { data: [] };
@@ -484,7 +508,7 @@ async function sbGet(){
     cognomPare: row.cognom1 || "", cognomMare: row.cognom2 || "",
     conductor: row.driver || "", places: row.seats == null ? 3 : row.seats,
     phone: row.phone || "", phoneVisible: row.phone_visible !== false,
-    curs: row.curs || "", codiFam: "",   // el codi propi es carrega a banda amb codi_familia()
+    curs: row.curs || "", codiFam: "", ownerId: owners[row.id] || "",   // el codi propi es carrega a banda amb codi_familia()
     cotxe: {}, propi: {}, nens: [], porta: {}
   }));
   const perId = {}; fams.forEach(x => perId[x.id] = x);
@@ -681,7 +705,23 @@ function celesPendents(f){
   return p;
 }
 function graellaCompleta(f){ return celesPendents(f).length === 0; }
-function potCal(){ const f = lameva(); return esAdmin || esStaff || (f && perfilComplet(f) && graellaCompleta(f)); }
+function potCal(){ const f = lameva(); return esAdmin || esStaff || esProgenitor || (f && perfilComplet(f) && graellaCompleta(f)); }
+/* Porta única de només lectura: el progenitor (2n compte de la família) no edita res.
+   La BD ho torna a bloquejar amb can_touch_family()/es_titular() (SQL v39): això
+   només és per no deixar-lo tocar botons que després fallarien. */
+/* Desactiva els controls d'edició de la pestanya actual quan ets progenitor.
+   Es crida al final de cada pinta* editable perquè els repintats no ho perdin. */
+function bloquejaEdicio(){
+  if (!esProgenitor) return;
+  const c = $("#tab-cos"); if (!c) return;
+  c.querySelectorAll("input, select, textarea").forEach(el => { el.disabled = true; });
+  c.querySelectorAll(".stepper, .chip-x, .mini-x").forEach(el => { el.style.display = "none"; });
+}
+function nomesTitular(){
+  if (!esProgenitor) return false;
+  avis("\u26a0 Nom\u00e9s el titular de la fam\u00edlia pot fer canvis.");
+  return true;
+}
 
 function fotoAssig(){
   const f = lameva(); const m = {};
@@ -767,6 +807,28 @@ function avisVell(txt){
   a.innerHTML = txt; a.style.display = "block";
   if (typeof a.scrollIntoView === "function"){ try { a.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch(e){} }
 }
+/* Cobertura de trajectes: dem = trajectes de nens a cobrir de tot el grup,
+   cob = els que ja tenen cotxe, meus = els que cobreix el MEU cotxe.
+   balanc() ja exclou les caselles en blanc per curs. */
+function statsCobertura(){
+  const meva = lameva();
+  let dem = 0, cob = 0, meus = 0; const pendSet = {};
+  DIES.forEach(d2 => FRANGES.forEach(fr => {
+    balanc(fr.id, d2).nens.forEach(n => {
+      dem++;
+      if (n.portadaPerId){ cob++; if (meva && n.portadaPerId === meva.id) meus++; }
+      else pendSet[n.famId + "|" + n.nenId] = 1;
+    });
+  }));
+  return { dem: dem, cob: cob, meus: meus, nPend: Object.keys(pendSet).length };
+}
+function barraCobHtml(titol, val, tot, sub, clic){
+  const pct = tot ? Math.round(val * 100 / tot) : 0;
+  return "<div class='barra-cob'" + (clic ? " onclick=\"" + clic + "\"" : "") + ">" +
+    "<div class='bc-cap'><span>" + titol + "</span><b>" + (tot ? val + " de " + tot + " \u00b7 " + pct + " %" : "Encara no hi ha trajectes a cobrir") + "</b></div>" +
+    "<div class='bc-pista'><div class='bc-ompl " + (tot && pct === 100 ? "fet" : (pct < 50 && tot ? "baix" : "")) + "' style='width:" + (tot ? pct : 0) + "%'></div><i style='left:25%'></i><i style='left:50%'></i><i style='left:75%'></i></div>" +
+    (sub || "") + "</div>";
+}
 function pintaPeuStats(){
   const el = $("#peu-stats"); if (!el) return;
   if (!doc || !doc.families || !doc.families.length){ el.innerHTML = ""; return; }
@@ -778,22 +840,14 @@ function pintaPeuStats(){
       if (te(f.cotxe, fr.id, d)){ viatges++; compartides += portaValids(f, fr.id, d).length; }
     }));
   });
-  // Barra de progrés: trajectes \ud83d\ude64 coberts (balanc ja exclou les caselles en blanc)
-  let dem = 0, cob = 0; const pendSet = {};
-  DIES.forEach(d2 => FRANGES.forEach(fr => {
-    balanc(fr.id, d2).nens.forEach(n => { dem++; if (n.portadaPerId) cob++; else pendSet[n.famId + "|" + n.nenId] = 1; });
-  }));
-  const nPend = Object.keys(pendSet).length;
-  const pct = dem ? Math.round(cob * 100 / dem) : 0;
-  const barra =
-    "<div class='barra-cob' onclick='obreResumDesDePeu()'>" +
-    "<div class='bc-cap'><span>\ud83c\udfaf Trajectes coberts</span><b>" + (dem ? cob + " de " + dem + " \u00b7 " + pct + " %" : "Encara no hi ha trajectes a cobrir") + "</b></div>" +
-    "<div class='bc-pista'><div class='bc-ompl " + (dem && pct === 100 ? "fet" : pct < 50 && dem ? "baix" : "") + "' style='width:" + (dem ? pct : 0) + "%'></div><i style='left:25%'></i><i style='left:50%'></i><i style='left:75%'></i></div>" +
-    (dem ? (pct === 100
+  // Barra de progrés de TOT EL GRUP (la del peu)
+  const st = statsCobertura();
+  const barra = barraCobHtml("\ud83c\udfaf Trajectes coberts de tot el grup", st.cob, st.dem,
+    (st.dem ? (st.cob === st.dem
         ? "<div class='bc-sub be'>\ud83c\udf89 100 % \u00b7 tots els nens tenen cotxe</div>"
-        : (nPend ? "<div class='bc-sub'>" + nPend + (nPend === 1 ? " nen encara" : " nens encara") + " sense cotxe en algun trajecte</div>" : ""))
-      : "") +
-    "</div>";
+        : (st.nPend ? "<div class='bc-sub'>" + st.nPend + (st.nPend === 1 ? " nen encara" : " nens encara") + " sense cotxe en algun trajecte</div>" : ""))
+      : ""),
+    "obreResumDesDePeu()");
   el.innerHTML =
     "<span>\ud83d\udc6a " + pl(doc.families.length, "fam\u00edlia", "fam\u00edlies") + "</span>" +
     "<span>\ud83e\uddd2 " + pl(nens, "nen", "nens") + "</span>" +
@@ -827,6 +881,7 @@ function barraAvis(html, tipus){ const b = $("#barra-avis"); if (!b) return; b.i
 function barraAvisNeteja(){ const b = $("#barra-avis"); if (b){ b.classList.add("ocult"); b.innerHTML = ""; } }
 async function desa(){
   const fg = lameva();
+  if (nomesTitular()) return;
   if (fg){
     const dobles = doblesDe(fg);
     if (dobles.length){
@@ -918,6 +973,9 @@ async function entraApp(){
     const mevaFam = doc.families.find(x => x.id === perfil.family_id);
     esAdmin = !!(mevaFam && mevaFam.rol === "admin");
     esStaff = !!(mevaFam && mevaFam.rol === "staff");
+    // Progenitor = compte vinculat a la família que NO n'és el titular. Només lectura.
+    // Si owner_id encara no hi és (SQL v39 sense executar), ningú no és progenitor.
+    esProgenitor = !!(mevaFam && mevaFam.ownerId && sessio && sessio.user && sessio.user.id !== mevaFam.ownerId);
     famId = (famId && lameva()) ? famId : perfil.family_id;
     estat("Connectat ✓", "ok");
     connectaRealtime();
@@ -1143,6 +1201,7 @@ function nfAfegeixNen(){ if (nfNens.length < 5) nfNens.push({ nom: "", curs: "" 
 function nfTreuNen(i){ nfNens.splice(i,1); pintaNfNens(); }
 
 async function creaFam(){
+  if (nomesTitular()) return;
   const socMembre = !!(perfil && perfil.family_id);
   if (socMembre && esStaff && !esAdmin){ avis("El rol de staff pot corregir famílies, però no crear-ne."); return; }
   if (socMembre && !esAdmin){ avis("Aquest compte ja té una família: hi entrem directament."); await entraApp(); return; }
@@ -1259,6 +1318,7 @@ async function entraSel(){
   await entraApp();
 }
 async function rolFam(id){
+  if (nomesTitular()) return;
   if (!esAdmin || !doc.adminFam || !lameva() || lameva().id !== doc.adminFam) return;
   const fx = doc.families.find(x => x.id === id); if (!fx) return;
   if (doc.adminFam && fx.id === doc.adminFam){ avis("Aquesta és la família de l'administrador: el seu rol és fix."); return; }
@@ -1272,6 +1332,7 @@ async function rolFam(id){
   if (tabAct === "rols") pintaRols(); else pantallaApp();
 }
 function adminEdita(id){
+  if (nomesTitular()) return;
   if (!esAdmin && !esStaff) return;
   if (!esAdmin && esStaff && doc.adminFam && id === doc.adminFam){ avis("La fam\u00edlia de l'administrador nom\u00e9s la gestiona l'administrador."); return; }
   tabAct = "perfil"; triaFam(id);
@@ -1284,9 +1345,10 @@ function pantallaApp(){
   const f = lameva();
   if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
-  if (!perfilComplet(f) && !esAdmin && !esStaff) tabAct = "perfil";
+  if (!perfilComplet(f) && !esAdmin && !esStaff && !esProgenitor) tabAct = "perfil";
   $("#pantalla").innerHTML =
-    "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet'>\u00b7 " + (f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
+    "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet" + (esProgenitor ? " prog" : "") + "'>\u00b7 " + (esProgenitor ? "progenitor" : f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
+    (esProgenitor ? "<div class='prog-banner'>\ud83d\udc40 Has entrat com a <b>progenitor</b> de la fam\u00edlia <b>" + esc(f.nom) + "</b> \u00b7 <b>nom\u00e9s lectura</b>.<br><span class='hint'>Pots mirar-ho tot, per\u00f2 els canvis els fa el titular de la fam\u00edlia.</span></div>" : "") +
     ((esAdmin || esStaff) && perfil && f.id !== perfil.family_id ? (function(){
       const pr = doc.families.find(x => x.id === perfil.family_id);
       return "<div class='adm-banner'>\ud83d\udee1\ufe0f Est\u00e0s dins d'una altra fam\u00edlia: tot el que editis \u00e9s seu." + (pr ? " <button class='enllac' onclick=\"triaFam('" + pr.id + "')\">torna a la meva</button>" : "") + "</div>";
@@ -1341,24 +1403,58 @@ function triaTab(t){
   else pintaCalendari();
 }
 
+/* Normalitza un mòbil per a wa.me: sense símbols i amb prefix de país. */
+function telWa(t){
+  let n = String(t || "").replace(/[^0-9+]/g, "");
+  if (n.indexOf("+") === 0) n = n.slice(1);
+  if (n.indexOf("00") === 0) n = n.slice(2);
+  if (/^[6789]\d{8}$/.test(n)) n = "34" + n;   // mòbil espanyol escrit sense prefix
+  return n;
+}
+/* Com va cada família: sense marcar / a mitges / completa (mateix criteri que el Resum). */
+function estatFamilia(x){
+  let teRes = false;
+  FRANGES.forEach(fr => DIES.forEach(d => {
+    if (estatCasella(x, fr.id, d) !== "normal") return;
+    if (te(x.cotxe, fr.id, d) || te(x.propi, fr.id, d)) teRes = true;
+    (x.nens || []).forEach(n => { if (te(n.marca, fr.id, d)) teRes = true; });
+  }));
+  if (!teRes) return { cls: "def", txt: "\u23f3 sense marcar" };
+  if (!perfilComplet(x)) return { cls: "just", txt: "\u26a0 perfil incomplet" };
+  if (!graellaCompleta(x)) return { cls: "just", txt: "\u26a0 graella a mitges" };
+  return { cls: "ok", txt: "\u2713 completa" };
+}
 function pintaFamilies(){
+  let nOk = 0, nPend = 0;
   const dirHtml = famOrd().map(x => {
-    const potEditar = esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam));
+    const potEditar = !esProgenitor && (esAdmin || (esStaff && !(doc.adminFam && x.id === doc.adminFam)));
+    const st = estatFamilia(x);
+    if (st.cls === "ok") nOk++; else nPend++;
+    const veuTel = x.phone && x.phoneVisible;
+    const wa = veuTel ? telWa(x.phone) : "";
+    const contacte = veuTel
+      ? "<div class='fam-contacte'><span class='fam-tel'>\ud83d\udcde " + esc(x.phone) + "</span>" +
+        "<a class='fam-bt' href='tel:" + esc(String(x.phone).replace(/[^0-9+]/g, "")) + "'>Trucar</a>" +
+        (wa ? "<a class='fam-bt wa' href='https://wa.me/" + esc(wa) + "' target='_blank' rel='noopener'>\ud83d\udcac WhatsApp</a>" : "") +
+        "</div>"
+      : "<div class='fam-sensetel'>Sense tel\u00e8fon visible</div>";
     const nensDet = (x.nens || []).length
       ? (x.nens || []).map(n => esc(n.nom) + (n.curs ? " · " + esc(n.curs) : "")).join("<br>")
       : "—";
-    return "<details class='conf fam-det'><summary>" + (x.rol === "admin" ? "🛡️ " : x.rol === "staff" ? "🛠️ " : "👤 ") + "<b>" + esc(x.nom) + "</b> <span class='rolet'>· " + esc(x.rol || "usuari") + "</span></summary>" +
+    return "<div class='fam-card'><div class='fam-cap'>" + (x.rol === "admin" ? "🛡️" : x.rol === "staff" ? "🛠️" : "👤") +
+      " <b>" + esc(x.nom) + "</b> <span class='rolet'>· " + esc(x.rol || "usuari") + "</span>" +
+      "<span class='mp " + st.cls + "'>" + st.txt + "</span></div>" + contacte +
+      "<details class='conf fam-det'><summary>Detalls</summary>" +
       "<div style='padding:2px 2px 8px'>" +
       "<div class='f-linia'>🧒 Nens:<br>" + nensDet + "</div>" +
       (x.curs ? "<div class='f-linia'>🎓 Curs de la família: " + esc(x.curs) + "</div>" : "") +
       (x.conductor ? "<div class='f-linia'>🚗 Condueix: " + esc(x.conductor) + "</div>" : "") +
       "<div class='f-linia'>🪑 Places lliures al cotxe: <b>" + x.places + "</b></div>" +
-      (x.phone && x.phoneVisible ? "<div class='f-linia'>📞 " + esc(x.phone) + "</div>" : "") +
       (potEditar ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button></div>" : "") +
-      "</div></details>";
+      "</div></details></div>";
   }).join("");
   $("#tab-cos").innerHTML =
-    "<div class='targeta'><div class='p-fila'><span class='p-lab'>Les famílies del grup «" + esc(doc.grupNom || "") + "» (" + doc.families.length + ")<span class='p-sub'>qui forma part del grup" + ((esAdmin || esStaff) ? " · amb «edita» hi entres a corregir" : "") + "</span></span></div>" +
+    "<div class='targeta'><div class='p-fila'><span class='p-lab'>Les famílies del grup «" + esc(doc.grupNom || "") + "» (" + doc.families.length + ")<span class='p-sub'><b>" + nOk + "</b> " + (nOk === 1 ? "completa" : "completes") + " · <b>" + nPend + "</b> " + (nPend === 1 ? "pendent" : "pendents") + ((esAdmin || esStaff) && !esProgenitor ? " · amb «edita» hi entres a corregir" : "") + "</span></span></div>" +
     (dirHtml || "<p class='hint'>Encara no hi ha cap família.</p>") + "</div>";
 }
 
@@ -1408,15 +1504,40 @@ function pintaPerfil(){
     "<p class='hint' style='text-align:center;margin-top:14px'>Has entrat com a <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b></p>" +
     "<div style='text-align:center;margin-top:6px'>" +
     (perfil && perfil.family_id && f.id === perfil.family_id ? "<button class='enllac' onclick='desvinculaCompte()'>Desvincula aquest compte de la fam\u00edlia</button><br>" : "") +
-    "<button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la fam\u00edlia del grup</button><br>" +
+    (esProgenitor ? "" : "<button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la fam\u00edlia del grup</button><br>") +
     "<button class='enllac' onclick='tancaSessio()'>Tanca la sessi\u00f3 en aquest dispositiu</button></div>" +
     "</div>";
+  bloquejaEdicio();
 }
 
+/* Un canvi de curs mou les caselles que toquen: n'hi ha de marcades que queden
+   en blanc i de noves que queden sense respondre. No s'esborra res sol: s'avisa
+   i s'ofereix esborrar la graella per tornar-la a fer. */
+function avaluaConflicteCurs(f, nen){
+  const caiguts = [];
+  FRANGES.forEach(fr => DIES.forEach(d => {
+    if (estatCasella(f, fr.id, d) === "normal") return;
+    if (te(f.cotxe, fr.id, d) || te(f.propi, fr.id, d) || (f.nens || []).some(n => te(n.marca, fr.id, d)))
+      caiguts.push(DIES_NOM[d] + " " + fr.hora);
+  }));
+  const nous = celesPendents(f);
+  const nom = nen ? nen.nom.trim().split(/\s+/)[0] : (conflicteCurs ? conflicteCurs.nen : "");
+  conflicteCurs = (caiguts.length || nous.length) ? { nen: nom, caiguts: caiguts, nous: nous } : null;
+}
+function conflicteCursHtml(){
+  if (!conflicteCurs) return "";
+  const c = conflicteCurs;
+  return "<div class='g-estat mal'>\u26a0 <b>Has canviat el curs" + (c.nen ? " de " + esc(c.nen) : "") + "</b>: l'horari del curs nou no encaixa amb la graella que ten\u00edeu." +
+    (c.caiguts.length ? "<br>\u2022 <b>" + c.caiguts.length + "</b> " + (c.caiguts.length === 1 ? "casella marcada queda" : "caselles marcades queden") + " en blanc (" + esc(c.caiguts.slice(0, 3).join(", ")) + (c.caiguts.length > 3 ? "\u2026" : "") + ")." : "") +
+    (c.nous.length ? "<br>\u2022 <b>" + c.nous.length + "</b> " + (c.nous.length === 1 ? "casella nova" : "caselles noves") + " sense respondre (" + esc(c.nous[0]) + (c.nous.length > 1 ? "\u2026" : "") + ")." : "") +
+    "<br><b>Cal esborrar la graella i tornar-la a fer.</b>" +
+    (esProgenitor ? "" : "<div style='margin-top:8px'><button class='boto' style='background:#B3372C;color:#fff' onclick='esborraGraella()'>\ud83d\uddd1\ufe0f Esborra la graella i comen\u00e7a de nou</button></div>") +
+    "</div>";
+}
 function estatGHtml(f){
   const pend = celesPendents(f);
   const info = infoCursos(f);
-  return (pend.length
+  return conflicteCursHtml() + (pend.length
     ? "<div class='g-estat mal'>\u26a0 Falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab). Primera: " + esc(pend[0]) + ".</div>"
     : "<div class='g-estat be'>\u2713 Setmana completa \u2014 els Calendaris estan oberts.</div>") + info;
 }
@@ -1435,11 +1556,12 @@ function pintaGraellaTab(){
     "<div id='g-accions'></div>";
   pintaGraella();
   pintaGraellaAccions();
+  bloquejaEdicio();
 }
 function pintaGraellaAccions(){
   const el = $("#g-accions"); if (!el) return;
   const f = lameva(); if (!f){ el.innerHTML = ""; return; }
-  const bloq = esStaff && !esAdmin && doc.adminFam && f.id === doc.adminFam;   // staff mai sobre la família admin
+  const bloq = esProgenitor || (esStaff && !esAdmin && doc.adminFam && f.id === doc.adminFam);   // progenitor: només lectura · staff mai sobre la família admin
   // un sol control de desar a tota l'app: la barra de baix; aquí només l'esborrat
   el.innerHTML = bloq ? "" : "<div class='fila' style='margin-top:10px;justify-content:flex-end'>" +
     "<button class='boto sec' style='color:#97301F' onclick='esborraGraella()'>\ud83d\uddd1\ufe0f Esborra tota la graella</button></div>";
@@ -1447,6 +1569,7 @@ function pintaGraellaAccions(){
 let esborrantGraella = false;
 function esborraGraella(){
   const f = lameva(); if (!f || esborrantGraella) return;
+  if (nomesTitular()) return;
   mostraConfirm({
     titol: "\ud83d\uddd1\ufe0f Esborrar tota la graella de " + esc(f.nom) + "?",
     text: "Esborrar\u00e0s <b>TOTES les caselles de la setmana</b> de " + esc(f.nom) + " (\ud83d\ude97, \ud83d\ude4b i \ud83d\udeab) i els nens assignats al vostre cotxe. Els nens d'altres fam\u00edlies que port\u00e0veu es quedaran sense pla\u00e7a i ho veuran als Avisos. Els canvis sense desar tamb\u00e9 es perden. <b>Es desa a l'instant i no es pot desfer.</b>",
@@ -1463,6 +1586,7 @@ async function esborraGraellaDeDebò(f){
     estat("Error", true); avis("No s'ha pogut esborrar: " + esc(msgNeta((d1 && d1.error) || d2.error)));
     esborrantGraella = false; return;
   }
+  conflicteCurs = null;
   await logActivitat("esborrat graella", "Graella esborrada del tot", f.id);
   await sbGet();
   dirty = false; pintaBarra(); estat("Graella esborrada", "ok");
@@ -1477,6 +1601,7 @@ function triaPinzell(p){ pinzell = p; pintaHorariComplet(); }
 let celObert = null;
 function obreCasella(slot, dia){
   const f = lameva();
+  if (nomesTitular()) return;
   if (f){
     const ec = estatCasella(f, slot, dia);
     if (ec === "blanc-entrada"){
@@ -1512,6 +1637,7 @@ function pintaCasella(){
 }
 function celAccio(ac){
   if (!celObert) return;
+  if (nomesTitular()) return;
   const s = celObert.slot, d = celObert.dia;
   if (ac === "demana"){
     const k = s + "-" + d + "|demana", ara = Date.now();
@@ -1601,6 +1727,7 @@ function pintaGraella(){
 
 function pinta(slot, dia){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   const k = slot + "-" + dia + "|" + pinzell, ara = Date.now();
   if (ultimToc.k === k && ara - ultimToc.t < 350) return; // escut anti-tocs dobles
   ultimToc = { k: k, t: ara };
@@ -1632,12 +1759,14 @@ function pinta(slot, dia){
 
 function canviaPlaces(d){
   const f = lameva();
+  if (nomesTitular()) return;
   f.places = Math.min(6, Math.max(0, (f.places || 0) + d));
   $("#pl-num").textContent = f.places;
   dirty = true; pintaBarra(); pintaHorariComplet();
 }
 function afegeixNen(){
   const f = lameva(); const v = $("#nou-nen").value.trim();
+  if (nomesTitular()) return;
   if (!v || f.nens.length >= 5){ if (f.nens.length >= 5) avis("Màxim 5 fills per família."); return; }
   let nid = slug(v) || "nen"; while (f.nens.some(n => n.id === nid)) nid += "-2";
   f.nens.push({ id: nid, nom: v, curs: "", marca: {} });
@@ -1646,6 +1775,7 @@ function afegeixNen(){
 }
 function treuNen(id){
   const f = lameva(); const n = f.nens.find(x => x.id === id);
+  if (nomesTitular()) return;
   if (!n || !confirm("Treure " + n.nom + " i totes les seves marques?")) return;
   f.nens = f.nens.filter(x => x.id !== id);
   if (pinzell === id) pinzell = "cotxe";
@@ -1718,6 +1848,7 @@ function copiaCodisTot(){
   copiaText(txt, null);
 }
 function regeneraCodi(id){
+  if (nomesTitular()) return;
   if (!esAdmin) return;
   const f = doc.families.find(x => x.id === id); if (!f) return;
   mostraConfirm({
@@ -1754,7 +1885,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.6", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.0", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -1772,6 +1903,7 @@ async function copiaSeguretat(){
 
 /* ── Importador de dades antigues (dades.json de l'era GitHub) ── */
 async function importaDades(){
+  if (nomesTitular()) return;
   if (!esAdmin) return;
   const txt = $("#imp-json").value.trim();
   const box = $("#imp-estat");
@@ -1868,8 +2000,8 @@ function renomFam(v){
   dirty = true; pintaBarra(); pantallaApp();
 }
 function recomponNom(f){ const a = (f.cognomPare || "").trim(), b = (f.cognomMare || "").trim(); if (a || b) f.nom = (a + " " + b).trim(); }
-function renomCognomPare(v){ const f = lameva(); if (!f) return; const nou = v.trim(); if (nou === (f.cognomPare || "")) return; f.cognomPare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
-function renomCognomMare(v){ const f = lameva(); if (!f) return; const nou = v.trim(); if (nou === (f.cognomMare || "")) return; f.cognomMare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
+function renomCognomPare(v){ const f = lameva(); if (!f) return; if (nomesTitular()) return; const nou = v.trim(); if (nou === (f.cognomPare || "")) return; f.cognomPare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
+function renomCognomMare(v){ const f = lameva(); if (!f) return; if (nomesTitular()) return; const nou = v.trim(); if (nou === (f.cognomMare || "")) return; f.cognomMare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
 function pintaBloqueig(){
   const f = lameva();
   const pend = celesPendents(f);
@@ -1911,20 +2043,28 @@ function pintaAvisos(){
 }
 function renomTel(v){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   f.phone = v.trim(); dirty = true; pintaBarra();
 }
 function triaCurs(v){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   f.curs = v; dirty = true; pintaBarra();
 }
 function triaCursNen(id, v){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   const n = f.nens.find(x => x.id === id);
-  if (!n) return;
+  if (!n || (n.curs || "") === (v || "")) return;
   n.curs = v; dirty = true; pintaBarra();
+  avaluaConflicteCurs(f, n);
+  if (conflicteCurs)
+    barraAvis("\u26a0 <b>El canvi de curs desquadra la graella</b>: l'horari de " + esc(v || "sense curs") + " no \u00e9s el mateix. Cal <b>esborrar la graella i tornar-la a fer</b> \u2014 tens el bot\u00f3 a la pestanya Graella.");
+  if (tabAct === "graella") pintaGraellaTab();
 }
 function renomConductor(v){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   const nou = v.trim();
   if (nou === (f.conductor || "")){ return; }
   f.conductor = nou;
@@ -1932,6 +2072,7 @@ function renomConductor(v){
 }
 function renomNen(id, v){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   const n = f.nens.find(x => x.id === id);
   const nom = v.trim();
   if (!n || !nom || nom === n.nom){ pintaHorariComplet(); return; }
@@ -1973,6 +2114,7 @@ async function desvinculaCompteDeDebo(){
 }
 function esborraFam(){
   const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
   mostraConfirm({
     titol: "\u26a0\ufe0f Est\u00e0s a punt de sortir del grup \u00ab" + esc(doc && doc.grupNom || "") + "\u00bb",
     text: "Si continues, la fam\u00edlia <b>" + esc(f.nom) + "</b> s'esborrar\u00e0 del grup: els nens, les marques de la graella i les places que ofer\u00edeu. Ho veuran la resta de fam\u00edlies. Es desa a l'instant i no es pot desfer.",
@@ -2193,14 +2335,22 @@ function pintaCotxe(){
     $("#tab-cos").innerHTML = "<div class='targeta'><p class='lead'>Aquesta setmana no conduïu cap viatge. Marqueu 🚗 a la Graella i aquí us apareixeran, dia per dia, els nens que demanen plaça per pujar al vostre cotxe.</p></div>";
     return;
   }
-  $("#tab-cos").innerHTML =
+  const stc = statsCobertura();
+  const barraTu = "<div class='targeta'>" +
+    barraCobHtml("\ud83c\udfaf Trajectes coberts per tu", stc.meus, stc.dem,
+      (pendTotals ? "<div class='bc-sub'>" + pendTotals + (pendTotals === 1 ? " nen espera" : " nens esperen") + " pla\u00e7a als teus viatges</div>"
+                  : "<div class='bc-sub be'>\u2713 cap nen pendent als teus viatges</div>"), "") +
+    "</div>";
+  $("#tab-cos").innerHTML = barraTu +
     (pendTotals ? "<div class='targeta' style='border-left:4px solid #d64545;margin-bottom:10px'><b>⚠ " + pendTotals + (pendTotals === 1 ? " nen demana" : " nens demanen") + " plaça als teus viatges</b><br><span class='hint'>Marca la seva casella i prem «Desa els canvis».</span></div>"
                 : "<p class='hint' style='margin:0 2px 10px'>Tots els nens que demanen plaça als teus viatges ja hi són assignats. ✓</p>") + h;
+  bloquejaEdicio();
 }
 function repintaCotxe(){ if (tabAct === "cotxe") pintaCotxe(); else pintaDia(); }
 
 function assigna(slot, dia, famRef, nenRef, posar){
   const f = lameva();
+  if (nomesTitular()) return;
   if (!f || !te(f.cotxe, slot, dia)) return;
   const cel = slot + "-" + dia;
   if (!f.porta) f.porta = {};
