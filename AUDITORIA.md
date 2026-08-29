@@ -1,6 +1,52 @@
 # 🔁 AUDITORIA — Cotxes · Escola Anoia
-Data: 27-08-2026 (49a iteració · v2.29 — la icona de la família al cotxe) · Fitxer: `index.html`
+Data: 29-08-2026 (v3.7 — fulls imprimibles: conductor, grup i print CSS) · Fitxer: `index.html`
 Mètode /loop: evidència → canvi → verificació executable → reversió clara.
+
+## v3.7 — FULLS IMPRIMIBLES: EL NOM DEL CONDUCTOR, EL GRUP I EL PAPER EN BLANC `[a petició + bug reproduït]`
+
+**1. Full del conductor: el nom a cada casella.**
+Evidència: cada viatge 🚗 sortia com «portes N» — no aporta res al
+paper (qui el llegeix ja sap que és el seu cotxe) i el nombre es
+dedueix dels noms. Canvi: a `descarregaHorariConductor()` el `titol`
+passa a `nomConductor(f)` (mateixa funció que el full del nen: «Víctor
+QA»; sense conductor informat cau al nom de la família), i la `nota`
+conserva el recompte davant dels noms: «porta 2: Jan, Marta · 1 plaça
+lliure» (sense passatgers: «sense passatgers · N places lliures»). El
+model {pal, titol, nota} és compartit: full HTML i canvas JPEG canvien
+alhora. Verificació: suite 10h (cap «portes », títol = nom del
+conductor, nota amb 2 noms i places, fallback al nom de família).
+Reversió: restaurar `titol: "portes " + tots.length` a la línia del
+`c = { pal: "ok", … }`.
+
+**2. BUG «🖨️ Imprimeix» sortia EN BLANC (ordinador i Android).**
+Evidència: el print CSS feia `body > *{display:none}` +
+`#full-horari{display:block}`, però #full-horari NO és fill directe de
+body (viu dins .tel > .cos): la regla amagava .tel sencer i el full
+quedava dins d'un avi a display:none → pàgina buida. Canvi: tècnica de
+visibilitat, que no depèn de l'arbre — `body *{visibility:hidden}`,
+`#full-horari, #full-horari *{visibility:visible}`, #full-horari en
+posició absoluta a 0,0 amb width:100%, i neutralització de .tel
+(max-width/min-height/flex) i del fons gris del body en imprimir.
+@page A4 apaïsat 8mm i el disseny v2.28 es mantenen; el camí d'iOS /
+app instal·lada (botó amagat + «Desa → Fotos → Imprimeix») no canvia.
+Verificació: suite 10h (el bloc @media print conté les regles de
+visibilitat i cap `body > *`); comprovació manual pendent de l'usuari
+a Chrome d'escriptori i Android (full sencer en una sola A4).
+Reversió: restaurar la línia única
+`@media print{ body > *{display:none !important} … }`.
+
+**3. El grup a la capçalera dels DOS fulls.**
+Evidència: amb fulls d'anys diferents a la nevera no es pot saber de
+quin curs és cadascun. Canvi: el subtítol (`sub`, compartit entre full
+HTML i JPEG) afegeix « · Grup EA 26/27» (de `doc.grupNom`, mai text
+fix) als dos generadors; el títol no canvia. El nom del fitxer també
+duu el grup («horari-conductor-victor-qa-ea-26-27.jpg», amb slug()).
+Al canvas, si el subtítol llarg s'acosta a la marca «🚗 Cotxes ·
+Escola Anoia» de la dreta, la mida baixa de 36 a 29 (measureText).
+Verificació: suite 10h (els dos fulls contenen «Grup » + doc.grupNom).
+Reversió: treure el sufix del `sub` i del `fitxer` als dos generadors.
+
+Suite: `node audita.js` → **200 correctes · 0 fallades**. Peu: versió 3.7.
 
 ## v2.29 — LA ICONA DE LA FAMÍLIA AL COTXE `[art de l'usuari]`
 Joc d'icones nou (família saludant des del cotxe, navy + sol groc):

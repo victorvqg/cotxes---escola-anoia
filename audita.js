@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.6", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.6"));
+  T("lema i peu amb versió 3.7", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.7"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -597,7 +597,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el full del nen s'obre a pantalla, llest per imprimir o desar en PDF", !d.querySelector("#full-horari").classList.contains("ocult") && d.querySelector("#full-horari").innerHTML.includes("Horari de Jan") && d.querySelector("#full-horari").innerHTML.includes("Imprimeix") && d.querySelector("#full-horari").innerHTML.includes("FULL DEL NEN") && d.querySelector("#full-horari").innerHTML.includes("ENTRADA · MATÍ"));
   w.tancaFull(); await tic();
   w.descarregaHorariConductor(); await tic();
-  T("el full del conductor: qui puja a cada viatge", d.querySelector("#full-horari").innerHTML.includes("Horari del conductor") && d.querySelector("#full-horari").innerHTML.includes("portes"));
+  T("el full del conductor: qui puja a cada viatge", d.querySelector("#full-horari").innerHTML.includes("Horari del conductor") && d.querySelector("#full-horari").innerHTML.includes("porta ") && d.querySelector("#full-horari").innerHTML.includes("lliure"));
   await w.comparteixFull(); await tic();
   T("sense canvas ni share (laboratori): consell honest de la captura", d.querySelector("#avis").textContent.includes("captura de pantalla"));
   w.tancaFull(); await tic();
@@ -927,6 +927,27 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.esborraGraella();
   T("el doble toc queda bloquejat mentre s'esborra", !d.querySelector("#conf-box"));
   await pEsb; await tic(30);
+
+  console.log("10h · NOVETATS v3.7 (fulls: nom del conductor a la casella, grup a la capçalera, print CSS)");
+  const mp = html.slice(html.indexOf("@media print"), html.indexOf("@page"));
+  T("print: fora la regla que amagava el full (body > *{display:none})", !mp.includes("body > *"));
+  T("print: el full s'imprimeix per visibilitat (no depèn de l'arbre .tel > .cos)", mp.includes("visibility:hidden") && mp.includes("#full-horari, #full-horari *") && mp.includes("visibility:visible"));
+  const fCond = famDoc("Vila Puig");
+  fCond.nens.push({ id: "tmp-nen-full", nom: "Bet", curs: "1r ESO", marca: {} });   // segon nen, per provar la nota amb 2 noms
+  w.commuta(fCond.cotxe, "e9", "dl");
+  w.descarregaHorariConductor(); await tic();
+  const fullC = d.querySelector("#full-horari").innerHTML;
+  T("full del conductor: el títol de la casella és el nom del conductor, no «portes N»", !fullC.includes("portes ") && fullC.includes(w.nomConductor(fCond)));
+  T("…la nota duu el recompte, els 2 noms i les places lliures", fullC.includes("porta 2:") && fullC.includes("Janot") && fullC.includes("Bet") && fullC.includes("lliure"));
+  T("…i el grup a la capçalera (de doc.grupNom)", fullC.includes("Grup " + w.doc.grupNom));
+  const condAbans = fCond.conductor; fCond.conductor = "";
+  w.descarregaHorariConductor(); await tic();
+  T("sense conductor informat, la casella cau al nom de la família", d.querySelector("#full-horari").innerHTML.includes("Vila Puig"));
+  fCond.conductor = condAbans;
+  w.descarregaHorariNen(fCond.id, idJan()); await tic();
+  T("el full del nen també duu el grup a la capçalera", d.querySelector("#full-horari").innerHTML.includes("Grup " + w.doc.grupNom));
+  w.tancaFull(); w.commuta(fCond.cotxe, "e9", "dl");   // es deixa la graella com estava (buida)
+  fCond.nens = fCond.nens.filter(n => n.id !== "tmp-nen-full");
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);

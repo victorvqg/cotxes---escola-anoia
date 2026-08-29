@@ -135,7 +135,15 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-fila:first-of-type{border-top:0}
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
-@media print{ body > *{display:none !important} #full-horari{display:block !important;position:static} .fh-eines{display:none !important} .fh-full{max-width:none} }
+@media print{
+  body *{visibility:hidden}
+  #full-horari, #full-horari *{visibility:visible}
+  #full-horari{display:block !important;position:absolute;inset:auto;left:0;top:0;width:100%;height:auto;overflow:visible;padding:0;background:#fff}
+  body{display:block;background:#fff}
+  .tel{max-width:none;min-height:0;display:block;background:#fff}
+  .fh-eines, .hint{display:none !important}
+  .fh-full{max-width:none}
+}
 @page{size:A4 landscape;margin:8mm}
 .fullh{position:fixed;inset:0;background:#fdfefe;z-index:70;overflow:auto;padding:12px}
 .fullh.ocult{display:none}
@@ -323,7 +331,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.6</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.7</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -2157,7 +2165,9 @@ function dibuixaCanvasHorari(fa){
   ctx.fillStyle = "#1d4a6e"; ctx.fillRect(0, 0, W, 200);
   ctx.fillStyle = "#FFFFFF"; for (let x = 30; x < W; x += 120) ctx.fillRect(x, 172, 60, 28);
   ctx.font = "800 64" + F; ctx.fillText(fa.titol, 70, 82);
-  ctx.fillStyle = "#c9dcee"; ctx.font = "600 36" + F; ctx.fillText(fa.sub, 70, 140);
+  ctx.fillStyle = "#c9dcee"; ctx.font = "600 36" + F;
+  if (ctx.measureText && ctx.measureText(fa.sub).width > W - 720) ctx.font = "600 29" + F;   // el subtítol llarg (amb el grup) no ha de trepitjar la marca de la dreta
+  ctx.fillText(fa.sub, 70, 140);
   ctx.fillStyle = "#f6c026"; ctx.font = "800 38" + F; ctx.textAlign = "right";
   ctx.fillText("\ud83d\ude97 Cotxes \u00b7 Escola Anoia", W - 70, 82); ctx.textAlign = "left";
   const x0 = 80, colE = 220, colW = (W - x0 * 2 - colE) / 5, yCap = 276, rowH = 206, grupH = 52;
@@ -2322,8 +2332,9 @@ function descarregaHorariNen(fid, nid){
     if (c) cont[fr.id][d] = c;
   }); });
   const lleg = [["#2e8047", "cotxe compartit (el nom \u00e9s qui condueix)"], ["#1d4a6e", "amb la seva fam\u00edlia"], ["#9aa6b0", "pel seu compte / no hi ha classe"], ["#d64545", "pendent de conductor"]];
-  fullActual = { titol: "Horari de " + nen.nom, sub: "Amb qui va cada dia \u00b7 " + fam.nom, cont: cont, fitxer: "horari-" + slug(nen.nom) + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
-  mostraFull(fullHorariHtml("Horari de " + nen.nom, "Amb qui va cada dia \u00b7 " + fam.nom, cont, "FULL DEL NEN", lleg));
+  const subN = "Amb qui va cada dia \u00b7 " + fam.nom + (doc.grupNom ? " \u00b7 Grup " + doc.grupNom : "");
+  fullActual = { titol: "Horari de " + nen.nom, sub: subN, cont: cont, fitxer: "horari-" + slug(nen.nom) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari de " + nen.nom, subN, cont, "FULL DEL NEN", lleg));
 }
 
 function descarregaHorariConductor(){
@@ -2335,16 +2346,17 @@ function descarregaHorariConductor(){
       const tots = f.nens.map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
       const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
       const pl = lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures");
-      c = { pal: "ok", titol: tots.length ? "portes " + tots.length : "el teu cotxe",
-            nota: (tots.length ? tots.join(", ") : "sense passatgers") + " \u00b7 " + pl };
+      c = { pal: "ok", titol: nomConductor(f),
+            nota: (tots.length ? "porta " + tots.length + ": " + tots.join(", ") : "sense passatgers") + " \u00b7 " + pl };
     } else if (te(f.propi, fr.id, d)){
       c = { pal: "propi", titol: "pel vostre compte", nota: "" };
     }
     if (c) cont[fr.id][d] = c;
   }); });
   const lleg = [["#2e8047", "viatges que condueixes (amb els nens i les places que et queden)"], ["#9aa6b0", "pel vostre compte"]];
-  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: "Qui puges a cada viatge \u00b7 " + f.nom, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
-  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), "Qui puges a cada viatge \u00b7 " + f.nom, cont, "FULL DEL CONDUCTOR", lleg));
+  const subC = "Qui puges a cada viatge \u00b7 " + f.nom + (doc.grupNom ? " \u00b7 Grup " + doc.grupNom : "");
+  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: subC, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), subC, cont, "FULL DEL CONDUCTOR", lleg));
 }
 
 function pintaDescarrega(){
