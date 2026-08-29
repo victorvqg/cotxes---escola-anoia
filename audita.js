@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.3", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.3"));
+  T("lema i peu amb versió 3.4", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.4"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -221,7 +221,8 @@ function rpc(nom, p){
   }
   if (nom === "families_per_reclamar"){
     const r = DB.families.filter(f => f.group_id === p.p_group && DB.profiles.filter(x => x.family_id === f.id).length < 2)
-      .map(f => ({ id: f.id, name: f.name }));
+      .map(f => ({ id: f.id, name: f.name, driver: f.driver || "", seats: f.seats, curs: f.curs || "",
+                   nens: DB.children.filter(c => c.family_id === f.id).map(c => c.name).join(", ") }));
     return dades(r);
   }
   if (nom === "claim_family"){
@@ -700,7 +701,12 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   console.log("9 · BAIXA D'UNA FAMÍLIA (cascada + comptes desvinculats)");
   await surtIentra("admin@test.cat", "admin123");
   w.adminEdita(famDB("Ajudada Extra").id); await tic(20);
-  await w.esborraFam(); await tic(30);
+  await w.esborraFam(); await tic(20);
+  T("la baixa avisa que surts del grup, amb el seu nom", (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("a punt de sortir del grup") && (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("EA 25/26"));
+  d.querySelector("#conf-no").click(); await tic(10);
+  T("si cancel·les, la família segueix al grup", !!famDB("Ajudada Extra"));
+  await w.esborraFam(); await tic(20);
+  d.querySelector("#conf-si").click(); await tic(30);
   T("la família esborrada desapareix de la BD amb els seus fills", DB.families.length === 5 && !famDB("Ajudada Extra") && !DB.children.some(c => c.name === "Pau"));
   T("els comptes de la família queden desvinculats", DB.profiles.filter(p => ["c@test.cat", "d2@test.cat"].includes(p.email)).every(p => p.family_id === null && p.status === "pendent"));
   T("l'admin torna a casa seva", pant().includes("Hola") && pant().includes("Vila Puig"));
@@ -808,6 +814,22 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("Famílies: cada família és un desplegable amb nens, curs, conductor, places i telèfon", cos().includes("fam-det") && cos().includes("Places lliures") && cos().includes("Condueix") && cos().includes("1r ESO"));
   w.triaTab("cotxe"); await tic();
   T("«El teu cotxe» mostra la família de cada nen sota el nom", cos().includes("a-sub") && cos().includes("Grau"), cos().slice(0, 300));
+
+  console.log("10e · NOVETATS v3.4 (grup a la Graella, perfil sense curs duplicat, reclamar amb dades actuals)");
+  await surtIentra("admin@test.cat", "admin123");
+  w.triaTab("graella"); await tic();
+  T("la Graella porta el nom del grup al títol", (d.querySelector("#cap-titol") || { innerHTML: "" }).innerHTML.includes("EA 25/26"));
+  w.triaTab("perfil"); await tic();
+  T("al Perfil ja NO hi ha el curs de família duplicat (només curs per nen)", !cos().includes('onchange="triaCurs(this.value)"'));
+  await surtIentra("c@test.cat", "ccc123");   // compte desvinculat de la secció 9
+  await uneixAmbCodi(CODI);
+  d.querySelector("#sel-fam").value = famDB("Vila Puig").id;
+  w.selFamCanvia(); await tic();
+  T("en triar la família es veuen les seves dades actuals (nens i conductor)", d.querySelector("#sel-preview").innerHTML.includes("Dades actuals") && d.querySelector("#sel-preview").innerHTML.includes("Jan") && d.querySelector("#sel-preview").innerHTML.includes("Marta"));
+  T("…i el formulari de creació s'amaga", d.querySelector("#nf-wrap").style.display === "none");
+  T("el botó verd acaba el registre", d.querySelector("#sel-bloc").innerHTML.includes("acaba el registre"));
+  d.querySelector("#sel-fam").value = "__nova__"; w.selFamCanvia(); await tic();
+  T("si la família no hi és, llavors sí que surt el formulari", d.querySelector("#nf-wrap").style.display === "" && !d.querySelector("#sel-preview").innerHTML);
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
