@@ -331,7 +331,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.7</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.8</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -351,10 +351,10 @@ const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
 const DIES_NOM = {dl:"Dilluns",dt:"Dimarts",dc:"Dimecres",dj:"Dijous",dv:"Divendres"};
-/* ── Lògica per curs (horari de l'escola) ────────────────────────────
-   1r/2n ESO: CURS12_E8 = dies que comencen a les 8.00.
-   3r/4t ESO: CURS34_SENSE_TARDA = tardes SENSE escola: aquelles
-   caselles de tarda no cal respondre-les (graella igualment completa). */
+/* ── Lògica per curs (horari DEFINITIU de l'escola) ──────────────────
+   1r/2n ESO → 8.00 dimarts i dimecres; 9.00 dilluns, dijous i divendres.
+   3r/4t ESO → 8.00 TOTS els dies; dimecres i divendres no hi ha tarda.
+   Cap curs tria entre 8.00 i 9.00: l'hora d'entrada la fixa el curs. */
 const CURS12_E8 = { "1r ESO": ["dt", "dc"], "2n ESO": ["dt", "dc"] };           // 1r/2n comencen a les 8.00 dimarts i dimecres
 const CURS34_SENSE_TARDA = { "3r ESO": ["dc", "dv"], "4t ESO": ["dc", "dv"] };  // 3r/4t no tenen escola les tardes de dimecres i divendres
 function cursosDe(f){
@@ -362,27 +362,33 @@ function cursosDe(f){
   if (!s.size && f.curs) s.add(f.curs);
   return s;
 }
+function horaEntradaCurs(c, dia){
+  // l'entrada que fixa el curs per a aquell dia (null = sense curs: qualsevol)
+  if (c === "1r ESO" || c === "2n ESO") return (CURS12_E8[c] || []).includes(dia) ? "e8" : "e9";
+  if (c === "3r ESO" || c === "4t ESO") return "e8";   // 3r/4t entren SEMPRE a les 8.00
+  return null;
+}
+function nenTeCasella(n, slot, dia){
+  // si el NEN (pel seu curs) té aquesta casella aquest dia
+  const c = (n.curs || "").trim();
+  if (!c) return true;   // sense curs: tot obert (i el Perfil surt incomplet)
+  if (slot === "e8" || slot === "e9") return horaEntradaCurs(c, dia) === slot;
+  if ((slot === "e15" || slot === "r17") && (CURS34_SENSE_TARDA[c] || []).includes(dia)) return false;
+  return true;
+}
+function nensDeCasella(f, slot, dia){ return (f.nens || []).filter(n => nenTeCasella(n, slot, dia)); }
 /* estatCasella(f, slot, dia) → "normal" | "blanc-entrada" | "blanc-tarda"
    ÚNICA funció de veritat de la lògica de cursos: la fan servir la graella,
    celesPendents, desa, balanc, els Calendaris, els fulls i la barra de progrés.
-   Una casella només queda en blanc si TOTS els nens amb curs hi estan afectats;
+   La casella només queda en blanc si CAP nen amb curs no la té;
    sense curs a cap nen, tot és "normal" (i el Perfil surt incomplet). */
 function estatCasella(f, slot, dia){
   const cs = cursosDe(f);
   if (!cs.size) return "normal";
-  const arr = [...cs];
-  const tots12 = arr.every(c => c === "1r ESO" || c === "2n ESO");
-  const tots34 = arr.every(c => c === "3r ESO" || c === "4t ESO");
-  if (tots12){
-    const diesE8 = CURS12_E8[arr[0]] || [];
-    if (slot === "e8" && !diesE8.includes(dia)) return "blanc-entrada";
-    if (slot === "e9" && diesE8.includes(dia)) return "blanc-entrada";
-  }
-  if (tots34){
-    if (slot === "e8") return "blanc-entrada";   // 3r/4t entren sempre a les 9.00: la casella de les 8.00 no existeix
-    if ((slot === "e15" || slot === "r17") && (CURS34_SENSE_TARDA[arr[0]] || []).includes(dia)) return "blanc-tarda";
-  }
-  return "normal";
+  const ambCurs = (f.nens || []).filter(n => (n.curs || "").trim());
+  const nens = ambCurs.length ? ambCurs : [...cs].map(c => ({ curs: c }));   // famílies velles amb el curs només a la família
+  if (nens.some(n => nenTeCasella(n, slot, dia))) return "normal";
+  return (slot === "e8" || slot === "e9") ? "blanc-entrada" : "blanc-tarda";
 }
 function infoCursos(f){
   const cs = cursosDe(f);
@@ -390,9 +396,9 @@ function infoCursos(f){
     return "<div class='g-estat' style='background:#FDF6E3;color:#8a5a12'>\u26a0 Posa el curs de cada nen al Perfil: sense curs, totes les caselles es demanen.</div>";
   const arr = [...cs];
   const bits = [];
-  if (arr.some(c => c === "1r ESO" || c === "2n ESO")) bits.push("1r i 2n: 8.00 dimarts i dimecres, 9.00 la resta");
-  if (arr.some(c => c === "3r ESO" || c === "4t ESO")) bits.push("3r i 4t: sempre a les 9.00, i dimecres i divendres no hi ha tarda");
-  return bits.length ? "<div class='g-estat' style='background:#F4F8FA;color:#5A6B7A'>\u2139\ufe0f " + esc(bits.join(" \u00b7 ")) + ".</div>" : "";
+  if (arr.some(c => c === "1r ESO" || c === "2n ESO")) bits.push("1r i 2n: entren a les 8.00 dimarts i dimecres, i a les 9.00 la resta de dies");
+  if (arr.some(c => c === "3r ESO" || c === "4t ESO")) bits.push("3r i 4t: entren sempre a les 8.00. Dimecres i divendres no hi ha tarda");
+  return bits.length ? "<div class='g-estat' style='background:#F4F8FA;color:#5A6B7A'>" + bits.map(b => "\u2139\ufe0f " + esc(b) + ".").join("<br>") + "</div>" : "";
 }
 
 const FRANGES = [
@@ -541,7 +547,7 @@ async function sbDesaFamilia(f){
     if (te(f.cotxe, fr.id, dia)) files.push({ family_id: f.id, slot: fr.id, day: dia, type: "drive" });
     else if (te(f.propi, fr.id, dia)) files.push({ family_id: f.id, slot: fr.id, day: dia, type: "own" });
     else {
-      const idsNens = f.nens.filter(n => te(n.marca, fr.id, dia)).map(n => n.id);
+      const idsNens = f.nens.filter(n => te(n.marca, fr.id, dia) && nenTeCasella(n, fr.id, dia)).map(n => n.id);
       if (idsNens.length) files.push({ family_id: f.id, slot: fr.id, day: dia, type: "request", children_ids: idsNens });
     }
   }));
@@ -634,7 +640,7 @@ function portaValids(f, slot, dia){
     const ff = doc.families.find(x => x.id === r.fam);
     if (!ff || estatCasella(ff, slot, dia) !== "normal") return false;   // el nen no té aquesta casella
     const nn = (ff.nens || []).find(x => x.id === r.nen);
-    return !!nn && te(nn.marca, slot, dia) && !te(ff.cotxe, slot, dia);
+    return !!nn && te(nn.marca, slot, dia) && nenTeCasella(nn, slot, dia) && !te(ff.cotxe, slot, dia);
   });
 }
 function elPorta(famId, nenId, slot, dia){
@@ -645,13 +651,16 @@ function respon(f, slot, dia){ return te(f.cotxe, slot, dia) || te(f.propi, slot
 function perfilComplet(f){ return !!(f && f.nom && (f.cognomPare || "").trim() && (f.conductor || "").trim() && f.nens && f.nens.length && f.nens.every(n => (n.curs || "").trim())); }
 function celesPendents(f){
   const p = [];
+  const teCursos = cursosDe(f).size > 0;
   DIES.forEach(d => {
-    const e8b = estatCasella(f, "e8", d) !== "normal", e9b = estatCasella(f, "e9", d) !== "normal";
-    if (!e8b && !e9b){
-      if (!respon(f, "e8", d) && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada (8.00 o 9.00)");
+    const e8n = estatCasella(f, "e8", d) === "normal", e9n = estatCasella(f, "e9", d) === "normal";
+    if (!teCursos){
+      // sense cap curs: les dues entrades són una sola resposta (fins que el Perfil no és complet)
+      if (e8n && e9n && !respon(f, "e8", d) && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada (8.00 o 9.00)");
     } else {
-      const sEnt = e8b ? "e9" : "e8";   // 1r/2n: una sola entrada possible cada dia
-      if (!respon(f, sEnt, d)) p.push(DIES_NOM[d] + " entrada " + (sEnt === "e8" ? "8.00" : "9.00"));
+      // amb cursos, l'hora d'entrada la fixa el curs: cada entrada oberta és d'uns nens concrets i cal respondre-la
+      if (e8n && !respon(f, "e8", d)) p.push(DIES_NOM[d] + " entrada 8.00");
+      if (e9n && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada 9.00");
     }
     ["r13", "e15", "r17"].forEach(s => {
       if (estatCasella(f, s, d) !== "normal") return;   // les caselles en blanc no compten mai
@@ -797,7 +806,9 @@ function pintaBarra(){
 function doblesDe(f){
   const out = [];
   (f.nens || []).forEach(n => DIES.forEach(d2 => {
-    if (te(n.marca, "e8", d2) && te(n.marca, "e9", d2)) out.push(n.nom.trim().split(/\s+/)[0] + " (" + DIES_NOM[d2] + ")");
+    // una marca en una casella que el nen ja no té (pel curs) no compta: en desar s'esborra sola
+    if (te(n.marca, "e8", d2) && te(n.marca, "e9", d2) && nenTeCasella(n, "e8", d2) && nenTeCasella(n, "e9", d2))
+      out.push(n.nom.trim().split(/\s+/)[0] + " (" + DIES_NOM[d2] + ")");
   }));
   return out;
 }
@@ -941,7 +952,7 @@ async function fesLogin(){
   estat("Entrant…");
   const r = await sb.auth.signInWithPassword({ email: email, password: pass });
   if (r.error){ pantallaLogin(msgNeta(r.error)); estat("Entra al grup"); return; }
-  sessio = r.data.session;
+  sessio = (await sb.auth.getSession()).data.session;   // única font de veritat: mai la resposta directa de signIn
   await carregaPerfilIRuta();
 }
 async function fesRegistre(){
@@ -950,7 +961,7 @@ async function fesRegistre(){
   estat("Creant el compte…");
   const r = await sb.auth.signUp({ email: email, password: pass });
   if (r.error){ pantallaLogin("No s'ha pogut crear el compte: " + msgNeta(r.error)); estat("Entra al grup"); return; }
-  if (r.data && r.data.session){ sessio = r.data.session; await carregaPerfilIRuta(); return; }
+  if (r.data && r.data.session){ sessio = (await sb.auth.getSession()).data.session; await carregaPerfilIRuta(); return; }   // única font de veritat: mai la resposta directa de signUp
   pantallaLogin("Compte creat ✓ T'hem enviat un correu de confirmació: clica l'enllaç i després entra aquí.");
   estat("Entra al grup");
 }
@@ -1067,7 +1078,8 @@ async function pantallaTria(){
   const ops = opcions.map(o => "<option value='" + o.id + "'>" + esc(o.txt) + "</option>").join("");
   $("#pantalla").innerHTML =
     "<img class='hero-ico' src='android-chrome-192x192.png' alt='' onerror=\"this.style.display='none'\">" +
-    "<div class='targeta'><h2>Qui sou?</h2>" + cap +
+    "<div class='targeta'><h2>Qui sou?</h2>" +
+    "<p class='hint' style='margin:0 0 6px'>Has entrat com a <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b></p>" + cap +
     (opcions.length
       ? "<p class='lead'>" + (socMembre ? "Tria una família per entrar-hi:" : "Si la teva família ja és al grup (l'ha creat la teva parella o ve de la importació de dades), tria-la: en veuràs les <b>dades actuals</b> i només et caldrà el <b>codi de la família</b> per acabar el registre (t'el ha de passar algú d'aquella família: el veu al seu Perfil).") + "</p>" +
         "<div class='apila'><select class='input' id='sel-fam'" + (socMembre ? "" : " onchange='selFamCanvia()'") + "><option value=''>— Tria la família —</option>" + ops + (socMembre ? "" : "<option value='__nova__'>✚ La meva família no hi és: la vull crear</option>") + "</select>" +
@@ -1133,17 +1145,19 @@ async function creaFam(){
     await sbGet(); famId = nouId; estat("Desat ✓", "ok"); pantallaApp();
     return;
   }
-  // Compte nou que s'uneix al grup amb codi d'invitació
+  // Compte nou que s'uneix al grup amb codi d'invitació.
+  // Alta ATÒMICA: els nens viatgen DINS de join_group_crea (una sola transacció):
+  // si falla res, no queda cap perfil vinculat a mitges.
   avis(""); estat("Creant la família…");
-  const r = await sb.rpc("join_group_crea", { p_code: codiInvitacio, p_cognom1: dades.cpare, p_cognom2: dades.cmare, p_driver: dades.cond, p_seats: dades.places });
+  sessio = (await sb.auth.getSession()).data.session || sessio;   // única font de veritat abans de l'RPC
+  const r = await sb.rpc("join_group_crea", { p_code: codiInvitacio, p_cognom1: dades.cpare, p_cognom2: dades.cmare, p_driver: dades.cond, p_seats: dades.places,
+    p_nens: dades.nens.map(n => ({ nom: typeof n === "string" ? n : n.nom, curs: typeof n === "string" ? "" : (n.curs || "") })) });
   if (r.error){
-    if (/ja té família/i.test((r.error && r.error.message) || "") && await recuperaSiJaTeFamilia()) return;
+    if (/ja té família|ja està vinculat/i.test((r.error && r.error.message) || "") && await recuperaSiJaTeFamilia()) return;
     estat("Error", true); avis("No s'ha pogut crear la família: " + esc(msgNeta(r.error))); return;
   }
-  const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
-  if (pr.data && pr.data[0]) perfil = pr.data[0];
-  try { await insereixNens(perfil.family_id, dades.nens); }
-  catch(e){ avis("La família s'ha creada però no s'han pogut afegir els nens: afegeix-los des del Perfil."); }
+  const pr = await sb.rpc("el_meu_perfil");
+  if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
   await desaTelCurs(perfil.family_id, dades);
   await entraApp();
 }
@@ -1171,11 +1185,17 @@ function selFamCanvia(){
   }
 }
 async function recuperaSiJaTeFamilia(){
-  // Si una alta anterior va quedar a mitges (p. ex. va fallar afegir els nens),
-  // el compte ja té família a la BD: en lloc d'error, entrem directament.
-  const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
-  if (pr.data && pr.data[0] && pr.data[0].family_id){ perfil = pr.data[0]; await entraApp(); return true; }
+  // Recuperació ROBUSTA: es llegeix el perfil via RPC el_meu_perfil() (security
+  // definer sobre auth.uid()), el MATEIX usuari que ha donat l'error a l'RPC —
+  // no una variable del client. I sempre es comprova .error.
+  const pr = await sb.rpc("el_meu_perfil");
+  if (pr.error || !pr.data || !pr.data[0]) return false;
+  if (pr.data[0].family_id){ perfil = pr.data[0]; await entraApp(); return true; }
   return false;
+}
+async function recuperaIEntra(){
+  avis(""); estat("Entrant…");
+  if (!(await recuperaSiJaTeFamilia())){ estat("Error", true); avis("No s'ha trobat cap família vinculada a aquest compte: recarrega la pàgina i torna-ho a provar."); }
 }
 async function entraSel(){
   const v = $("#sel-fam").value; if (!v || v === "__nova__") return;
@@ -1188,13 +1208,30 @@ async function entraSel(){
   const codiF = $("#sel-codi") ? $("#sel-codi").value.trim().toUpperCase() : "";
   if (!codiF){ avis("Escriu el codi de la família: t'l'ha de passar algú d'aquella família (el veu al seu Perfil)."); return; }
   avis(""); estat("Vinculant…");
+  // Única font de veritat de la sessió abans de l'RPC de vinculació
+  sessio = (await sb.auth.getSession()).data.session || sessio;
+  try {
+    const gu = await sb.auth.getUser();
+    console.log("[vincula] sessio.user.id =", sessio && sessio.user && sessio.user.id,
+      "· auth.getUser =", gu.data && gu.data.user && gu.data.user.id,
+      "· email =", gu.data && gu.data.user && gu.data.user.email);
+  } catch(e){}
   const r = await sb.rpc("claim_family", { p_family: v, p_token: codiF });
   if (r.error){
-    if (/ja té família/i.test((r.error && r.error.message) || "") && await recuperaSiJaTeFamilia()) return;
+    const m = (r.error && r.error.message) || "";
+    if (/ja té família|ja està vinculat/i.test(m)){
+      if (await recuperaSiJaTeFamilia()) return;
+      const nomF = (m.match(/vinculat a la família (.+)$/) || [])[1] || "";
+      estat("Error", true);
+      avis("Aquest compte ja està vinculat" + (nomF ? " a la família <b>" + esc(nomF) + "</b>" : " a una altra família") + "." +
+        "<button class='boto' style='width:100%;margin:10px 0 6px' onclick='recuperaIEntra()'>Entra a la " + (nomF ? "família " + esc(nomF) : "meva família") + "</button>" +
+        "<span class='hint'>Si t'has equivocat de família: Perfil \u2192 Desvincula aquest compte.</span>", true);
+      return;
+    }
     estat("Error", true); avis("No s'ha pogut vincular: " + esc(msgNeta(r.error))); return;
   }
-  const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
-  if (pr.data && pr.data[0]) perfil = pr.data[0];
+  const pr = await sb.rpc("el_meu_perfil");
+  if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
   await entraApp();
 }
 async function rolFam(id){
@@ -1340,12 +1377,14 @@ function pintaPerfil(){
     "<div>" + filesNens + "</div>" +
     "<div class='fila'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : "", f.nens.some(n => !(n.curs || "").trim()) ? "el curs de cada nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
-    (dirty ? "<div style='margin-top:12px'><button class='boto' style='width:100%' onclick='desa()'>💾 Desa els canvis</button></div>" : "") +
     (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa'l a l'altre progenitor: el necessitar\u00e0 per vincular el seu compte a la vostra fam\u00edlia</span></span></div>" +
     "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
     "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup<span class='p-sub'>codi d'invitaci\u00f3 del grup: passa'l a les fam\u00edlies que s'hi vulguin unir</span></span></div>" +
     "<div class='nomgran' style='text-align:center'>" + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + " \u00b7 <span style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span></div>" +
-    "<div style='text-align:center;margin-top:14px'><button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la fam\u00edlia del grup</button><br>" +
+    "<p class='hint' style='text-align:center;margin-top:14px'>Has entrat com a <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b></p>" +
+    "<div style='text-align:center;margin-top:6px'>" +
+    (perfil && perfil.family_id && f.id === perfil.family_id ? "<button class='enllac' onclick='desvinculaCompte()'>Desvincula aquest compte de la fam\u00edlia</button><br>" : "") +
+    "<button class='enllac' style='color:#97301F' onclick='esborraFam()'>Esborra la fam\u00edlia del grup</button><br>" +
     "<button class='enllac' onclick='tancaSessio()'>Tanca la sessi\u00f3 en aquest dispositiu</button></div>" +
     "</div>";
 }
@@ -1366,7 +1405,7 @@ function pintaGraellaTab(){
   const f = lameva();
   const estatG = "<div id='g-estat-box'>" + estatGHtml(f) + "</div>";
   $("#tab-cos").innerHTML =
-    "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. Cada nen entra a les 8.00 <b>o</b> a les 9.00: marcar-li una li treu l'altra.<br><span class='hint'>\ud83c\udf93 1r i 2n: 8.00 dimarts i dimecres, 9.00 la resta \u00b7 3r i 4t: sempre a les 9.00, i dimecres i divendres no hi ha tarda. Les caselles en blanc no cal respondre-les.</span></p>" +
+    "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. L'hora d'entrada de cada dia la fixa el curs del nen.<br><span class='hint'>\ud83c\udf93 1r i 2n: entren a les 8.00 dimarts i dimecres, i a les 9.00 la resta de dies \u00b7 3r i 4t: entren sempre a les 8.00, i dimecres i divendres no hi ha tarda. Les caselles en blanc no cal respondre-les.</span></p>" +
     estatG +
     "<div class='graella' id='graella'></div>" +
     "<div id='g-accions'></div>";
@@ -1377,10 +1416,9 @@ function pintaGraellaAccions(){
   const el = $("#g-accions"); if (!el) return;
   const f = lameva(); if (!f){ el.innerHTML = ""; return; }
   const bloq = esStaff && !esAdmin && doc.adminFam && f.id === doc.adminFam;   // staff mai sobre la família admin
-  el.innerHTML = "<div class='fila' style='margin-top:10px;gap:8px'>" +
-    (dirty ? "<button class='boto' style='flex:1' onclick='desa()'>\ud83d\udcbe Desa els canvis</button>" : "") +
-    (bloq ? "" : "<button class='boto sec' style='flex:1;color:#97301F' onclick='esborraGraella()'>\ud83d\uddd1\ufe0f Esborra tota la graella</button>") +
-    "</div>";
+  // un sol control de desar a tota l'app: la barra de baix; aquí només l'esborrat
+  el.innerHTML = bloq ? "" : "<div class='fila' style='margin-top:10px;justify-content:flex-end'>" +
+    "<button class='boto sec' style='color:#97301F' onclick='esborraGraella()'>\ud83d\uddd1\ufe0f Esborra tota la graella</button></div>";
 }
 let esborrantGraella = false;
 function esborraGraella(){
@@ -1419,11 +1457,9 @@ function obreCasella(slot, dia){
     const ec = estatCasella(f, slot, dia);
     if (ec === "blanc-entrada"){
       const cs34 = [...cursosDe(f)].every(c => c === "3r ESO" || c === "4t ESO");
-      avis(cs34
-        ? "Els de 3r i 4t entren sempre a les 9.00: la casella de les 8.00 queda en blanc."
-        : (slot === "e8"
-          ? "Els de 1r i 2n entren a les 8.00 nom\u00e9s dimarts i dimecres; aquest dia s'entra a les 9.00."
-          : "Els de 1r i 2n entren a les 9.00 dilluns, dijous i divendres; aquest dia s'entra a les 8.00."));
+      avis(slot === "e9"
+        ? (cs34 ? "Els de 3r i 4t entren sempre a les 8.00." : "Aquest dia tots els nens entren a les 8.00.")
+        : "Els de 1r i 2n entren a les 8.00 nom\u00e9s dimarts i dimecres; aquest dia s'entra a les 9.00.");
       return;
     }
     if (ec === "blanc-tarda"){ avis("Els de 3r i 4t no tenen escola " + DIES_NOM[dia].toLowerCase() + " a la tarda: aquesta casella queda en blanc."); return; }
@@ -1437,8 +1473,11 @@ function pintaCasella(){
   const fr = FRANGES.find(x => x.id === s) || {};
   const btn = (on, txt, ac) => "<button class='cbtn" + (on ? " on" : "") + "' onclick=\"celAccio('" + ac + "')\">" + txt + (on ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>";
   let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
-  const totsMarcats = f.nens.length > 0 && f.nens.every(n => te(n.marca, s, d));
-  const etDemana = f.nens.length === 1 ? "\ud83d\ude4b " + esc(f.nens[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a" : "\ud83d\ude4b Els nens demanen pla\u00e7a";
+  const nensCel = nensDeCasella(f, s, d);   // amb cursos barrejats, cada entrada és només dels nens que hi entren
+  const totsMarcats = nensCel.length > 0 && nensCel.every(n => te(n.marca, s, d));
+  const etDemana = nensCel.length === 1 ? "\ud83d\ude4b " + esc(nensCel[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a"
+    : nensCel.length < f.nens.length ? "\ud83d\ude4b " + esc(nensCel.map(n => n.nom.trim().split(/\s+/)[0]).join(" i ")) + " demanen pla\u00e7a"
+    : "\ud83d\ude4b Els nens demanen pla\u00e7a";
   h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 els nens v\u00e9nen amb nosaltres \u00b7 " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
   h += btn(totsMarcats, etDemana, "demana");
   h += btn(te(f.propi, s, d), "\ud83d\udeab Anem pel nostre compte", "propi");
@@ -1454,19 +1493,21 @@ function celAccio(ac){
     const k = s + "-" + d + "|demana", ara = Date.now();
     if (ultimToc.k === k && ara - ultimToc.t < 350) return;
     ultimToc = { k: k, t: ara };
-    const f = lameva(); if (!f || !f.nens.length) return;
+    const f = lameva(); if (!f) return;
+    const nensCel = nensDeCasella(f, s, d);   // només els nens que tenen aquesta casella (l'hora d'entrada la fixa el curs)
+    if (!nensCel.length) return;
     const cel = s + "-" + d;
     const portatsAbans = te(f.cotxe, s, d) ? portaValids(f, s, d).map(r => {
       const ff = doc.families.find(x => x.id === r.fam);
       const nn = ff && (ff.nens || []).find(x => x.id === r.nen);
       return nn ? nn.nom.trim().split(/\s+/)[0] : null;
     }).filter(Boolean) : [];
-    const tots = f.nens.every(n => te(n.marca, s, d));
-    if (tots){ f.nens.forEach(n => treu(n.marca, s, d)); }
+    const tots = nensCel.every(n => te(n.marca, s, d));
+    if (tots){ nensCel.forEach(n => treu(n.marca, s, d)); }
     else {
       treu(f.propi, s, d);
       if (te(f.cotxe, s, d)){ treu(f.cotxe, s, d); if (f.porta) delete f.porta[cel]; }
-      f.nens.forEach(n => {
+      nensCel.forEach(n => {
         if (!te(n.marca, s, d)) commuta(n.marca, s, d);
         if (s === "e8") treu(n.marca, "e9", d); else if (s === "e9") treu(n.marca, "e8", d);
       });
@@ -1486,6 +1527,7 @@ function celAccio(ac){
 }
 function netejaGermana(f, slot, dia){
   if (slot !== "e8" && slot !== "e9") return;
+  if (cursosDe(f).size) return;   // amb cursos no hi ha tria 8/9: cada entrada és dels seus nens i no es toquen entre elles
   if (!respon(f, slot, dia)) return;
   const g = slot === "e8" ? "e9" : "e8";
   const celG = g + "-" + dia;
@@ -1549,7 +1591,7 @@ function pinta(slot, dia){
   if (pinzell === "esborra"){ treu(f.cotxe, slot, dia); treu(f.propi, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "cotxe"){ treu(f.propi, slot, dia); commuta(f.cotxe, slot, dia); if (te(f.cotxe, slot, dia)) f.nens.forEach(n => treu(n.marca, slot, dia)); else if (f.porta) delete f.porta[cel]; }
   else if (pinzell === "propi"){ treu(f.cotxe, slot, dia); f.nens.forEach(n => treu(n.marca, slot, dia)); commuta(f.propi, slot, dia); if (f.porta) delete f.porta[cel]; }
-  else { const n = f.nens.find(x => x.id === pinzell); if (!n){ pinzell = "cotxe"; pintaGraellaTab(); return; } treu(f.propi, slot, dia); if (te(f.cotxe, slot, dia)){ treu(f.cotxe, slot, dia); if (f.porta) delete f.porta[cel]; } commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
+  else { const n = f.nens.find(x => x.id === pinzell); if (!n){ pinzell = "cotxe"; pintaGraellaTab(); return; } if (!nenTeCasella(n, slot, dia)){ avis(esc(n.nom.trim().split(/\s+/)[0]) + " no t\u00e9 aquesta casella: l'hora d'entrada la fixa el seu curs."); return; } treu(f.propi, slot, dia); if (te(f.cotxe, slot, dia)){ treu(f.cotxe, slot, dia); if (f.porta) delete f.porta[cel]; } commuta(n.marca, slot, dia); if (te(n.marca, slot, dia)){ if (slot === "e8") treu(n.marca, "e9", dia); else if (slot === "e9") treu(n.marca, "e8", dia); } }
   netejaGermana(f, slot, dia);
   dirty = true; pintaBarra(); pintaGraella();
   const hhFr = (FRANGES.find(x => x.id === slot) || {}).hora || "";
@@ -1883,6 +1925,27 @@ function mostraConfirm(o){
   vel.onclick = tanca;
   box.querySelector("#conf-no").onclick = tanca;
   box.querySelector("#conf-si").onclick = async () => { tanca(); await o.alOk(); };
+}
+function desvinculaCompte(){
+  const f = lameva(); if (!f || !perfil || !perfil.family_id) return;
+  mostraConfirm({
+    titol: "Desvincular aquest compte de " + esc(f.nom) + "?",
+    text: "El compte <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b> deixar\u00e0 d'estar vinculat a la fam\u00edlia; les dades de la fam\u00edlia NO s'esborren. Si aquest era l'\u00fanic compte, la fam\u00edlia quedar\u00e0 sense cap compte: es pot recuperar amb el seu <b>codi de fam\u00edlia</b> (el veus aqu\u00ed al Perfil).",
+    ok: "S\u00ed, desvincula'm", cancel: "Cancel\u00b7la",
+    alOk: desvinculaCompteDeDebo
+  });
+}
+async function desvinculaCompteDeDebo(){
+  estat("Desvinculant\u2026");
+  const r = await sb.rpc("desvincula_compte");
+  if (r.error){ estat("Error", true); avis("No s'ha pogut desvincular: " + esc(msgNeta(r.error))); return; }
+  const pr = await sb.rpc("el_meu_perfil");
+  if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
+  else if (perfil){ perfil.family_id = null; perfil.status = "pendent"; }
+  dirty = false; pintaBarra(); famId = ""; esAdmin = esStaff = false;
+  estat("Desvinculat \u2713", "ok");
+  avis("Compte desvinculat \u2713 Tria la teva fam\u00edlia (o una altra) per tornar a entrar.", true);
+  await pantallaTria();   // torna a «Qui sou?»
 }
 function esborraFam(){
   const f = lameva(); if (!f) return;
@@ -2311,17 +2374,22 @@ function descarregaHorariNen(fid, nid){
   FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
     let c = null;
     const ecF = estatCasella(fam, fr.id, d);
-    if (ecF === "blanc-entrada"){ /* el full només mostra l'entrada que toca */ }
+    const esTarda = fr.id === "e15" || fr.id === "r17";
+    if (ecF === "blanc-entrada" || !nenTeCasella(nen, fr.id, d)){
+      // el full només mostra les caselles del NEN: l'entrada que no és la seva surt buida;
+      // la tarda que no té (3r/4t dc/dv) surt com a «No hi ha classe»
+      if (esTarda) c = { pal: "propi", titol: "No hi ha classe", nota: "" };
+    }
     else if (ecF === "blanc-tarda"){
       c = { pal: "propi", titol: "No hi ha classe", nota: "" };
     }
     else if (te(fam.cotxe, fr.id, d)){
-      const comp = fam.nens.filter(x => x.id !== nid).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(fam, fr.id, d));
+      const comp = fam.nens.filter(x => x.id !== nid && nenTeCasella(x, fr.id, d)).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(fam, fr.id, d));
       c = { pal: "fam", titol: fam.conductor || "la fam\u00edlia", nota: comp.length ? "amb " + comp.join(", ") : "hi va sol" };
     } else if (te(nen.marca, fr.id, d)){
       const cf = elPorta(fid, nid, fr.id, d);
       if (cf){
-        const comp = nomsPortats(cf, fr.id, d).filter(x => x !== jo).concat((cf.nens || []).map(x => x.nom.trim().split(/\s+/)[0]));
+        const comp = nomsPortats(cf, fr.id, d).filter(x => x !== jo).concat(nensDeCasella(cf, fr.id, d).map(x => x.nom.trim().split(/\s+/)[0]));
         c = { pal: "ok", titol: nomConductor(cf), nota: comp.length ? "amb " + comp.join(", ") : "hi va sol" };
       } else {
         c = { pal: "pend", titol: "pendent", nota: "cal conductor" };
@@ -2343,7 +2411,7 @@ function descarregaHorariConductor(){
   FRANGES.forEach(fr => { cont[fr.id] = {}; DIES.forEach(d => {
     let c = null;
     if (te(f.cotxe, fr.id, d)){
-      const tots = f.nens.map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
+      const tots = nensDeCasella(f, fr.id, d).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
       const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
       const pl = lliures + (lliures === 1 ? " pla\u00e7a lliure" : " places lliures");
       c = { pal: "ok", titol: nomConductor(f),
@@ -2376,7 +2444,7 @@ function pintaDescarrega(){
     let resum = "";
     DIES.forEach(d => FRANGES.forEach(fr => {
       if (!te(f.cotxe, fr.id, d)) return;
-      const portats = f.nens.map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
+      const portats = nensDeCasella(f, fr.id, d).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
       const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
       resum += "<div class='d-fila'><span class='d-hora'>" + DIES_LBL[d] + " " + fr.hora + "</span><span class='d-txt'>portes <b>" + portats.length + (portats.length === 1 ? " nen" : " nens") + "</b>" + (portats.length ? " (" + esc(portats.join(", ")) + ")" : "") + " \u00b7 et " + (lliures === 1 ? "queda <b>1 pla\u00e7a</b> lliure" : "queden <b>" + lliures + " places</b> lliures") + "</span></div>";
     }));

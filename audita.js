@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.7", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.7"));
+  T("lema i peu amb versió 3.8", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.8"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -38,6 +38,12 @@ console.log("0 · CABLEJAT ESTÀTIC");
   // v3.3: curs per nen, tant a fase1 (instal·lacions noves) com al patch v33 (la BD actual)
   const sql33 = fs.readFileSync(path.join(__dirname, "supabase-v33.sql"), "utf-8");
   T("SQL: curs per nen a children (fase1 + patch v33)", /curs text not null default ''/.test(sql) && /alter table public\.children[\s\S]*add column if not exists curs/.test(sql33));
+  // v3.8: el patch v37 duu la vinculació robusta sencera
+  const sql37 = fs.readFileSync(path.join(__dirname, "supabase-v37.sql"), "utf-8");
+  T("SQL v37: el_meu_perfil + claim_family idempotent i clar + desvincula_compte + alta atòmica + default a children.curs",
+    sql37.includes("function public.el_meu_perfil") && sql37.includes("ja està vinculat a la família") &&
+    sql37.includes("function public.desvincula_compte") && sql37.includes("p_nens jsonb") &&
+    sql37.includes("alter column curs set default"));
   T("la URL del projecte Supabase és al CONFIG", html.includes("https://jbfjrgddsywpmwabvbtb.supabase.co"));
   T("la llibreria supabase-js es carrega per CDN", html.includes("@supabase/supabase-js"));
   // Regressió: a create_group, l'override del trigger de rols ha d'anar ABANS de l'insert de la família
@@ -249,15 +255,32 @@ function rpc(nom, p){
     logBD(f.group_id, "codi regenerat", f.id, "Codi d'accés regenerat per a " + f.name);
     return dades(codiDeFam(f));
   }
+  if (nom === "el_meu_perfil"){
+    const pr = meu();
+    return dades(pr ? [Object.assign({}, pr)] : []);
+  }
   if (nom === "claim_family"){
+    // v3.8: idempotent (ja vinculat a p_family → acaba bé) i clar (diu a quina família estàs)
+    const pr = meu();
+    if (pr && pr.family_id === p.p_family) return dades(null);
+    if (pr && pr.family_id){
+      const fm = famPerId(pr.family_id);
+      return err("Aquest compte ja està vinculat a la família " + (fm ? fm.name : "(desconeguda)"));
+    }
     const f = famPerId(p.p_family);
     if (!f) return err("Família inexistent");
     if (codiDeFam(f) !== String(p.p_token || "").trim().toUpperCase()) return err("Codi de la família incorrecte");
     if (DB.profiles.filter(x => x.family_id === f.id).length >= 2) return err("Aquesta família ja té 2 comptes");
-    const pr = meu();
-    if (pr && pr.family_id) return err("Aquest compte ja té família");
     pr.family_id = f.id; pr.requested_group = f.group_id; pr.status = "aprovat";
     logBD(f.group_id, "aprovació d'accés", f.id, "Compte vinculat a " + f.name);
+    return dades(null);
+  }
+  if (nom === "desvincula_compte"){
+    const pr = meu();
+    if (!pr || !pr.family_id) return dades(null);   // ja desvinculat: cap error
+    const fm = famPerId(pr.family_id);
+    pr.family_id = null; pr.status = "pendent";
+    if (fm) logBD(fm.group_id, "desvinculació", fm.id, "Compte desvinculat de " + fm.name);
     return dades(null);
   }
   if (nom === "join_group_crea"){
@@ -265,8 +288,14 @@ function rpc(nom, p){
     if (!g) return err("Codi d'invitació no vàlid");
     const pr = meu();
     if (pr && pr.family_id) return err("Aquest compte ja té família");
+    // v3.8: alta ATÒMICA — família + nens + perfil en una sola «transacció»;
+    // si un nen és invàlid, no es toca res (el trigger de 5 fills també hi val)
+    const nens = (p.p_nens || []).filter(x => x && String(x.nom || "").trim());
+    if (nens.length > 5) return err("Màxim 5 fills per família");
+    if ((p.p_nens || []).some(x => x && x.__peta)) return err("error simulat en inserir els nens");
     const fid = randomUUID();
     DB.families.push({ id: fid, group_id: g.id, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "usuari", invite_token: randomUUID(), created_at: new Date().toISOString() });
+    nens.forEach(x => DB.children.push({ id: randomUUID(), family_id: fid, name: String(x.nom).trim(), curs: x.curs || "" }));
     pr.family_id = fid; pr.requested_group = g.id; pr.status = "aprovat";
     logBD(g.id, "alta família", fid, "Alta amb codi d'invitació");
     return dades(fid);
@@ -799,7 +828,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
-  w.renomTel("600111222"); w.triaCurs("3r ESO"); await tic();
+  w.renomTel("600111222"); w.triaCurs("2n ESO"); await tic();
   // v3.6: canviar el curs pot deixar caselles noves per respondre (l'entrada passa a les 9.00); es reomplen
   const ompleForats = fx => ["e8", "e9", "r13", "e15", "r17"].forEach(s => ["dl", "dt", "dc", "dj", "dv"].forEach(dd => {
     if (w.estatCasella(fx, s, dd) !== "normal" || w.respon(fx, s, dd)) return;
@@ -809,9 +838,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   }));
   ompleForats(famDoc("Vila Puig"));
   await w.desa(); await tic(30);
-  T("telèfon i curs es desen a la BD", famDB("Vila Puig").phone === "600111222" && famDB("Vila Puig").curs === "3r ESO");
+  T("telèfon i curs es desen a la BD", famDB("Vila Puig").phone === "600111222" && famDB("Vila Puig").curs === "2n ESO");
   w.triaTab("families"); await tic();
-  T("a Famílies es veu el rol de cadascuna (+curs i telèfon)", cos().includes("· admin") && cos().includes("· staff") && cos().includes("3r ESO") && cos().includes("600111222"));
+  T("a Famílies es veu el rol de cadascuna (+curs i telèfon)", cos().includes("· admin") && cos().includes("· staff") && cos().includes("2n ESO") && cos().includes("600111222"));
   w.triaTab("cotxe"); await tic();
   T("«El teu cotxe» llista els nens que hi puc carregar, amb caselles", cos().includes("Qui puges al teu cotxe?") && (cos().includes("demana pla") || cos().includes("demanen pla")));
   await w.copiaSeguretat(); await tic();
@@ -870,11 +899,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   d.querySelector("#sel-fam").value = "__nova__"; w.selFamCanvia(); await tic();
   T("si la família no hi és, llavors sí que surt el formulari", d.querySelector("#nf-wrap").style.display === "" && !d.querySelector("#sel-preview").innerHTML);
 
-  console.log("10f · NOVETATS v3.5 (lògica de cursos: 8.00 dimarts/dimecres per a 1r/2n, tardes lliures dc/dv per a 3r/4t)");
+  console.log("10f · LÒGICA DE CURSOS (v3.8: 1r/2n → 8.00 dt/dc i 9.00 la resta; 3r/4t → 8.00 TOTS els dies, dc/dv sense tarda)");
   await surtIentra("admin@test.cat", "admin123");
   w.triaTab("perfil"); await tic();
   w.triaCursNen(idJan(), "3r ESO"); await tic();
-  ompleForats(famDoc("Vila Puig"));   // v3.6: amb 3r ESO l'entrada torna a les 9.00
+  ompleForats(famDoc("Vila Puig"));   // amb 3r ESO l'entrada passa a les 8.00 tots els dies
   await w.desa(); await tic(30);
   T("el curs del nen s'actualitza a la BD", nenDB(idVila, "Janot").curs === "3r ESO");
   // Família de 4t ESO sense cap marca: la llista de pendents n'és la prova neta
@@ -891,10 +920,18 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await w.desa(); await tic(30);
   w.triaFam(famDB("Vila Puig").id); await tic(20);
   w.triaTab("graella"); await tic();
-  w.obreCasella("e8", "dt"); await tic();
-  T("família de 3r/4t: la casella de les 8.00 no s'obre mai", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("8.00"));
+  w.obreCasella("e9", "dt"); await tic();
+  T("família de 3r/4t: la casella de les 9.00 no s'obre MAI (entren sempre a les 8.00)", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("entren sempre a les 8.00"));
+  w.obreCasella("e9", "dv"); await tic();
+  T("…tampoc divendres (cap dia)", !d.querySelector("#cel-menu").classList.contains("obert"));
+  w.obreCasella("e8", "dl"); await tic();
+  T("la de les 8.00 s'obre TOTS els dies (dilluns)", d.querySelector("#cel-menu").classList.contains("obert"));
+  w.tancaCasella();
+  w.obreCasella("e8", "dv"); await tic();
+  T("…i divendres també", d.querySelector("#cel-menu").classList.contains("obert"));
+  w.tancaCasella();
   w.obreCasella("e15", "dc"); await tic();
-  T("dimecres a la tarda tampoc (no tenen escola)", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("tarda"));
+  T("dimecres a la tarda no (no tenen escola)", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("tarda"));
   w.obreCasella("r13", "dc"); await tic();
   T("dimecres al migdia sí que s'obre", d.querySelector("#cel-menu").classList.contains("obert"));
   w.tancaCasella();
@@ -933,8 +970,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("print: fora la regla que amagava el full (body > *{display:none})", !mp.includes("body > *"));
   T("print: el full s'imprimeix per visibilitat (no depèn de l'arbre .tel > .cos)", mp.includes("visibility:hidden") && mp.includes("#full-horari, #full-horari *") && mp.includes("visibility:visible"));
   const fCond = famDoc("Vila Puig");
-  fCond.nens.push({ id: "tmp-nen-full", nom: "Bet", curs: "1r ESO", marca: {} });   // segon nen, per provar la nota amb 2 noms
-  w.commuta(fCond.cotxe, "e9", "dl");
+  fCond.nens.push({ id: "tmp-nen-full", nom: "Bet", curs: "3r ESO", marca: {} });   // segon nen (mateix curs que Janot), per provar la nota amb 2 noms
+  w.commuta(fCond.cotxe, "e8", "dl");   // 3r/4t entren a les 8.00
   w.descarregaHorariConductor(); await tic();
   const fullC = d.querySelector("#full-horari").innerHTML;
   T("full del conductor: el títol de la casella és el nom del conductor, no «portes N»", !fullC.includes("portes ") && fullC.includes(w.nomConductor(fCond)));
@@ -946,8 +983,65 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   fCond.conductor = condAbans;
   w.descarregaHorariNen(fCond.id, idJan()); await tic();
   T("el full del nen també duu el grup a la capçalera", d.querySelector("#full-horari").innerHTML.includes("Grup " + w.doc.grupNom));
-  w.tancaFull(); w.commuta(fCond.cotxe, "e9", "dl");   // es deixa la graella com estava (buida)
+  w.tancaFull(); w.commuta(fCond.cotxe, "e8", "dl");   // es deixa la graella com estava (buida)
   fCond.nens = fCond.nens.filter(n => n.id !== "tmp-nen-full");
+
+  console.log("10i · NOVETATS v3.8 (horari per curs a cada nen, un sol desar, vinculació robusta)");
+  // ── A · horari: el text d'ajuda i la família tota de 3r/4t ──
+  T("el text d'ajuda ja NO diu «sempre a les 9.00»", !html.includes("sempre a les 9.00"));
+  T("…i diu que 3r i 4t entren sempre a les 8.00", html.includes("entren sempre a les 8.00"));
+  const f34 = { nens: [{ id: "a", nom: "Ona", curs: "4t ESO", marca: {} }], cotxe: {}, propi: {}, curs: "" };
+  ["dl", "dt", "dc", "dj", "dv"].forEach(dd => { w.commuta(f34.propi, "e8", dd); w.commuta(f34.propi, "r13", dd); });
+  ["dl", "dt", "dj"].forEach(dd => { w.commuta(f34.propi, "e15", dd); w.commuta(f34.propi, "r17", dd); });
+  T("família tota de 3r/4t: setmana completa amb 5 entrades de 8.00 + migdies + les 3 tardes que toquen", w.celesPendents(f34).length === 0, w.celesPendents(f34).join(" | "));
+  T("…i la de les 9.00 és en blanc TOTS els dies", ["dl", "dt", "dc", "dj", "dv"].every(dd => w.estatCasella(f34, "e9", dd) === "blanc-entrada"));
+  // ── A · família mixta (2n + 4t): cada entrada és dels seus nens ──
+  const fMix = { nens: [{ id: "n2", nom: "Pau", curs: "2n ESO", marca: {} }, { id: "n4", nom: "Bru2", curs: "4t ESO", marca: {} }], cotxe: {}, propi: {}, curs: "" };
+  T("mixta 2n+4t: dilluns les DUES entrades són normals", w.estatCasella(fMix, "e8", "dl") === "normal" && w.estatCasella(fMix, "e9", "dl") === "normal");
+  T("…però cadascuna és del seu nen (8.00 el de 4t, 9.00 el de 2n)", w.nensDeCasella(fMix, "e8", "dl").map(n => n.nom).join() === "Bru2" && w.nensDeCasella(fMix, "e9", "dl").map(n => n.nom).join() === "Pau");
+  T("…dimarts tots dos a les 8.00 i la de les 9.00 en blanc", w.nensDeCasella(fMix, "e8", "dt").length === 2 && w.estatCasella(fMix, "e9", "dt") === "blanc-entrada");
+  T("…i les dues entrades de dilluns són pendents per separat", w.celesPendents(fMix).filter(x => x.indexOf("Dilluns entrada") === 0).length === 2);
+  // menú de casella: només el nen que hi entra
+  const fV = famDoc("Vila Puig");
+  fV.nens.push({ id: "tmp-mix", nom: "Nil", curs: "1r ESO", marca: {} });   // Janot 3r + Nil 1r = mixta
+  w.triaTab("graella"); await tic();
+  w.obreCasella("e9", "dl"); await tic();
+  T("menú de la 9.00 de dilluns (mixta 3r+1r): només hi demana plaça el de 1r", d.querySelector("#cel-menu").innerHTML.includes("Nil demana") && !d.querySelector("#cel-menu").innerHTML.includes("Janot"));
+  w.tancaCasella();
+  w.obreCasella("e8", "dl"); await tic();
+  T("…i al de les 8.00, només el de 3r", d.querySelector("#cel-menu").innerHTML.includes("Janot demana") && !d.querySelector("#cel-menu").innerHTML.includes("Nil"));
+  w.tancaCasella();
+  fV.nens = fV.nens.filter(n => n.id !== "tmp-mix");
+  // ── B · un sol control de desar a la Graella ──
+  w.triaPinzell("cotxe"); await tic(400); w.pinta("r13", "dl"); await tic();   // canvi pendent
+  const graHtml = cos();
+  T("amb canvis pendents: UN sol control de desar (la barra) i el botó d'esborrar present", (graHtml.match(/Desa els canvis/g) || []).length === 0 && graHtml.includes("Esborra tota la graella") && !d.querySelector("#barra").classList.contains("amaga"));
+  await tic(400); w.pinta("r13", "dl"); await tic();   // desfà el canvi
+  // ── C · vinculació robusta (claim idempotent, una altra família, desvincula, alta atòmica) ──
+  const sbFake = fakeSupabaseClient();
+  const rMateixa = await sbFake.rpc("claim_family", { p_family: mevaFamId(), p_token: "QUALSEVOL" });
+  T("claim_family sobre la MATEIXA família: acaba bé sense error (idempotent)", !rMateixa.error);
+  const rAltra = await sbFake.rpc("claim_family", { p_family: famDB("Grau").id, p_token: codiDeFam(famDB("Grau")) });
+  T("claim_family sobre UNA ALTRA família: error amb el nom de la meva", !!rAltra.error && rAltra.error.message.includes("ja està vinculat a la família Vila Puig"));
+  const rPerfil = await sbFake.rpc("el_meu_perfil");
+  T("el_meu_perfil(): retorna la fila del MATEIX usuari del JWT", !rPerfil.error && rPerfil.data[0] && rPerfil.data[0].family_id === mevaFamId());
+  // alta amb fallada de nens: NO queda cap perfil vinculat a mitges (transacció)
+  afegeixUsuari("atomic@test.cat", "atomic123");
+  await surtIentra("atomic@test.cat", "atomic123");
+  await acceptaConsentiment();
+  const rPeta = await fakeSupabaseClient().rpc("join_group_crea", { p_code: CODI, p_cognom1: "Atomic", p_cognom2: "", p_driver: "A", p_seats: 3, p_nens: [{ nom: "X", __peta: true }] });
+  const prAtomic = DB.profiles.find(x => x.email === "atomic@test.cat");
+  T("alta atòmica: si falla l'insert dels nens, el perfil NO queda vinculat", !!rPeta.error && prAtomic.family_id === null && !DB.families.some(x => x.name === "Atomic"));
+  const rOk = await fakeSupabaseClient().rpc("join_group_crea", { p_code: CODI, p_cognom1: "Atomic", p_cognom2: "", p_driver: "A", p_seats: 3, p_nens: [{ nom: "Xus", curs: "1r ESO" }] });
+  T("l'alta atòmica bona crea família i nens d'una tacada", !rOk.error && DB.children.some(c => c.name === "Xus" && c.curs === "1r ESO"));
+  // desvincula_compte: només el perfil propi
+  const abansAltres = DB.profiles.filter(x => x.email !== "atomic@test.cat").map(x => x.family_id).join("|");
+  const rDesv = await fakeSupabaseClient().rpc("desvincula_compte");
+  T("desvincula_compte(): el perfil propi queda a null · 'pendent'", !rDesv.error && prAtomic.family_id === null && prAtomic.status === "pendent");
+  T("…i NO toca cap altre perfil", DB.profiles.filter(x => x.email !== "atomic@test.cat").map(x => x.family_id).join("|") === abansAltres);
+  T("…i queda al registre d'activitat", DB.activity_log.some(l => l.action === "desvinculació"));
+  await fakeSupabaseClient().rpc("esborra_familia", { p_family: (DB.families.find(x => x.name === "Atomic") || {}).id });
+  await surtIentra("admin@test.cat", "admin123");
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
