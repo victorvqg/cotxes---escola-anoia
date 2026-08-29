@@ -1,6 +1,75 @@
 # 🔁 AUDITORIA — Cotxes · Escola Anoia
-Data: 29-08-2026 (v3.7 — fulls imprimibles: conductor, grup i print CSS) · Fitxer: `index.html`
+Data: 29-08-2026 (v3.8 — horari per curs corregit, un sol desar, vinculació robusta) · Fitxer: `index.html`
 Mètode /loop: evidència → canvi → verificació executable → reversió clara.
+
+## v3.8 — L'HORARI DE DEBÒ, UN SOL DESAR I LA VINCULACIÓ QUE NO PETA `[correcció + bug reproduïts]`
+
+**1. CORRECCIÓ · l'horari de 3r i 4t era al revés.**
+Evidència: el text d'ajuda deia «3r i 4t: sempre a les 9.00» — FALS.
+Horari DEFINITIU: 1r/2n → 8.00 dt/dc i 9.00 la resta; 3r/4t → 8.00
+TOTS els dies i dc/dv sense tarda. Cap curs tria entre 8.00 i 9.00.
+Canvi: la lògica passa a ser PER NEN — `horaEntradaCurs(curs, dia)` i
+`nenTeCasella(nen, slot, dia)` són la base; `estatCasella` (família)
+deixa una casella en blanc només si CAP nen amb curs no la té, i
+`nensDeCasella` diu de quins nens és cada casella. Amb això, una
+família mixta (2n + 4t) té les DUES entrades obertes dl/dj/dv i
+cadascuna és només dels seus nens (menú de casella, 🙋 demana plaça,
+🚗 conduïm, fulls, El teu cotxe i pendents filtren per nen); dt/dc
+tots entren a les 8.00 i la de les 9.00 queda en blanc. La tria 8/9
+(netejaGermana) només sobreviu per a famílies SENSE cap curs.
+Textos: «ℹ️ 1r i 2n: entren a les 8.00 dimarts i dimecres, i a les
+9.00 la resta de dies.» · «ℹ️ 3r i 4t: entren sempre a les 8.00.
+Dimecres i divendres no hi ha tarda.» · casella 9.00 en blanc: «Els
+de 3r i 4t entren sempre a les 8.00.»
+Verificació: suite 10f reescrita + 10i (família tota de 3r/4t amb
+setmana completa de 5×8.00; mixta amb les dues entrades pendents per
+separat i el menú que només llista el nen que hi entra; l'ajuda ja no
+conté «sempre a les 9.00»). Reversió: restaurar l'estatCasella per
+famílies senceres del commit anterior.
+
+**2. BUG · dos botons «💾 Desa els canvis» a la Graella.**
+Evidència: després d'esborrar la graella i tornar-la a omplir
+conviuen el botó inline de sota la graella i la barra de desar.
+Canvi: fora el desar inline de `pintaGraellaAccions` (i el del
+Perfil): l'ÚNIC control de desar de tota l'app és la barra de baix;
+sota la graella només queda «🗑️ Esborra tota la graella» (secundari
+vermell, a la dreta, sempre visible; el .cos té padding-bottom 96px i
+la barra no el tapa). Verificació: suite 10i (amb canvis pendents,
+zero «Desa els canvis» al cos i barra activa). Reversió: restaurar el
+botó condicional a `pintaGraellaAccions`.
+
+**3. BUG · «No s'ha pogut vincular: Aquest compte ja té família».**
+Evidència: claim_family falla per l'auth.uid() del JWT, però la
+recuperació del client llegia profiles per `sessio.user.id` (variable
+del client, guardada de la RESPOSTA de signUp/signIn) i sense
+comprovar `.error`: si JWT i variable divergeixen, o l'alta anterior
+va quedar a mitges (join_group_crea vinculava el perfil ABANS que el
+client inserís els nens), l'usuari queda clavat a l'error.
+Canvi (SQL v37 + client):
+- Sessió amb UNA font de veritat: `sb.auth.getSession()` després de
+  signIn/signUp i abans de les RPC de vinculació; log de diagnòstic
+  (sessio.user.id vs auth.getUser) abans del claim.
+- `el_meu_perfil()` (security definer): la recuperació llegeix el
+  MATEIX usuari que ha donat l'error, i comprova `.error`.
+- `claim_family` idempotent: ja vinculat a p_family → acaba bé;
+  vinculat a una altra → «Aquest compte ja està vinculat a la família
+  X», i el client mostra el botó «Entra a la família X» + la pista
+  «Perfil → Desvincula aquest compte».
+- `desvincula_compte()`: només el perfil propi (family_id null,
+  status pendent), al log; botó al Perfil amb avís que la família pot
+  quedar sense comptes (es recupera amb el seu codi).
+- Alta ATÒMICA: els nens viatgen DINS de join_group_crea (p_nens
+  jsonb, una transacció) i children.curs té DEFAULT '' — cap perfil
+  pot quedar vinculat a mitges.
+- «Has entrat com a [email]» a «Qui sou?» i al Perfil.
+Verificació: suite 10i (claim idempotent, error amb nom + recuperació,
+el_meu_perfil, alta que falla sense deixar rastre, desvincula que
+només toca el perfil propi i queda al log) + consultes al final de
+supabase-v37.sql. Reversió: restaurar claim_family/join_group_crea de
+v32/fase1 i treure les funcions noves.
+
+Suite: `node audita.js` → **223 correctes · 0 fallades**. Peu: versió 3.8.
+PENDENT DE L'USUARI: executar `supabase-v37.sql` al SQL Editor.
 
 ## v3.7 — FULLS IMPRIMIBLES: EL NOM DEL CONDUCTOR, EL GRUP I EL PAPER EN BLANC `[a petició + bug reproduït]`
 
