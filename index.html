@@ -66,6 +66,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .g-dia{font:700 13px 'Baloo 2';text-align:center;color:#46596A;text-transform:uppercase;letter-spacing:.04em;padding:2px 0}
 .g-grup{grid-column:1/-1;font:700 12.5px 'Baloo 2';color:#17456B;text-transform:uppercase;letter-spacing:.06em;padding:7px 2px 1px}
 .g-hora{font-size:14px;font-weight:700;color:#33424F;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
+.cel.na{opacity:.38;border-style:dashed}
 .cel{min-height:54px;border-radius:12px;border:1.5px solid #D6E0E7;background:#FAFCFD;line-height:1;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 .cel .c-ico{font-size:17px;line-height:1}
 .cel .c-nom{font:800 12px 'Baloo 2';letter-spacing:.04em;max-width:100%;overflow:hidden;white-space:nowrap;color:#6E4E00}
@@ -311,7 +312,7 @@ h1{font-size:24px}
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
   <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.4</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.5</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -335,12 +336,33 @@ const DIES_NOM = {dl:"Dilluns",dt:"Dimarts",dc:"Dimecres",dj:"Dijous",dv:"Divend
    1r/2n ESO: CURS12_E8 = dies que comencen a les 8.00.
    3r/4t ESO: CURS34_SENSE_TARDA = tardes SENSE escola: aquelles
    caselles de tarda no cal respondre-les (graella igualment completa). */
-const CURS12_E8 = { "1r ESO": [], "2n ESO": [] };           // pendent de confirmar dies
-const CURS34_SENSE_TARDA = { "3r ESO": [], "4t ESO": [] };  // pendent de confirmar dies
+const CURS12_E8 = { "1r ESO": ["dt", "dc"], "2n ESO": ["dt", "dc"] };           // 1r/2n comencen a les 8.00 dimarts i dimecres
+const CURS34_SENSE_TARDA = { "3r ESO": ["dc", "dv"], "4t ESO": ["dc", "dv"] };  // 3r/4t no tenen escola les tardes de dimecres i divendres
 function cursosDe(f){
   const s = new Set((f.nens || []).map(n => n.curs).filter(Boolean));
   if (!s.size && f.curs) s.add(f.curs);
   return s;
+}
+function potE8(f, d){
+  // L'entrada de les 8.00 només existeix per a 1r/2n ESO, i només els dies CURS12_E8
+  const cs = cursosDe(f);
+  if (!cs.size) return true;
+  for (const c of cs){
+    if ((c === "1r ESO" || c === "2n ESO") && (CURS12_E8[c] || []).includes(d)) return true;
+  }
+  return false;
+}
+function infoCursos(f){
+  const cs = cursosDe(f);
+  if (!cs.size) return "";
+  const bits = [];
+  const e8dies = DIES.filter(d => potE8(f, d));
+  if (e8dies.length < DIES.length)
+    bits.push(e8dies.length ? "l'entrada de les 8.00 nom\u00e9s s'usa " + e8dies.map(d => DIES_NOM[d].toLowerCase()).join(" i ") : "els vostres cursos entren sempre a les 9.00");
+  const tards = DIES.filter(d => !tardaCal(f, d));
+  if (tards.length)
+    bits.push("les tardes de " + tards.map(d => DIES_NOM[d].toLowerCase()).join(" i ") + " no cal respondre-les (3r/4t ESO no tenen escola)");
+  return bits.length ? "<div class='g-estat' style='background:#F4F8FA;color:#5A6B7A'>\u2139\ufe0f Segons el curs dels vostres nens: " + esc(bits.join(" \u00b7 ")) + ".</div>" : "";
 }
 function tardaCal(f, d){
   // Si tots els nens amb curs són de 3r/4t i aquell dia no hi ha escola
@@ -1254,9 +1276,10 @@ function pintaPerfil(){
 
 function estatGHtml(f){
   const pend = celesPendents(f);
-  return pend.length
+  const info = infoCursos(f);
+  return (pend.length
     ? "<div class='g-estat mal'>\u26a0 Falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab). Primera: " + esc(pend[0]) + ".</div>"
-    : "<div class='g-estat be'>\u2713 Setmana completa \u2014 els Calendaris estan oberts.</div>";
+    : "<div class='g-estat be'>\u2713 Setmana completa \u2014 els Calendaris estan oberts.</div>") + info;
 }
 function refrescaEstatG(){
   const el = $("#g-estat-box"); if (!el) return;
@@ -1277,7 +1300,12 @@ function pintaHorariComplet(){ if (tabAct === "perfil") pintaPerfil(); else pint
 function triaPinzell(p){ pinzell = p; pintaHorariComplet(); }
 
 let celObert = null;
-function obreCasella(slot, dia){ celObert = { slot: slot, dia: dia }; pintaCasella(); }
+function obreCasella(slot, dia){
+  const f = lameva();
+  if (f && slot === "e8" && !potE8(f, dia)){ avis("Els vostres cursos no comencen a les 8.00 " + DIES_NOM[dia].toLowerCase() + ": marqueu l'entrada de les 9.00."); return; }
+  if (f && (slot === "e15" || slot === "r17") && !tardaCal(f, dia)){ avis("Els vostres cursos no tenen escola " + DIES_NOM[dia].toLowerCase() + " a la tarda: no cal respondre aquesta casella."); return; }
+  celObert = { slot: slot, dia: dia }; pintaCasella();
+}
 function tancaCasella(){ celObert = null; const m = $("#cel-menu"), v = $("#cel-vel"); if (m) m.classList.remove("obert"); if (v) v.classList.remove("obert"); }
 function pintaCasella(){
   if (!celObert) return;
@@ -1374,7 +1402,8 @@ function pintaGraella(){
         const inicialsNen = x => x.nom.trim().split(/\s+/).map(p => p[0].toUpperCase()).slice(0, 2).join("");
         cont = "<span class='c-ico'>🙋</span><span class='c-nom'>" + marcats.slice(0, 2).map(x => esc(inicialsNen(x))).join("·") + (marcats.length > 2 ? "+" : "") + "</span>";
       }
-      h += "<button class='cel " + cls + "' onclick=\"obreCasella('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
+      const noAplica = (fr.id === "e8" && !potE8(f, d)) || ((fr.id === "e15" || fr.id === "r17") && !tardaCal(f, d));
+      h += "<button class='cel " + cls + (noAplica ? " na" : "") + "' onclick=\"obreCasella('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
   });
   $("#graella").innerHTML = h;
@@ -1481,7 +1510,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.4", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "3.5", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
