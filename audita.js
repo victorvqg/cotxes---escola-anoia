@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.4", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.4"));
+  T("lema i peu amb versió 3.5", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.5"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -830,6 +830,45 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el botó verd acaba el registre", d.querySelector("#sel-bloc").innerHTML.includes("acaba el registre"));
   d.querySelector("#sel-fam").value = "__nova__"; w.selFamCanvia(); await tic();
   T("si la família no hi és, llavors sí que surt el formulari", d.querySelector("#nf-wrap").style.display === "" && !d.querySelector("#sel-preview").innerHTML);
+
+  console.log("10f · NOVETATS v3.5 (lògica de cursos: 8.00 dimarts/dimecres per a 1r/2n, tardes lliures dc/dv per a 3r/4t)");
+  await surtIentra("admin@test.cat", "admin123");
+  w.triaTab("perfil"); await tic();
+  w.triaCursNen(idJan(), "3r ESO"); await tic();
+  await w.desa(); await tic(30);
+  T("el curs del nen s'actualitza a la BD", nenDB(idVila, "Janot").curs === "3r ESO");
+  // Família de 4t ESO sense cap marca: la llista de pendents n'és la prova neta
+  w.adminEdita(famDB("Família Nova").id); await tic(20);
+  w.triaTab("perfil"); await tic();
+  const polId = famDoc("Família Nova").nens[0].id;
+  w.triaCursNen(polId, "4t ESO"); await tic();
+  await w.desa(); await tic(30);
+  const pendN = w.celesPendents(famDoc("Família Nova"));
+  T("4t ESO: les tardes de dimecres i divendres NO són pendents", !pendN.some(x => /Dimecres (15|17)|Divendres (15|17)/.test(x)), pendN.join(" | "));
+  T("però el migdia de dimecres SÍ que cal respondre'l", pendN.some(x => x.includes("Dimecres 13.00")), pendN.join(" | "));
+  T("i la tarda de dilluns també", pendN.some(x => x.includes("Dilluns 15.00")), pendN.join(" | "));
+  T("si el nen fos de 1r, dimecres a la tarda SÍ que caldria", (function(){ w.triaCursNen(polId, "1r ESO"); const p2 = w.celesPendents(famDoc("Família Nova")); w.triaCursNen(polId, "4t ESO"); return p2.some(x => x.includes("Dimecres 15.00")); })());
+  await w.desa(); await tic(30);
+  w.triaFam(famDB("Vila Puig").id); await tic(20);
+  w.triaTab("graella"); await tic();
+  w.obreCasella("e8", "dt"); await tic();
+  T("família de 3r/4t: la casella de les 8.00 no s'obre mai", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("8.00"));
+  w.obreCasella("e15", "dc"); await tic();
+  T("dimecres a la tarda tampoc (no tenen escola)", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("tarda"));
+  w.obreCasella("r13", "dc"); await tic();
+  T("dimecres al migdia sí que s'obre", d.querySelector("#cel-menu").classList.contains("obert"));
+  w.tancaCasella();
+  T("la graella informa de les exempcions del curs", cos().includes("no cal respondre-les"));
+  w.triaTab("perfil"); await tic();
+  w.triaCursNen(idJan(), "1r ESO"); await tic();
+  w.triaTab("graella"); await tic();
+  w.obreCasella("e8", "dt"); await tic();
+  T("1r ESO: dimarts SÍ es pot respondre la 8.00", d.querySelector("#cel-menu").classList.contains("obert"));
+  w.tancaCasella();
+  w.obreCasella("e8", "dl"); await tic();
+  T("però dilluns no (1r/2n entren a les 9.00)", !d.querySelector("#cel-menu").classList.contains("obert"));
+  w.triaTab("perfil"); await tic();
+  await w.desa(); await tic(30);
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
