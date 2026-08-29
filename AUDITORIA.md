@@ -1,6 +1,65 @@
 # 🔁 AUDITORIA — Cotxes · Escola Anoia
-Data: 29-08-2026 (v3.8 — horari per curs corregit, un sol desar, vinculació robusta) · Fitxer: `index.html`
+Data: 29-08-2026 (v3.9 — imprimir en una A4 amb colors; el codi de família sol vincula) · Fitxer: `index.html`
 Mètode /loop: evidència → canvi → verificació executable → reversió clara.
+
+## v3.9 — UNA SOLA A4 AMB COLORS, I EL CODI DE FAMÍLIA JA N'HI HA PROU `[bug reproduït + captura d'usuari]`
+
+**1. BUG · Imprimeix: 2 pàgines, sense colors de fons.**
+Evidència: la solució v3.7 amb `visibility:hidden` amagava el contingut
+però NO l'espai — `.tel` (min-height:100vh, flex) seguia ocupant alçada
+i el document feia 2 pàgines; i Chrome no imprimeix fons per defecte
+(«Gràfics de fons» desmarcat), així que tot sortia blanc i pla.
+Canvi:
+- #full-horari passa a FILL DIRECTE de <body> (ja era una capa fixa a
+  pantalla completa: no depèn de .tel). El print CSS torna a
+  `display:none` — `body > *:not(#full-horari){display:none}` — que sí
+  que allibera l'espai; html/body a height:auto, cap `vh` al bloc print.
+- Colors forçats: `.fh-full, .fh-full *{-webkit-print-color-adjust:
+  exact; print-color-adjust:exact}` (capçalera navy, barres de color,
+  zebra — amb background-color sòlid de reserva —, xips i píndoles).
+- El full fa EXACTAMENT l'A4 útil: .fh-full 281×194 mm en grid de 6
+  files (capçalera · zebra · dies · cos 1fr · llegenda · peu); les
+  franges van dins d'un `.fh-cos` nou (grid de 9 files: 4 separadors
+  auto + 5 franges 1fr que es reparteixen l'espai); break-inside:avoid
+  pertot i cap min-height fixa en print.
+- `document.fonts.ready` abans de window.print(): Baloo 2 carregada.
+- El disseny v2.26 (banda navy + badge groc, píndoles de dia, barres
+  de color, separadors 🌅/🎒, xips) ara S'IMPRIMEIX tal com es veu.
+- El camí d'iOS / app instal·lada i el JPEG del canvas no canvien.
+Verificació: suite 10h reescrita (fill directe de body, display:none
+selectiu, print-color-adjust, cap vh, 281×194 i graella en grid);
+comprovació visual pendent de l'usuari a Chrome escriptori i Android
+(1 pàgina apaïsada amb colors, full del nen i del conductor).
+Reversió: restaurar el bloc @media print de v3.8 i tornar el div dins
+de .cos.
+
+**2. MILLORA · vincular un segon compte NOMÉS amb el codi de família.**
+Evidència (captura): un progenitor escriu A638F916 (codi de FAMÍLIA, 8)
+a la casella del codi del GRUP (6) i rep «Cap grup actiu amb aquest
+codi»: el camí de dos codis en dues pantalles encalla qui només ha
+rebut el codi de família per WhatsApp.
+Canvi (SQL v38 + client):
+- UNA casella «Codi d'accés»: 6 caràcters → flux del grup de sempre;
+  8 → vincula directament amb `claim_family_per_codi` i entra («Vinculat
+  a la família X ✓»), sense passar per «Qui sou?»; altra llargada →
+  «El codi del grup té 6 caràcters i el de la família en té 8…».
+- `vincula_compte_a_familia()` és el cos ÚNIC de vinculació (idempotent,
+  nom de la família si és una altra, màxim 2 comptes) — claim_family i
+  claim_family_per_codi el reutilitzen; és PRIVAT (revoke execute a
+  l'API). La cerca per codi va DINS del security definer: cap client
+  llegeix invite_token ni escaneja families (grants v36 intactes).
+- Sessió de getSession + el_meu_perfil() abans i després, com a v3.8.
+- Guia al Perfil: «passa aquest codi a l'altre progenitor o al vostre
+  fill/a: amb aquest codi sol ja poden crear el seu compte i entrar».
+Verificació: suite 10j (8 bons → entra; 8 inexistents → missatge de
+família; 7 → llargada; 6 → flux del grup intacte; tercer compte →
+«ja té 2 comptes»; invite_token il·legible per a un usuari normal) +
+consultes al final de supabase-v38.sql.
+Reversió: restaurar claim_family de v37 i treure les funcions noves.
+
+Suite: `node audita.js` → **234 correctes · 0 fallades**. Peu: versió 3.9.
+PENDENT DE L'USUARI: executar `supabase-v38.sql` al SQL Editor i
+comprovar la impressió a Chrome (escriptori i Android).
 
 ## v3.8 — L'HORARI DE DEBÒ, UN SOL DESAR I LA VINCULACIÓ QUE NO PETA `[correcció + bug reproduïts]`
 

@@ -136,13 +136,21 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .av-quan{font:800 12.5px 'Baloo 2';color:#6B7D8A;flex:none;width:92px;padding-top:2px}
 .ocult{display:none}
 @media print{
-  body *{visibility:hidden}
-  #full-horari, #full-horari *{visibility:visible}
-  #full-horari{display:block !important;position:absolute;inset:auto;left:0;top:0;width:100%;height:auto;overflow:visible;padding:0;background:#fff}
-  body{display:block;background:#fff}
-  .tel{max-width:none;min-height:0;display:block;background:#fff}
+  /* #full-horari és fill directe de body: la resta s'amaga amb display:none,
+     que sí que allibera l'espai (amb visibility el document feia 2 pàgines) */
+  body > *:not(#full-horari){display:none !important}
+  html, body{height:auto !important;overflow:visible !important;background:#fff !important;display:block !important;margin:0;padding:0}
+  #full-horari{display:block !important;position:static !important;inset:auto;overflow:visible;padding:0;background:#fff}
   .fh-eines, .hint{display:none !important}
-  .fh-full{max-width:none}
+  /* Chrome no imprimeix fons per defecte: es força el color exacte */
+  .fh-full, .fh-full *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  /* el full ocupa exactament l'A4 apaïsat útil (297−16 × 210−16 mm) */
+  .fh-full{width:281mm;height:194mm;max-width:none;margin:0;display:grid;grid-template-rows:auto auto auto 1fr auto auto;gap:2mm;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid}
+  .fh-cos{display:grid;grid-template-rows:auto 1fr 1fr auto 1fr auto 1fr auto 1fr;gap:1.6mm;min-height:0}
+  .fh-fila{page-break-inside:avoid;break-inside:avoid;min-height:0}
+  .fh-cel{min-height:0}
+  .fh-hora{justify-content:flex-end;padding-right:6px}
+  .fh-zebra{background-color:#c9d6e4}   /* reserva sòlida si el navegador no pinta el gradient */
 }
 @page{size:A4 landscape;margin:8mm}
 .fullh{position:fixed;inset:0;background:#fdfefe;z-index:70;overflow:auto;padding:12px}
@@ -156,6 +164,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .fh-s{font:600 12.5px 'Baloo 2';color:#c9dcee;margin-top:2px}
 .fh-marca{font:800 14px 'Baloo 2';color:#f6c026;white-space:nowrap}
 .fh-zebra{height:8px;margin:0 12px;background:repeating-linear-gradient(90deg,#1d4a6e 0 16px,transparent 16px 32px)}
+.fh-cos{display:flex;flex-direction:column;gap:9px}
 .fh-fila{display:grid;grid-template-columns:58px repeat(5,1fr);gap:8px;align-items:stretch}
 .fh-dia{background:#16324f;color:#fff;border-radius:999px;padding:5px 0;text-align:center;font:700 13.5px 'Baloo 2'}
 .fh-grup{display:flex;align-items:center;gap:7px;border-radius:8px;padding:3px 12px;font:800 10.5px 'Baloo 2';letter-spacing:1.5px}
@@ -330,13 +339,15 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <div id="full-horari" class="fullh ocult"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.8</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 3.9</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
   </div></div>
 </div>
+<!-- #full-horari és FILL DIRECTE de <body>: la capa és fixa a pantalla completa
+     i, en imprimir, la resta del body es pot amagar amb display:none (allibera l'espai) -->
+<div id="full-horari" class="fullh ocult"></div>
 <script>
 /*JS-INICI*/
 "use strict";
@@ -992,10 +1003,10 @@ function pantallaGrup(){
   document.body.classList.remove("dins");
   estat("El teu grup");
   $("#pantalla").innerHTML =
-    "<div class='targeta'><h2>Uneix-te amb codi d'invitació</h2>" +
-    "<p class='lead'>L'administrador del grup t'ha de passar un codi de 6 lletres/xifres.</p>" +
-    "<div class='apila'><input class='input' id='gg-codi' placeholder='Codi d&#39;invitació' maxlength='12' style='text-transform:uppercase' onkeydown=\"if(event.key==='Enter')buscaGrup()\">" +
-    "<button class='boto' onclick='buscaGrup()'>Cerca el grup</button></div></div>" +
+    "<div class='targeta'><h2>Uneix-te amb un codi d'acc\u00e9s</h2>" +
+    "<p class='lead'>Tens el codi del <b>GRUP</b> (6 car\u00e0cters, te'l dona l'administrador) o el codi de la vostra <b>FAM\u00cdLIA</b> (8 car\u00e0cters, el veu qui ja hi \u00e9s al seu Perfil)? Escriu-ne un.</p>" +
+    "<div class='apila'><input class='input' id='gg-codi' placeholder='Codi d&#39;acc\u00e9s (6 o 8 car\u00e0cters)' maxlength='8' style='text-transform:uppercase' onkeydown=\"if(event.key==='Enter')buscaGrup()\">" +
+    "<button class='boto' onclick='buscaGrup()'>Continua</button></div></div>" +
     "<details class='conf'><summary>➕ No tinc codi: vull crear un grup nou (seré l'administrador)</summary>" +
     "<div class='targeta' style='margin-top:8px'><h2>Crea el grup</h2>" +
     "<div class='p-fila'><span class='p-lab'>Nom del grup<span class='p-sub'>ex: EA 26/27 (Escola Anoia, curs 2026/27)</span></span></div>" +
@@ -1016,7 +1027,9 @@ function pantallaGrup(){
 }
 async function buscaGrup(){
   const v = $("#gg-codi").value.trim().toUpperCase();
-  if (v.length < 4){ avis("Escriu el codi d'invitació."); return; }
+  // Una sola casella per als dos codis: la llargada decideix el camí
+  if (v.length === 8){ await vinculaPerCodiFamilia(v); return; }   // codi de FAMÍLIA: un sol pas
+  if (v.length !== 6){ avis("El codi del grup t\u00e9 6 car\u00e0cters i el de la fam\u00edlia en t\u00e9 8. Revisa quin t'han passat."); return; }
   estat("Cercant…");
   const r = await sb.rpc("grup_per_codi", { p_code: v });
   estat("El teu grup");
@@ -1024,6 +1037,17 @@ async function buscaGrup(){
   if (!(r.data || []).length){ avis("Cap grup actiu amb aquest codi. Revisa que l'hagis escrit bé."); return; }
   grupTrobat = r.data[0]; codiInvitacio = v;
   await pantallaTria();
+}
+async function vinculaPerCodiFamilia(codi){
+  avis(""); estat("Vinculant…");
+  sessio = (await sb.auth.getSession()).data.session || sessio;   // única font de veritat abans de l'RPC
+  const r = await sb.rpc("claim_family_per_codi", { p_token: codi });
+  if (r.error){ estat("Error", true); avis(esc(msgNeta(r.error))); return; }
+  const fila = (r.data || [])[0];
+  const pr = await sb.rpc("el_meu_perfil");
+  if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
+  avis("Vinculat a la fam\u00edlia <b>" + esc(fila ? fila.nom : "") + "</b> \u2713", true);
+  await entraApp();
 }
 async function creaGrup(){
   const nomG = $("#gg-nom") ? $("#gg-nom").value.trim() : "";
@@ -1377,7 +1401,7 @@ function pintaPerfil(){
     "<div>" + filesNens + "</div>" +
     "<div class='fila'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : "", f.nens.some(n => !(n.curs || "").trim()) ? "el curs de cada nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
-    (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa'l a l'altre progenitor: el necessitar\u00e0 per vincular el seu compte a la vostra fam\u00edlia</span></span></div>" +
+    (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa aquest codi a l'altre progenitor o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia</span></span></div>" +
     "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
     "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup<span class='p-sub'>codi d'invitaci\u00f3 del grup: passa'l a les fam\u00edlies que s'hi vulguin unir</span></span></div>" +
     "<div class='nomgran' style='text-align:center'>" + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + " \u00b7 <span style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span></div>" +
@@ -2332,6 +2356,7 @@ function fullHorariHtml(titol, sub, cont, distintiu, llegenda){
   h += "<div class='fh-cap'><div><div class='fh-tl'><span class='fh-t'>" + esc(titol) + "</span><span class='fh-badge'>" + esc(distintiu) + "</span></div><div class='fh-s'>" + esc(sub) + "</div></div><div class='fh-marca'>\ud83d\ude97 Cotxes \u00b7 Escola Anoia</div></div>";
   h += "<div class='fh-zebra'></div>";
   h += "<div class='fh-fila fh-capdies'><div></div>" + DIES.map(d => "<div class='fh-dia'>" + DIES_NOM[d] + "</div>").join("") + "</div>";
+  h += "<div class='fh-cos'>";   // cos amb les franges: en print és un grid que omple l'alçada que queda de l'A4
   BANDES.forEach(b => {
     h += "<div class='fh-grup " + b.cls + "'><span>" + b.icona + "</span><span>" + b.nom + "</span></div>";
     b.fr.forEach(fid => {
@@ -2345,6 +2370,7 @@ function fullHorariHtml(titol, sub, cont, distintiu, llegenda){
       h += "</div>";
     });
   });
+  h += "</div>";   // /fh-cos
   h += "<div class='fh-llegenda'>" + llegenda.map(l => "<span class='fh-chip'><span class='fh-q' style='background:" + l[0] + "'></span>" + esc(l[1]) + "</span>").join("") + "</div>";
   h += "<div class='fh-peu'>De Montbui poble a l'Escola Anoia \u00b7 creat per V\u00edctor Quintana \u00b7 " + new Date().toLocaleDateString("ca") + "</div>";
   h += "</div>";
@@ -2364,7 +2390,13 @@ function mostraFull(html){
   window.scrollTo(0, 0);
 }
 function tancaFull(){ const dv = $("#full-horari"); if (dv){ dv.classList.add("ocult"); dv.innerHTML = ""; } }
-function imprimeixFull(){ try { window.print(); } catch(e){ avis("Fes una captura de pantalla del full per desar-lo."); } }
+async function imprimeixFull(){
+  try {
+    // tipografies (Baloo 2 / Atkinson) carregades abans del print, que no surti la font per defecte
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    window.print();
+  } catch(e){ avis("Fes una captura de pantalla del full per desar-lo."); }
+}
 function descarregaHorariNen(fid, nid){
   const fam = doc.families.find(x => x.id === fid);
   const nen = fam && (fam.nens || []).find(x => x.id === nid);
