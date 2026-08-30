@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.1", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.1"));
+  T("lema i peu amb versió 4.2", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.2"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1021,6 +1021,41 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   ompleForats(famDoc("Vila Puig"));   // amb 3r ESO l'entrada passa a les 8.00 tots els dies
   await w.desa(); await tic(30);
   T("el curs del nen s'actualitza a la BD", nenDB(idVila, "Janot").curs === "3r ESO");
+
+  // ── v4.2 · afegir un fill NO ha de tocar la graella dels germans ──
+  {
+    const fVP = famDoc("Vila Puig");
+    const marquesAbans = JSON.stringify(fVP.nens[0].marca);
+    const cotxeAbans = JSON.stringify(fVP.cotxe), propiAbans = JSON.stringify(fVP.propi);
+    const nensAbans = fVP.nens.length;
+    w.triaTab("perfil"); await tic();
+    d.querySelector("#nou-nen").value = "Toni";
+    w.afegeixNen(); await tic();
+    const toni = famDoc("Vila Puig").nens.find(x => x.nom === "Toni");
+    T("el fill nou s'afegeix a la família", !!toni && famDoc("Vila Puig").nens.length === nensAbans + 1);
+    w.triaCursNen(toni.id, "1r ESO"); await tic();
+    T("afegir un fill NO canvia les marques del germà",
+      JSON.stringify(famDoc("Vila Puig").nens[0].marca) === marquesAbans);
+    T("…ni el 🚗 ni el 🚫 de la família",
+      JSON.stringify(famDoc("Vila Puig").cotxe) === cotxeAbans && JSON.stringify(famDoc("Vila Puig").propi) === propiAbans);
+    T("…i no salta cap avís de conflicte de curs",
+      !d.querySelector("#barra-avis").textContent.includes("desquadra"));
+    w.triaTab("graella"); await tic();
+    T("…tampoc a la Graella", !cos().includes("Has canviat el curs"));
+    T("les caselles del fill nou surten pel camí normal (pendents de respondre)",
+      w.celesPendents(famDoc("Vila Puig")).length > 0);
+
+    // ── i el cas que SÍ ha de saltar: canviar el curs d'un fill que JA tenia marques ──
+    const gran = famDoc("Vila Puig").nens[0];
+    w.posa(gran.marca, "e8", "dl");          // vàlida amb 3r ESO (entren sempre a l'hora matinera)
+    w.triaCursNen(gran.id, "1r ESO"); await tic();   // amb 1r, dilluns ja no és matiner
+    w.triaTab("graella"); await tic();
+    T("canviar el curs d'un fill amb marques SÍ avisa", cos().includes("Has canviat el curs"));
+    T("…i ofereix esborrar només les d'AQUELL fill",
+      cos().includes("esborraGraellaNen('" + gran.id + "')") && cos().includes("Esborra la graella de"));
+    T("…i mai la graella de tota la família", !cos().includes("onclick='esborraGraella()'"));
+    await surtIentra("admin@test.cat", "admin123");   // res d'això no s'ha desat: torna a l'estat de la BD
+  }
   // Família de 4t ESO sense cap marca: la llista de pendents n'és la prova neta
   w.adminEdita(famDB("Família Nova").id); await tic(20);
   w.triaTab("perfil"); await tic();
