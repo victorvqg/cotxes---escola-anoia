@@ -354,7 +354,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.1</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.2</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -451,7 +451,7 @@ var doc = null;
 let pinzell = "cotxe", dirty = false;
 let esAdmin = false, esStaff = false;   // deriven del rol de la MEVA família a la BD
 let esProgenitor = false;      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
-let conflicteCurs = null;      // {nens:[], caiguts:[], nous:n} quan un canvi de curs desquadra la graella
+let conflicteCurs = null;      // {nenId, nen, caiguts:[]} — SEMPRE d'UN sol fill
 let confObert = false;
 let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
 let tabAct = "graella";
@@ -1526,25 +1526,52 @@ function pintaPerfil(){
 /* Un canvi de curs mou les caselles que toquen: n'hi ha de marcades que queden
    en blanc i de noves que queden sense respondre. No s'esborra res sol: s'avisa
    i s'ofereix esborrar la graella per tornar-la a fer. */
+/* El conflicte és SEMPRE d'un sol fill: només les caselles que AQUELL fill
+   tenia marcades i que, amb el curs nou, ja no li pertoquen.
+   Afegir un fill no n'és mai cap: un fill nou no té cap marca. Les seves
+   caselles noves surten pel camí normal («falten N caselles per respondre»),
+   i les marques dels germans no es toquen. */
 function avaluaConflicteCurs(f, nen){
+  if (!nen){ conflicteCurs = null; return; }
   const caiguts = [];
   FRANGES.forEach(fr => DIES.forEach(d => {
-    if (estatCasella(f, fr.id, d) === "normal") return;
-    if (te(f.cotxe, fr.id, d) || te(f.propi, fr.id, d) || (f.nens || []).some(n => te(n.marca, fr.id, d)))
-      caiguts.push(DIES_NOM[d] + " " + fr.hora);
+    if (!te(nen.marca, fr.id, d)) return;                                              // no hi tenia res
+    if (nenTeCasella(nen, fr.id, d) && estatCasella(f, fr.id, d) === "normal") return;  // la segueix tenint
+    caiguts.push(DIES_NOM[d] + " " + fr.hora);
   }));
-  const nous = celesPendents(f);
-  const nom = nen ? nen.nom.trim().split(/\s+/)[0] : (conflicteCurs ? conflicteCurs.nen : "");
-  conflicteCurs = (caiguts.length || nous.length) ? { nen: nom, caiguts: caiguts, nous: nous } : null;
+  conflicteCurs = caiguts.length
+    ? { nenId: nen.id, nen: nen.nom.trim().split(/\s+/)[0], caiguts: caiguts }
+    : null;
+}
+/* Esborra NOMÉS les marques d'un fill. La graella de la resta de la família
+   (el 🚗, el 🚫 i els germans) no es toca. Es fa en memòria: cal «Desa els
+   canvis», i així es pot desfer sense desar. */
+function esborraGraellaNen(id){
+  const f = lameva(); if (!f) return;
+  if (nomesTitular()) return;
+  const n = f.nens.find(x => x.id === id); if (!n) return;
+  const nomC = n.nom.trim().split(/\s+/)[0];
+  mostraConfirm({
+    titol: "\ud83d\uddd1\ufe0f Esborrar la graella de " + esc(nomC) + "?",
+    text: "S'esborraran <b>nom\u00e9s les caselles marcades de " + esc(nomC) + "</b> (\ud83d\ude4b). La resta de la fam\u00edlia es queda igual: el vostre \ud83d\ude97, el \ud83d\udeab i les marques dels altres fills. Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
+    ok: "S\u00ed, esborra les seves", cancel: "Cancel\u00b7la",
+    alOk: () => {
+      FRANGES.forEach(fr => DIES.forEach(d => treu(n.marca, fr.id, d)));
+      conflicteCurs = null;
+      dirty = true; pintaBarra();
+      if (tabAct === "graella") pintaGraellaTab(); else pintaHorariComplet();
+      avis("\ud83d\uddd1\ufe0f Marques de <b>" + esc(nomC) + "</b> esborrades. Prem \u00abDesa els canvis\u00bb.", true);
+    }
+  });
 }
 function conflicteCursHtml(){
   if (!conflicteCurs) return "";
   const c = conflicteCurs;
-  return "<div class='g-estat mal'>\u26a0 <b>Has canviat el curs" + (c.nen ? " de " + esc(c.nen) : "") + "</b>: l'horari del curs nou no encaixa amb la graella que ten\u00edeu." +
-    (c.caiguts.length ? "<br>\u2022 <b>" + c.caiguts.length + "</b> " + (c.caiguts.length === 1 ? "casella marcada queda" : "caselles marcades queden") + " en blanc (" + esc(c.caiguts.slice(0, 3).join(", ")) + (c.caiguts.length > 3 ? "\u2026" : "") + ")." : "") +
-    (c.nous.length ? "<br>\u2022 <b>" + c.nous.length + "</b> " + (c.nous.length === 1 ? "casella nova" : "caselles noves") + " sense respondre (" + esc(c.nous[0]) + (c.nous.length > 1 ? "\u2026" : "") + ")." : "") +
-    "<br><b>Cal esborrar la graella i tornar-la a fer.</b>" +
-    (esProgenitor ? "" : "<div style='margin-top:8px'><button class='boto' style='background:#B3372C;color:#fff' onclick='esborraGraella()'>\ud83d\uddd1\ufe0f Esborra la graella i comen\u00e7a de nou</button></div>") +
+  return "<div class='g-estat mal'>\u26a0 <b>Has canviat el curs de " + esc(c.nen) + "</b>: amb l'horari nou, <b>" + c.caiguts.length + "</b> " +
+    (c.caiguts.length === 1 ? "casella que tenia marcada ja no li pertoca" : "caselles que tenia marcades ja no li pertoquen") +
+    " (" + esc(c.caiguts.slice(0, 3).join(", ")) + (c.caiguts.length > 3 ? "\u2026" : "") + ")." +
+    "<br>Cal esborrar <b>les marques de " + esc(c.nen) + "</b> i tornar-les a fer. La graella dels altres fills no es toca." +
+    (esProgenitor ? "" : "<div style='margin-top:8px'><button class='boto' style='background:#B3372C;color:#fff' onclick=\"esborraGraellaNen('" + c.nenId + "')\">\ud83d\uddd1\ufe0f Esborra la graella de " + esc(c.nen) + "</button></div>") +
     "</div>";
 }
 function estatGHtml(f){
@@ -1923,7 +1950,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.1", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.2", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2092,7 +2119,7 @@ function triaCursNen(id, v){
   n.curs = v; dirty = true; pintaBarra();
   avaluaConflicteCurs(f, n);
   if (conflicteCurs)
-    barraAvis("\u26a0 <b>El canvi de curs desquadra la graella</b>: l'horari de " + esc(v || "sense curs") + " no \u00e9s el mateix. Cal <b>esborrar la graella i tornar-la a fer</b> \u2014 tens el bot\u00f3 a la pestanya Graella.");
+    barraAvis("\u26a0 <b>El canvi de curs desquadra les marques de " + esc(n.nom.trim().split(/\\s+/)[0]) + "</b>: amb " + esc(v || "sense curs") + " hi ha caselles seves que ja no li pertoquen. Ves a la Graella: hi tens el bot\u00f3 per esborrar nom\u00e9s les seves.");
   if (tabAct === "graella") pintaGraellaTab();
 }
 function renomConductor(v){
