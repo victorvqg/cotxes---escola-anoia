@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 3.9", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 3.9"));
+  T("lema i peu amb versió 4.1", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.1"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -49,13 +49,94 @@ console.log("0 · CABLEJAT ESTÀTIC");
   // Regressió: a create_group, l'override del trigger de rols ha d'anar ABANS de l'insert de la família
   const cg = sql.slice(sql.indexOf("function create_group"), sql.indexOf("$$ language", sql.indexOf("function create_group")));
   T("SQL: create_group posa l'admin_override ABANS d'inserir la família", cg.indexOf("admin_override") > -1 && cg.indexOf("admin_override") < cg.indexOf("insert into families"));
+  // v3.9→v4.0: només el titular escriu (families.owner_id)
+  const sql39 = fs.readFileSync(path.join(__dirname, "supabase-v39.sql"), "utf-8");
+  T("SQL v39: owner_id + es_titular i can_touch_family exigeix ser-ne el titular",
+    sql39.includes("add column if not exists owner_id") && sql39.includes("function es_titular") &&
+    /p_family = my_family\(\) and es_titular\(p_family\)/.test(sql39) && sql39.includes("trg_marca_titular"));
+  T("el client no deixa editar el progenitor (guards + banner)",
+    html.includes("function nomesTitular") && html.includes("esProgenitor") && html.includes("prog-banner") &&
+    (html.match(/if \(nomesTitular\(\)\) return;/g) || []).length >= 20);
+  // v4.1 · TASCA 4: les hores que es mostren viuen NOMÉS a FRANGES[].hora
+  T("les hores mostrades són 7.35 / 8.35 / 14.35 (13.00 i 17.00 sense tocar)",
+    html.includes('{id:"e8", hora:"7.35"') && html.includes('{id:"e9", hora:"8.35"') &&
+    html.includes('{id:"e15",hora:"14.35"') && html.includes('{id:"r13",hora:"13.00"') && html.includes('{id:"r17",hora:"17.00"'));
+  T("no queda cap hora vella (8.00 / 9.00 / 15.00) enlloc del codi", !/8\.00|9\.00|15\.00/.test(html));
+  T("les claus internes dels torns NO han canviat (les dades de Supabase hi van lligades)",
+    ["e8", "e9", "r13", "e15", "r17"].every(k => html.includes('id:"' + k + '"') || html.includes('id:"' + k + '" ')));
+  T("els textos en prosa llegeixen l'hora de FRANGES (horaDe), no literals",
+    html.includes("function horaDe(id)") && (html.match(/horaDe\("e[89]"\)/g) || []).length >= 8);
+  // v4.1 · TASCA 1: el curs duplicat de la família fora del formulari
+  T("ja no hi ha el camp «Curs dels nens» ni el select nf-curs", !html.includes("Curs dels nens") && !html.includes("nf-curs"));
+  T("families.curs ja no es fa servir enlloc (ni lògica, ni desat, ni pantalles)",
+    !html.includes("f.curs") && !html.includes("dades.curs") && !html.includes("Curs de la família"));
+  T("el curs de cada fill sí que hi és, al formulari i al Perfil",
+    html.includes("nfNens[") && html.includes("triaCursNen"));
+  // v4.1 · TASCA 2: el codi de creació NO pot ser a l'app
+  T("el codi de creació no és enlloc d'index.html: es comprova a create_group()",
+    html.includes("gg-codicreacio") && html.includes("p_codi: codiC") && !html.includes("codi_creacio_grup:"));
+  const sql41 = fs.readFileSync(path.join(__dirname, "supabase-v41.sql"), "utf-8");
+  T("SQL v41: app_config amb RLS i sense cap política + create_group el comprova",
+    sql41.includes("create table if not exists app_config") && sql41.includes("alter table app_config enable row level security") &&
+    sql41.includes("Codi de creació incorrecte") && sql41.includes("drop function if exists create_group(text, text, text, text, int)"));
+  T("SQL v41: llegir i canviar el codi és només per a l'admin",
+    /function public\.codi_creacio_grup\(\)[\s\S]*?is_admin\(\)/.test(sql41) &&
+    /function public\.set_codi_creacio_grup\(p_codi text\)[\s\S]*?is_admin\(\)/.test(sql41));
+  // v4.1 · TASCA 3: cap pantalla de pas sense sortida
+  T("les pantalles de pas (codi de grup i tria de família) tenen sortida",
+    (html.match(/Enrere \\u00b7 tanca la sessi\\u00f3/g) || []).length >= 2 &&
+    html.includes("No tens el codi? Demana'l a l'administrador del grup."));
+  /* v4.0.1 · REGRESSIÓ: activity_log.action té un CHECK amb llista tancada.
+     Tota acció que el codi escrigui (JS o RPC) hi ha de ser, o la BD avorta
+     l'operació sencera. Va passar amb 'desvinculació', 'codi regenerat' i
+     'esborrat graella'. Aquesta prova ho enganxa abans que ho faci un usuari. */
+  {
+    const sql40 = fs.readFileSync(path.join(__dirname, "supabase-v40.sql"), "utf-8");
+    const i0 = sql40.indexOf("add constraint activity_log_action_check");
+    const i1 = sql40.indexOf("));", i0);
+    const bloc = (i0 >= 0 && i1 > i0) ? sql40.slice(i0, i1) : "";
+    const permeses = new Set([...bloc.matchAll(/'((?:[^']|'')*)'/g)].map(x => x[1].replace(/''/g, "'")));
+    // 1 · accions que escriu el client
+    const delJs = [...html.matchAll(/logActivitat\(\s*"((?:[^"\\]|\\.)*)"/g)]
+      .map(m => { try { return JSON.parse('"' + m[1] + '"'); } catch(e){ return m[1]; } });
+    // 2 · accions que escriuen les RPC: columna `action` de cada insert into activity_log
+    const delSql = [];
+    for (const fitxer of fs.readdirSync(__dirname).filter(n => /^supabase-.*\.sql$/.test(n))){
+      const t = fs.readFileSync(path.join(__dirname, fitxer), "utf-8");
+      for (const m of t.matchAll(/insert into activity_log\s*\(([^)]*)\)\s*values\s*\(([\s\S]*?)\);/gi)){
+        const cols = m[1].split(",").map(c => c.trim());
+        const idx = cols.indexOf("action");
+        if (idx < 0) continue;
+        const v = m[2]; const parts = []; let cur = "", dep = 0, j = 0;
+        while (j < v.length){
+          const ch = v[j];
+          if (ch === "'"){ cur += ch; j++;
+            while (j < v.length){ cur += v[j];
+              if (v[j] === "'"){ if (v[j+1] === "'"){ cur += v[++j]; j++; continue; } j++; break; }
+              j++; }
+            continue; }
+          if (ch === "(") dep++; else if (ch === ")") dep--;
+          else if (ch === "," && dep === 0){ parts.push(cur); cur = ""; j++; continue; }
+          cur += ch; j++;
+        }
+        parts.push(cur);
+        const val = (parts[idx] || "").trim();
+        if (val.startsWith("'")) delSql.push(val.slice(1, val.lastIndexOf("'")).replace(/''/g, "'"));
+      }
+    }
+    const totes = [...new Set([...delJs, ...delSql])];
+    const fora = totes.filter(a => !permeses.has(a));
+    T("SQL v40: el CHECK d'activity_log llista 15 accions", permeses.size === 15, permeses.size + ": " + [...permeses].join(" | "));
+    T("cap de les " + totes.length + " accions que escriu el codi queda fora del CHECK", fora.length === 0, "fora: " + fora.join(", "));
+  }
 }
 
 /* ══ Supabase simulat (taules + RLS bàsica + triggers + rpc) ══ */
 const DB = {
   users: {}, groups: [], profiles: [], families: [], children: [],
   weekly_marks: [], assignments: [], notifications: [], notification_reads: [],
-  activity_log: [], join_requests: [], _canals: []
+  activity_log: [], join_requests: [], _canals: [],
+  app_config: { codi_creacio_grup: "CODI-TEST" }   // v4.1: viu a Supabase, mai a index.html
 };
 let currentUserId = null;
 const authCbs = [];
@@ -211,6 +292,9 @@ function qb(t){
 function rpc(nom, p){
   p = p || {};
   if (nom === "create_group"){
+    // v4.1: sense el codi de creació correcte no es crea res
+    if (String(p.p_codi || "").trim().toUpperCase() !== String(DB.app_config.codi_creacio_grup || "").trim().toUpperCase())
+      return err("Codi de creació incorrecte");
     const gid = randomUUID();
     const codi = randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
     DB.groups.push({ id: gid, name: p.p_name, invite_code: codi, status: "actiu", notice: "", created_by: currentUserId, created_at: new Date().toISOString() });
@@ -221,6 +305,17 @@ function rpc(nom, p){
     if (pr){ pr.family_id = fid; pr.requested_group = gid; pr.status = "aprovat"; }
     logBD(gid, "alta família", fid, "Grup " + p.p_name + " creat");
     return dades(gid);
+  }
+  if (nom === "codi_creacio_grup"){
+    if (!socAdmin()) return err("Només l'administrador pot veure el codi de creació");
+    return dades(DB.app_config.codi_creacio_grup);
+  }
+  if (nom === "set_codi_creacio_grup"){
+    if (!socAdmin()) return err("Només l'administrador pot canviar el codi de creació");
+    const v = String(p.p_codi || "").trim();
+    if (v.length < 4) return err("El codi de creació ha de tenir com a mínim 4 caràcters");
+    DB.app_config.codi_creacio_grup = v;
+    return dades(null);
   }
   if (nom === "grup_per_codi"){
     const g = DB.groups.filter(x => x.invite_code === String(p.p_code || "").trim().toUpperCase() && x.status === "actiu").map(x => ({ id: x.id, name: x.name }));
@@ -446,6 +541,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   console.log("2 · CREAR EL GRUP (admin)");
   d.querySelector("#gg-nom").value = "EA 25/26";
   ompleFamForm("Vila", "Prat", "Marta", ["Jan", "Mia"]);
+  // v4.1: cal el codi de creació de grup
+  T("el formulari demana el codi de creació i diu a qui demanar-lo",
+    !!d.querySelector("#gg-codicreacio") && pant().includes("victorvqg@gmail.com"));
+  d.querySelector("#gg-codicreacio").value = "AIXO-NO-VA";
+  await w.creaGrup(); await tic(20);
+  T("amb un codi de creació dolent NO es crea cap grup", DB.groups.length === 0 && d.querySelector("#avis").textContent.includes("Codi de creació incorrecte"));
+  d.querySelector("#gg-codicreacio").value = "codi-test";   // sense distingir majúscules
   await w.creaGrup(); await tic(30);
   T("el grup es crea amb codi d'invitació", DB.groups.length === 1 && /^[A-Z0-9]{6}$/.test(DB.groups[0].invite_code));
   T("la família admin es crea amb els fills", famDB("Vila Prat") && famDB("Vila Prat").role === "admin" && DB.children.filter(c => c.family_id === famDB("Vila Prat").id).map(c => c.name).join(",") === "Jan,Mia");
@@ -928,7 +1030,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const pendN = w.celesPendents(famDoc("Família Nova"));
   T("4t ESO: les tardes de dimecres i divendres NO són pendents", !pendN.some(x => /Dimecres (15|17)|Divendres (15|17)/.test(x)), pendN.join(" | "));
   T("però el migdia de dimecres SÍ que cal respondre'l", pendN.some(x => x.includes("Dimecres 13.00")), pendN.join(" | "));
-  T("i la tarda de dilluns també", pendN.some(x => x.includes("Dilluns 15.00")), pendN.join(" | "));
+  T("i la tarda de dilluns també", pendN.some(x => x.includes("Dilluns 14.35")), pendN.join(" | "));
   T("si el nen fos de 1r, dimecres a la tarda SÍ que caldria", (function(){ w.triaCursNen(polId, "1r ESO"); const p2 = w.celesPendents(famDoc("Família Nova")); w.triaCursNen(polId, "4t ESO"); return p2.some(x => x.includes("Dimecres 15.00")); })());
   await w.desa(); await tic(30);
   w.triaFam(famDB("Vila Puig").id); await tic(20);
@@ -1002,8 +1104,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("10i · NOVETATS v3.8 (horari per curs a cada nen, un sol desar, vinculació robusta)");
   // ── A · horari: el text d'ajuda i la família tota de 3r/4t ──
-  T("el text d'ajuda ja NO diu «sempre a les 9.00»", !html.includes("sempre a les 9.00"));
-  T("…i diu que 3r i 4t entren sempre a les 8.00", html.includes("entren sempre a les 8.00"));
+  T("el text d'ajuda ja NO diu «sempre a les 8.35»", !html.includes("sempre a les 8.35"));
+  T("…i diu que 3r i 4t entren sempre a l'hora matinera", html.includes("3r i 4t: entren sempre a les \" + horaDe(\"e8\")"));
   const f34 = { nens: [{ id: "a", nom: "Ona", curs: "4t ESO", marca: {} }], cotxe: {}, propi: {}, curs: "" };
   ["dl", "dt", "dc", "dj", "dv"].forEach(dd => { w.commuta(f34.propi, "e8", dd); w.commuta(f34.propi, "r13", dd); });
   ["dl", "dt", "dj"].forEach(dd => { w.commuta(f34.propi, "e15", dd); w.commuta(f34.propi, "r17", dd); });

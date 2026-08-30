@@ -354,7 +354,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.0</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.1</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -378,20 +378,21 @@ const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
 const DIES_NOM = {dl:"Dilluns",dt:"Dimarts",dc:"Dimecres",dj:"Dijous",dv:"Divendres"};
 /* ── Lògica per curs (horari DEFINITIU de l'escola) ──────────────────
-   1r/2n ESO → 8.00 dimarts i dimecres; 9.00 dilluns, dijous i divendres.
-   3r/4t ESO → 8.00 TOTS els dies; dimecres i divendres no hi ha tarda.
-   Cap curs tria entre 8.00 i 9.00: l'hora d'entrada la fixa el curs. */
-const CURS12_E8 = { "1r ESO": ["dt", "dc"], "2n ESO": ["dt", "dc"] };           // 1r/2n comencen a les 8.00 dimarts i dimecres
+   1r/2n ESO → 7.35 dimarts i dimecres; 8.35 dilluns, dijous i divendres.
+   3r/4t ESO → 7.35 TOTS els dies; dimecres i divendres no hi ha tarda.
+   Cap curs tria entre les dues entrades: l'hora la fixa el curs.
+   ATENCIÓ: les claus e8/e9/e15 són històriques i NO es toquen (hi ha les dades
+   desades a Supabase); les hores que es mostren viuen a FRANGES[].hora. */
+const CURS12_E8 = { "1r ESO": ["dt", "dc"], "2n ESO": ["dt", "dc"] };           // 1r/2n fan l'entrada matinera dimarts i dimecres
 const CURS34_SENSE_TARDA = { "3r ESO": ["dc", "dv"], "4t ESO": ["dc", "dv"] };  // 3r/4t no tenen escola les tardes de dimecres i divendres
 function cursosDe(f){
-  const s = new Set((f.nens || []).map(n => n.curs).filter(Boolean));
-  if (!s.size && f.curs) s.add(f.curs);
-  return s;
+  // Només el curs de cada fill: families.curs ja no es fa servir enlloc.
+  return new Set((f.nens || []).map(n => n.curs).filter(Boolean));
 }
 function horaEntradaCurs(c, dia){
   // l'entrada que fixa el curs per a aquell dia (null = sense curs: qualsevol)
   if (c === "1r ESO" || c === "2n ESO") return (CURS12_E8[c] || []).includes(dia) ? "e8" : "e9";
-  if (c === "3r ESO" || c === "4t ESO") return "e8";   // 3r/4t entren SEMPRE a les 8.00
+  if (c === "3r ESO" || c === "4t ESO") return "e8";   // 3r/4t fan SEMPRE l'entrada matinera
   return null;
 }
 function nenTeCasella(n, slot, dia){
@@ -409,10 +410,8 @@ function nensDeCasella(f, slot, dia){ return (f.nens || []).filter(n => nenTeCas
    La casella només queda en blanc si CAP nen amb curs no la té;
    sense curs a cap nen, tot és "normal" (i el Perfil surt incomplet). */
 function estatCasella(f, slot, dia){
-  const cs = cursosDe(f);
-  if (!cs.size) return "normal";
-  const ambCurs = (f.nens || []).filter(n => (n.curs || "").trim());
-  const nens = ambCurs.length ? ambCurs : [...cs].map(c => ({ curs: c }));   // famílies velles amb el curs només a la família
+  const nens = (f.nens || []).filter(n => (n.curs || "").trim());
+  if (!nens.length) return "normal";   // cap nen amb curs: tot obert (i el Perfil surt incomplet)
   if (nens.some(n => nenTeCasella(n, slot, dia))) return "normal";
   return (slot === "e8" || slot === "e9") ? "blanc-entrada" : "blanc-tarda";
 }
@@ -422,18 +421,22 @@ function infoCursos(f){
     return "<div class='g-estat' style='background:#FDF6E3;color:#8a5a12'>\u26a0 Posa el curs de cada nen al Perfil: sense curs, totes les caselles es demanen.</div>";
   const arr = [...cs];
   const bits = [];
-  if (arr.some(c => c === "1r ESO" || c === "2n ESO")) bits.push("1r i 2n: entren a les 8.00 dimarts i dimecres, i a les 9.00 la resta de dies");
-  if (arr.some(c => c === "3r ESO" || c === "4t ESO")) bits.push("3r i 4t: entren sempre a les 8.00. Dimecres i divendres no hi ha tarda");
+  if (arr.some(c => c === "1r ESO" || c === "2n ESO")) bits.push("1r i 2n: entren a les " + horaDe("e8") + " dimarts i dimecres, i a les " + horaDe("e9") + " la resta de dies");
+  if (arr.some(c => c === "3r ESO" || c === "4t ESO")) bits.push("3r i 4t: entren sempre a les " + horaDe("e8") + ". Dimecres i divendres no hi ha tarda");
   return bits.length ? "<div class='g-estat' style='background:#F4F8FA;color:#5A6B7A'>" + bits.map(b => "\u2139\ufe0f " + esc(b) + ".").join("<br>") + "</div>" : "";
 }
 
 const FRANGES = [
-  {id:"e8", hora:"8.00", tipus:"Entrada"},
-  {id:"e9", hora:"9.00", tipus:"Entrada"},
+  {id:"e8", hora:"7.35", tipus:"Entrada"},
+  {id:"e9", hora:"8.35", tipus:"Entrada"},
   {id:"r13",hora:"13.00",tipus:"Recollida"},
-  {id:"e15",hora:"15.00",tipus:"Entrada"},
+  {id:"e15",hora:"14.35",tipus:"Entrada"},
   {id:"r17",hora:"17.00",tipus:"Recollida"}
 ];
+/* ÚNIC lloc on viuen les hores que es mostren: FRANGES[].hora. Les claus internes
+   (e8, e9, e15, r13, r17) NO canvien mai — hi van lligades totes les marques i
+   assignacions desades a Supabase. Per canviar una hora, toca només FRANGES. */
+function horaDe(id){ const f = FRANGES.find(x => x.id === id); return f ? f.hora : id; }
 
 /* ── Estat ── */
 let sb = null;                 // client Supabase
@@ -550,7 +553,7 @@ async function sbDesaFamilia(f){
   let r = await sb.from("families").update({
     name: f.nom, cognom1: f.cognomPare || "", cognom2: f.cognomMare || "",
     driver: f.conductor || "", seats: Math.min(6, Math.max(0, f.places || 0)),
-    phone: f.phone || "", phone_visible: f.phoneVisible !== false, curs: f.curs || ""
+    phone: f.phone || "", phone_visible: f.phoneVisible !== false
   }).eq("id", f.id);
   if (r.error) throw r.error;
   // 2 · fills: diff per conservar els ids (les assignacions els referencien)
@@ -691,11 +694,11 @@ function celesPendents(f){
     const e8n = estatCasella(f, "e8", d) === "normal", e9n = estatCasella(f, "e9", d) === "normal";
     if (!teCursos){
       // sense cap curs: les dues entrades són una sola resposta (fins que el Perfil no és complet)
-      if (e8n && e9n && !respon(f, "e8", d) && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada (8.00 o 9.00)");
+      if (e8n && e9n && !respon(f, "e8", d) && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada (" + horaDe("e8") + " o " + horaDe("e9") + ")");
     } else {
       // amb cursos, l'hora d'entrada la fixa el curs: cada entrada oberta és d'uns nens concrets i cal respondre-la
-      if (e8n && !respon(f, "e8", d)) p.push(DIES_NOM[d] + " entrada 8.00");
-      if (e9n && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada 9.00");
+      if (e8n && !respon(f, "e8", d)) p.push(DIES_NOM[d] + " entrada " + horaDe("e8"));
+      if (e9n && !respon(f, "e9", d)) p.push(DIES_NOM[d] + " entrada " + horaDe("e9"));
     }
     ["r13", "e15", "r17"].forEach(s => {
       if (estatCasella(f, s, d) !== "normal") return;   // les caselles en blanc no compten mai
@@ -885,13 +888,13 @@ async function desa(){
   if (fg){
     const dobles = doblesDe(fg);
     if (dobles.length){
-      barraAvis("\u26a0 <b>No es pot desar</b>: cada nen entra a les 8.00 <b>o</b> a les 9.00, no a totes dues. Ho tenen doblat: " + esc(dobles.join(", ")) + ". Toca la marca que sobri per treure-la.");
+      barraAvis("\u26a0 <b>No es pot desar</b>: cada nen entra a les " + horaDe("e8") + " <b>o</b> a les " + horaDe("e9") + ", no a totes dues. Ho tenen doblat: " + esc(dobles.join(", ")) + ". Toca la marca que sobri per treure-la.");
       if (tabAct !== "graella") triaTab("graella");
       return;
     }
     const pend = celesPendents(fg);
     if (pend.length){
-      barraAvis("\u26a0 <b>No es pot desar encara</b>: falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab; de les entrades 8.00/9.00 nom\u00e9s en cal una per nen). Primera: " + esc(pend[0]) + ". L'av\u00eds s'apagar\u00e0 sol quan la setmana sigui completa.");
+      barraAvis("\u26a0 <b>No es pot desar encara</b>: falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab; de les entrades " + horaDe("e8") + "/" + horaDe("e9") + " nom\u00e9s en cal una per nen). Primera: " + esc(pend[0]) + ". L'av\u00eds s'apagar\u00e0 sol quan la setmana sigui completa.");
       if (tabAct !== "graella") triaTab("graella");
       return;
     }
@@ -1064,7 +1067,10 @@ function pantallaGrup(){
     "<div class='targeta'><h2>Uneix-te amb un codi d'acc\u00e9s</h2>" +
     "<p class='lead'>Tens el codi del <b>GRUP</b> (6 car\u00e0cters, te'l dona l'administrador) o el codi de la vostra <b>FAM\u00cdLIA</b> (8 car\u00e0cters, el veu qui ja hi \u00e9s al seu Perfil)? Escriu-ne un.</p>" +
     "<div class='apila'><input class='input' id='gg-codi' placeholder='Codi d&#39;acc\u00e9s (6 o 8 car\u00e0cters)' maxlength='8' style='text-transform:uppercase' onkeydown=\"if(event.key==='Enter')buscaGrup()\">" +
-    "<button class='boto' onclick='buscaGrup()'>Continua</button></div></div>" +
+    "<button class='boto' onclick='buscaGrup()'>Continua</button></div>" +
+    "<p class='hint' style='margin:8px 2px 0'>No tens el codi? Demana'l a l'administrador del grup.</p></div>" +
+    "<div class='targeta' style='text-align:center'><button class='boto sec' onclick='tancaSessio()'>\u2190 Enrere \u00b7 tanca la sessi\u00f3</button>" +
+    "<p class='hint' style='margin:8px 2px 0'>Has entrat com a <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b>.</p></div>" +
     "<details class='conf'><summary>➕ No tinc codi: vull crear un grup nou (seré l'administrador)</summary>" +
     "<div class='targeta' style='margin-top:8px'><h2>Crea el grup</h2>" +
     "<div class='p-fila'><span class='p-lab'>Nom del grup<span class='p-sub'>ex: EA 26/27 (Escola Anoia, curs 2026/27)</span></span></div>" +
@@ -1073,12 +1079,14 @@ function pantallaGrup(){
     "<div class='fila' style='align-items:flex-start'><input class='input' id='nf-cpare' placeholder='1r cognom' maxlength='20'><input class='input' id='nf-cmare' placeholder='2n cognom (opcional)' maxlength='20'></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment</span></div>" +
     "<input class='input' id='nf-cond' placeholder='ex: Marta' maxlength='20'>" +
-    "<div class='fila' style='margin-top:6px;align-items:flex-start'><div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Tel\u00e8fon m\u00f2bil</span></div><input class='input' id='nf-tel' type='tel' placeholder='ex: 600 123 456' maxlength='15'></div>" +
-    "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' id='nf-curs'><option value=''>\u2014</option>" + CURSOS.map(c => "<option>" + c + "</option>").join("") + "</select></div></div>" +
+    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Tel\u00e8fon m\u00f2bil</span></div>" +
+    "<input class='input' id='nf-tel' type='tel' placeholder='ex: 600 123 456' maxlength='15'>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>nom i curs de cada nen</span></span></div>" +
     "<div id='nf-nens'></div>" +
+    "<div class='p-fila' style='margin-top:10px'><span class='p-lab'>Codi de creaci\u00f3 de grup<span class='p-sub'>Per crear un grup nou, demana el codi de creaci\u00f3 a l'administrador: V\u00edctor Quintana Andrev\u00ed (victorvqg@gmail.com)</span></span></div>" +
+    "<input class='input' id='gg-codicreacio' placeholder='Codi de creaci\u00f3' maxlength='40' style='text-transform:uppercase'>" +
     "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
     "<button class='boto' style='margin-left:auto' onclick='creaGrup()'>Crea el grup</button></div></div></details>";
   nfNens = [{ nom: "", curs: "" }]; nfPl = 3; pintaNfNens();
@@ -1110,9 +1118,12 @@ async function vinculaPerCodiFamilia(codi){
 async function creaGrup(){
   const nomG = $("#gg-nom") ? $("#gg-nom").value.trim() : "";
   if (!nomG){ avis("Posa-li un nom al grup (ex: EA 26/27)."); return; }
+  const codiC = $("#gg-codicreacio") ? $("#gg-codicreacio").value.trim() : "";
+  if (!codiC){ avis("Falta el <b>codi de creaci\u00f3 de grup</b>. Demana'l a l'administrador: V\u00edctor Quintana Andrev\u00ed (victorvqg@gmail.com)."); return; }
   const dades = llegeixFormFam(); if (!dades) return;
   avis(""); estat("Creant el grup…");
-  const r = await sb.rpc("create_group", { p_name: nomG, p_cognom1: dades.cpare, p_cognom2: dades.cmare, p_driver: dades.cond, p_seats: dades.places });
+  // el codi NO és a l'app: el comprova create_group() contra app_config (SQL v41)
+  const r = await sb.rpc("create_group", { p_name: nomG, p_cognom1: dades.cpare, p_cognom2: dades.cmare, p_driver: dades.cond, p_seats: dades.places, p_codi: codiC });
   if (r.error){ estat("Error", true); avis("No s'ha pogut crear el grup: " + esc(msgNeta(r.error))); return; }
   const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
   if (pr.data && pr.data[0]) perfil = pr.data[0];
@@ -1127,16 +1138,16 @@ function llegeixFormFam(){
   const nom = (cpare + " " + cmare).trim();
   const cond = $("#nf-cond") ? $("#nf-cond").value.trim() : "";
   const tel = $("#nf-tel") ? $("#nf-tel").value.trim() : "";
-  const curs = $("#nf-curs") ? $("#nf-curs").value : "";
-  const nens = nfNens.map(x => ({ nom: (x.nom || "").trim(), curs: x.curs || curs })).filter(x => x.nom);
+  const nens = nfNens.map(x => ({ nom: (x.nom || "").trim(), curs: x.curs || "" })).filter(x => x.nom);
   if (!cpare){ avis("Posa el primer cognom de la família."); return null; }
   if (!nens.length){ avis("Afegeix com a mínim un nen."); return null; }
-  return { cpare: cpare, cmare: cmare, nom: nom, cond: cond, places: nfPl, nens: nens, tel: tel, curs: curs };
+  return { cpare: cpare, cmare: cmare, nom: nom, cond: cond, places: nfPl, nens: nens, tel: tel };
 }
 async function desaTelCurs(famIdDest, dades){
-  // Telèfon i curs viatgen fora de les RPC: update normal (RLS: la pròpia família / admin)
-  if (!famIdDest || (!dades.tel && !dades.curs)) return;
-  try { await sb.from("families").update({ phone: dades.tel || "", curs: dades.curs || "" }).eq("id", famIdDest); } catch(e){}
+  // El telèfon viatja fora de les RPC: update normal (RLS: la pròpia família / admin).
+  // El curs ja NO: és de cada nen i va dins de children.
+  if (!famIdDest || !dades.tel) return;
+  try { await sb.from("families").update({ phone: dades.tel || "" }).eq("id", famIdDest); } catch(e){}
 }
 
 /* ── Pantalla: tria o crea la família ── */
@@ -1178,15 +1189,17 @@ async function pantallaTria(){
     "<div class='fila' style='align-items:flex-start'><input class='input' id='nf-cpare' placeholder='1r cognom' maxlength='20'><input class='input' id='nf-cmare' placeholder='2n cognom (opcional)' maxlength='20'></div>" +
     "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Qui condueix normalment<span class='p-sub'>opcional — el nom del pare o mare al volant</span></span></div>" +
     "<input class='input' id='nf-cond' placeholder='ex: Marta' maxlength='20'>" +
-    "<div class='fila' style='margin-top:6px;align-items:flex-start'><div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Tel\u00e8fon m\u00f2bil</span></div><input class='input' id='nf-tel' type='tel' placeholder='ex: 600 123 456' maxlength='15'></div>" +
-    "<div style='flex:1;min-width:0'><div class='p-fila'><span class='p-lab'>Curs dels nens</span></div><select class='input' id='nf-curs'><option value=''>\u2014</option>" + CURSOS.map(c => "<option>" + c + "</option>").join("") + "</select></div></div>" +
+    "<div class='p-fila' style='margin-top:6px'><span class='p-lab'>Tel\u00e8fon m\u00f2bil</span></div>" +
+    "<input class='input' id='nf-tel' type='tel' placeholder='ex: 600 123 456' maxlength='15'>" +
     "<div class='p-fila'><span class='p-lab'>Places lliures al cotxe<span class='p-sub'>NOMÉS per a nens d'altres famílies — els vostres no hi compten</span></span>" +
     "<span class='stepper'><button onclick='nfPlaces(-1)'>−</button><span class='num' id='nf-pl'>3</span><button onclick='nfPlaces(1)'>+</button></span></div>" +
     "<div class='p-fila'><span class='p-lab'>Els vostres nens<span class='p-sub'>nom i curs de cada nen</span></span></div>" +
     "<div id='nf-nens'></div>" +
     "<div class='fila' style='margin-top:8px'><button class='boto sec' onclick='nfAfegeixNen()'>+ Afegeix un nen</button>" +
     "<button class='boto' style='margin-left:auto' onclick='creaFam()'>Crea i entra</button></div></div>" + (esAdmin ? "</details>" : (socMembre ? "" : "</div>")) +
-    "<p style='text-align:center;margin-top:2px'><button class='enllac' onclick='obreAdmin()'>🛡️ Zona d'administració</button></p>";
+    "<p style='text-align:center;margin-top:2px'><button class='enllac' onclick='obreAdmin()'>🛡️ Zona d'administració</button></p>" +
+    (socMembre ? "" : "<div class='targeta' style='text-align:center'><button class='boto sec' onclick='tancaSessio()'>\u2190 Enrere \u00b7 tanca la sessi\u00f3</button>" +
+      "<p class='hint' style='margin:8px 2px 0'>No trobes la teva fam\u00edlia? Demana-ho a l'administrador del grup.</p></div>");
   nfNens = [{ nom: "", curs: "" }]; nfPl = 3; pintaNfNens();
 }
 let nfNens = [{ nom: "", curs: "" }], nfPl = 3;
@@ -1218,7 +1231,7 @@ async function creaFam(){
     const ins = await sb.from("families").insert({
       group_id: grupActiu.id, cognom1: dades.cpare, cognom2: dades.cmare,
       name: dades.nom, driver: dades.cond, seats: dades.places, role: "usuari",
-      phone: dades.tel || "", curs: dades.curs || ""
+      phone: dades.tel || ""
     }).select("id");
     if (ins.error){ estat("Error", true); avis("No s'ha pogut crear la família: " + esc(msgNeta(ins.error))); return; }
     const nouId = ins.data[0].id;
@@ -1256,7 +1269,7 @@ function selFamCanvia(){
       "<div class='nomgran' style='font-size:19px;margin:2px 0 6px'>" + esc(f.name) + "</div>" +
       "<div class='f-linia'>🧒 Nens: " + esc(f.nens || "—") + "</div>" +
       (f.driver ? "<div class='f-linia'>🚗 Condueix: " + esc(f.driver) + "</div>" : "") +
-      (f.curs ? "<div class='f-linia'>🎓 Curs: " + esc(f.curs) + "</div>" : "") +
+
       (f.seats != null ? "<div class='f-linia'>🪑 Places lliures: " + f.seats + "</div>" : "") +
       "</div>" : "";
     if (bloc) bloc.style.display = "";
@@ -1447,7 +1460,7 @@ function pintaFamilies(){
       "<details class='conf fam-det'><summary>Detalls</summary>" +
       "<div style='padding:2px 2px 8px'>" +
       "<div class='f-linia'>🧒 Nens:<br>" + nensDet + "</div>" +
-      (x.curs ? "<div class='f-linia'>🎓 Curs de la família: " + esc(x.curs) + "</div>" : "") +
+
       (x.conductor ? "<div class='f-linia'>🚗 Condueix: " + esc(x.conductor) + "</div>" : "") +
       "<div class='f-linia'>🪑 Places lliures al cotxe: <b>" + x.places + "</b></div>" +
       (potEditar ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"adminEdita('" + x.id + "')\">edita</button></div>" : "") +
@@ -1550,7 +1563,7 @@ function pintaGraellaTab(){
   const f = lameva();
   const estatG = "<div id='g-estat-box'>" + estatGHtml(f) + "</div>";
   $("#tab-cos").innerHTML =
-    "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. L'hora d'entrada de cada dia la fixa el curs del nen.<br><span class='hint'>\ud83c\udf93 1r i 2n: entren a les 8.00 dimarts i dimecres, i a les 9.00 la resta de dies \u00b7 3r i 4t: entren sempre a les 8.00, i dimecres i divendres no hi ha tarda. Les caselles en blanc no cal respondre-les.</span></p>" +
+    "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. L'hora d'entrada de cada dia la fixa el curs del nen.<br><span class='hint'>\ud83c\udf93 1r i 2n: entren a les " + horaDe("e8") + " dimarts i dimecres, i a les " + horaDe("e9") + " la resta de dies \u00b7 3r i 4t: entren sempre a les " + horaDe("e8") + ", i dimecres i divendres no hi ha tarda. Les caselles en blanc no cal respondre-les.</span></p>" +
     estatG +
     "<div class='graella' id='graella'></div>" +
     "<div id='g-accions'></div>";
@@ -1607,8 +1620,8 @@ function obreCasella(slot, dia){
     if (ec === "blanc-entrada"){
       const cs34 = [...cursosDe(f)].every(c => c === "3r ESO" || c === "4t ESO");
       avis(slot === "e9"
-        ? (cs34 ? "Els de 3r i 4t entren sempre a les 8.00." : "Aquest dia tots els nens entren a les 8.00.")
-        : "Els de 1r i 2n entren a les 8.00 nom\u00e9s dimarts i dimecres; aquest dia s'entra a les 9.00.");
+        ? (cs34 ? "Els de 3r i 4t entren sempre a les " + horaDe("e8") + "." : "Aquest dia tots els nens entren a les " + horaDe("e8") + ".")
+        : "Els de 1r i 2n entren a les " + horaDe("e8") + " nom\u00e9s dimarts i dimecres; aquest dia s'entra a les " + horaDe("e9") + ".");
       return;
     }
     if (ec === "blanc-tarda"){ avis("Els de 3r i 4t no tenen escola " + DIES_NOM[dia].toLowerCase() + " a la tarda: aquesta casella queda en blanc."); return; }
@@ -1694,7 +1707,7 @@ function netejaGermana(f, slot, dia){
   treu(f.propi, g, dia);
   f.nens.forEach(n => treu(n.marca, g, dia));
   if (portats.length){
-    barraAvis("\u2139\ufe0f L'entrada ha passat a les " + (slot === "e8" ? "8.00" : "9.00") + " i el cotxe de les " + (g === "e8" ? "8.00" : "9.00") + " s'ha tret: <b>" + esc(portats.join(" i ")) + "</b> es queden sense pla\u00e7a. Les seves fam\u00edlies ho veuran als Avisos quan desis.", "info");
+    barraAvis("\u2139\ufe0f L'entrada ha passat a les " + horaDe(slot) + " i el cotxe de les " + horaDe(g) + " s'ha tret: <b>" + esc(portats.join(" i ")) + "</b> es queden sense pla\u00e7a. Les seves fam\u00edlies ho veuran als Avisos quan desis.", "info");
   }
 }
 function pintaGraella(){
@@ -1786,7 +1799,7 @@ function tancaAdmin(){ if (famId && lameva()) pantallaApp(); else pantallaTria()
 function pantallaAdmin(){
   document.body.classList.add("dins");
   setTimeout(pintaPeuStats, 0);
-  if (esAdmin) setTimeout(carregaCodis, 0);
+  if (esAdmin){ setTimeout(carregaCodis, 0); setTimeout(carregaCodiCreacio, 0); }
   let cos;
   if (esAdmin){
     cos = "<p class='lead'>\ud83d\udee1\ufe0f Ets l'administrador del grup <b>" + esc(doc.grupNom || "") + "</b>. El teu rol ve de la base de dades: ja no hi ha codis secrets que activar.</p>" +
@@ -1794,6 +1807,8 @@ function pantallaAdmin(){
       "<div class='fila' style='align-items:center;gap:8px'><div class='nomgran' style='letter-spacing:.14em;flex:1;text-align:center'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</div><button class='boto sec' onclick='copiaTextCodiGrup(this)'>copia</button></div>" +
       "<div id='codis-box'><p class='hint'>Carregant\u2026</p></div>" +
       "<p class='hint'>Rols: a la pestanya \u00abFam\u00edlies\u00bb tens \u00abedita\u00bb a cada fam\u00edlia, i a \u00abRols\u00bb (men\u00fa \u2630) alternes usuari \u2194 staff.</p>" +
+      "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de creaci\u00f3 de grup<span class='p-sub'>cal per crear un grup NOU. No \u00e9s dins l'app: viu a Supabase i nom\u00e9s el veus tu</span></span></div>" +
+      "<div id='codicreacio-box'><p class='hint'>Carregant\u2026</p></div>" +
       "<div class='p-fila' style='margin-top:8px'><span class='p-lab'>Importa les dades antigues<span class='p-sub'>enganxa el contingut del vell <b>dades.json</b> (del repo privat de GitHub) per passar les fam\u00edlies, els nens, les marques i les assignacions a Supabase. Les fam\u00edlies que ja existeixin pel mateix nom es respecten.</span></span></div>" +
       "<textarea class='input' id='imp-json' rows='5' placeholder='{\"families\":[…]}' style='font-family:monospace;font-size:13px'></textarea>" +
       "<div class='fila' style='margin-top:8px'><button class='boto' onclick='importaDades()'>Importa les dades</button></div>" +
@@ -1823,6 +1838,29 @@ function fallbackCopia(t, ok){
   ta.remove(); ok();
 }
 function copiaTextCodiGrup(btn){ copiaText(grupActiu ? grupActiu.invite_code : "", btn); }
+async function carregaCodiCreacio(){
+  const box = $("#codicreacio-box"); if (!box || !esAdmin) return;
+  const r = await sb.rpc("codi_creacio_grup");
+  if (r.error){
+    box.innerHTML = "<p class='hint'>No s'ha pogut llegir: " + esc(msgNeta(r.error)) + "<br>Si diu que la funci\u00f3 no existeix, encara no has executat el <b>supabase-v41.sql</b>.</p>";
+    return;
+  }
+  box.innerHTML =
+    "<div class='fila' style='align-items:center;gap:8px'><input class='input' id='cc-codi' value=\"" + esc(String(r.data || "")) + "\" maxlength='40' style='text-transform:uppercase'>" +
+    "<button class='boto' onclick='desaCodiCreacio()'>Desa</button></div>" +
+    "<p class='hint' style='margin-top:4px'>M\u00ednim 4 car\u00e0cters. Qui el tingui podr\u00e0 crear un grup nou i ser-ne l'administrador.</p>";
+}
+async function desaCodiCreacio(){
+  if (!esAdmin) return;
+  const v = $("#cc-codi") ? $("#cc-codi").value.trim() : "";
+  if (v.length < 4){ avis("El codi de creaci\u00f3 ha de tenir com a m\u00ednim 4 car\u00e0cters."); return; }
+  estat("Desant\u2026");
+  const r = await sb.rpc("set_codi_creacio_grup", { p_codi: v });
+  if (r.error){ estat("Error", true); avis("No s'ha pogut desar: " + esc(msgNeta(r.error))); return; }
+  estat("Desat \u2713", "ok");
+  avis("\u2713 Codi de creaci\u00f3 actualitzat.", true);
+  carregaCodiCreacio();
+}
 async function carregaCodis(){
   const box = $("#codis-box"); if (!box || !esAdmin) return;
   const r = await sb.rpc("codis_families");
@@ -1885,7 +1923,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.0", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.1", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2045,11 +2083,6 @@ function renomTel(v){
   const f = lameva(); if (!f) return;
   if (nomesTitular()) return;
   f.phone = v.trim(); dirty = true; pintaBarra();
-}
-function triaCurs(v){
-  const f = lameva(); if (!f) return;
-  if (nomesTitular()) return;
-  f.curs = v; dirty = true; pintaBarra();
 }
 function triaCursNen(id, v){
   const f = lameva(); if (!f) return;
@@ -2319,7 +2352,7 @@ function pintaCotxe(){
             const ff = doc.families.find(x => x.id === n.famId);
             const nn = ff ? (ff.nens || []).find(x => x.id === n.nenId) : null;
             const extra = (ff ? esc(ff.nom) : "") +
-              (nn && nn.curs ? " · " + esc(nn.curs) : ff && ff.curs ? " · " + esc(ff.curs) : "") +
+              (nn && nn.curs ? " · " + esc(nn.curs) : "") +
               (ff && ff.phone && ff.phoneVisible ? " · 📞 " + esc(ff.phone) : "");
             return "<label class='a-fila'><input type='checkbox' " + (meu ? "checked " : "") +
               "onchange=\"assigna('" + fr.id + "','" + d + "','" + n.famId + "','" + n.nenId + "', this.checked)\"> " +
