@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.2", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.2"));
+  T("lema i peu amb versió 4.3", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.3"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1053,7 +1053,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     T("canviar el curs d'un fill amb marques SÍ avisa", cos().includes("Has canviat el curs"));
     T("…i ofereix esborrar només les d'AQUELL fill",
       cos().includes("esborraGraellaNen('" + gran.id + "')") && cos().includes("Esborra la graella de"));
-    T("…i mai la graella de tota la família", !cos().includes("onclick='esborraGraella()'"));
+    T("…i l'avís de conflicte no ofereix mai esborrar la de tota la família",
+      !(d.querySelector("#g-estat-box") || { innerHTML: "" }).innerHTML.includes("esborraGraella()"));
     await surtIentra("admin@test.cat", "admin123");   // res d'això no s'ha desat: torna a l'estat de la BD
   }
   // Família de 4t ESO sense cap marca: la llista de pendents n'és la prova neta
@@ -1086,6 +1087,26 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("dimecres al migdia sí que s'obre", d.querySelector("#cel-menu").classList.contains("obert"));
   w.tancaCasella();
   T("la graella informa de les exempcions del curs", cos().includes("no cal respondre-les"));
+  // ── v4.3 · una graella per fill ──
+  {
+    const fam = famDoc("Vila Puig");
+    const gr = cos();
+    T("hi ha un bloc de graella per cada fill", (gr.match(/class='gr-bloc'/g) || []).length === fam.nens.length);
+    T("cada bloc porta el nom del fill i el seu curs",
+      fam.nens.every(n => gr.includes(n.nom) && (!n.curs || gr.includes(n.curs))));
+    T("cada bloc té el seu «Esborra la graella de [nom]»",
+      fam.nens.every(n => gr.includes("esborraGraellaNen('" + n.id + "')")));
+    T("les caselles porten l'id del fill (el 🙋 és seu, no de tota la família)",
+      fam.nens.every(n => gr.includes("','" + n.id + "')")));
+    T("l'avís de pendents diu de quin fill és",
+      !gr.includes("Falta respondre de") || /Falta respondre de <b>/.test(gr));
+    // el menú d'un bloc només toca aquell fill
+    const n0 = fam.nens[0];
+    w.obreCasella("r13", "dl", n0.id); await tic();
+    T("el menú obert des d'un bloc és d'aquell fill",
+      w.nensDelMenu(famDoc("Vila Puig"), "r13", "dl").length === 1);
+    w.tancaCasella(); await tic();
+  }
   w.triaTab("perfil"); await tic();
   w.triaCursNen(idJan(), "1r ESO"); await tic();
   w.triaTab("graella"); await tic();

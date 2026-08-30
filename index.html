@@ -126,6 +126,12 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .fam-bt.wa{background:#DCF1E3;color:#1F5C3B;border-color:#9CCDAD}
 .fam-bt:active{transform:scale(.97)}
 .fam-sensetel{font-size:13px;color:#8A99A5;margin:6px 0 2px}
+.gr-bloc{background:#fff;border:1.5px solid #D6E0E7;border-radius:16px;padding:11px 11px 12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(23,69,107,.08)}
+.gr-cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.gr-nom{font:800 17px 'Baloo 2';color:#17456B}
+.gr-curs{font:700 12.5px 'Baloo 2';background:#E3ECF4;color:#17456B;border-radius:999px;padding:2px 9px}
+.gr-curs.sensecurs{background:#FCEBB8;color:#6E4E00}
+.gr-cap .mp{margin-left:auto}
 .rolet.prog{background:#17456B;color:#fff;border-radius:99px;padding:1px 8px;font-weight:700}
 .rolet{font-size:12.5px;color:#6B7D8A}
 .hamb{background:none;border:none;font-size:24px;color:#17456B;padding:2px 10px 2px 0;cursor:pointer}
@@ -354,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.2</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.3</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -708,6 +714,33 @@ function celesPendents(f){
   return p;
 }
 function graellaCompleta(f){ return celesPendents(f).length === 0; }
+/* El 🚗 i el 🚫 són de tota la família i valen per a tots els fills;
+   el 🙋 és de cada fill. Això és el que fa que la graella es pugui
+   partir per fill sense duplicar cap dada. */
+function responNen(f, n, slot, dia){
+  return te(f.cotxe, slot, dia) || te(f.propi, slot, dia) || te(n.marca, slot, dia);
+}
+/* Les caselles que li falten a UN fill. celesPendents(f) segueix sent la font
+   de veritat per desar i per desbloquejar els Calendaris; aquesta és per
+   mostrar de qui són. */
+function celesPendentsNen(f, n){
+  const p = [];
+  const teCurs = !!(n.curs || "").trim();
+  DIES.forEach(d => {
+    if (!teCurs){
+      if (!responNen(f, n, "e8", d) && !responNen(f, n, "e9", d))
+        p.push(DIES_NOM[d] + " entrada (" + horaDe("e8") + " o " + horaDe("e9") + ")");
+    } else {
+      ["e8", "e9"].forEach(s2 => {
+        if (nenTeCasella(n, s2, d) && !responNen(f, n, s2, d)) p.push(DIES_NOM[d] + " entrada " + horaDe(s2));
+      });
+    }
+    ["r13", "e15", "r17"].forEach(s2 => {
+      if (nenTeCasella(n, s2, d) && !responNen(f, n, s2, d)) p.push(DIES_NOM[d] + " " + horaDe(s2));
+    });
+  });
+  return p;
+}
 function potCal(){ const f = lameva(); return esAdmin || esStaff || esProgenitor || (f && perfilComplet(f) && graellaCompleta(f)); }
 /* Porta única de només lectura: el progenitor (2n compte de la família) no edita res.
    La BD ho torna a bloquejar amb can_touch_family()/es_titular() (SQL v39): això
@@ -1592,7 +1625,7 @@ function pintaGraellaTab(){
   $("#tab-cos").innerHTML =
     "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. L'hora d'entrada de cada dia la fixa el curs del nen.<br><span class='hint'>\ud83c\udf93 1r i 2n: entren a les " + horaDe("e8") + " dimarts i dimecres, i a les " + horaDe("e9") + " la resta de dies \u00b7 3r i 4t: entren sempre a les " + horaDe("e8") + ", i dimecres i divendres no hi ha tarda. Les caselles en blanc no cal respondre-les.</span></p>" +
     estatG +
-    "<div class='graella' id='graella'></div>" +
+    "<div id='graella-blocs'></div>" +
     "<div id='g-accions'></div>";
   pintaGraella();
   pintaGraellaAccions();
@@ -1639,10 +1672,21 @@ function pintaHorariComplet(){ if (tabAct === "perfil") pintaPerfil(); else pint
 function triaPinzell(p){ pinzell = p; pintaHorariComplet(); }
 
 let celObert = null;
-function obreCasella(slot, dia){
+/* nenId és OPCIONAL: si ve, el menú és d'aquell fill (graella per fill);
+   si no, és de tota la família (compatibilitat amb el codi i les proves velles). */
+function obreCasella(slot, dia, nenId){
   const f = lameva();
   if (nomesTitular()) return;
-  if (f){
+  const nSel = (f && nenId) ? (f.nens || []).find(x => x.id === nenId) : null;
+  if (nSel && !nenTeCasella(nSel, slot, dia)){
+    const nomC = esc(nSel.nom.trim().split(/\s+/)[0]);
+    const q = nSel.curs ? " (" + esc(nSel.curs) + ")" : "";
+    avis((slot === "e8" || slot === "e9")
+      ? nomC + " no entra a les " + horaDe(slot) + " " + DIES_NOM[dia].toLowerCase() + ": l'hora d'entrada la fixa el seu curs" + q + "."
+      : nomC + " no t\u00e9 escola " + DIES_NOM[dia].toLowerCase() + " a la tarda" + q + ".");
+    return;
+  }
+  if (f && !nSel){
     const ec = estatCasella(f, slot, dia);
     if (ec === "blanc-entrada"){
       const cs34 = [...cursosDe(f)].every(c => c === "3r ESO" || c === "4t ESO");
@@ -1653,7 +1697,16 @@ function obreCasella(slot, dia){
     }
     if (ec === "blanc-tarda"){ avis("Els de 3r i 4t no tenen escola " + DIES_NOM[dia].toLowerCase() + " a la tarda: aquesta casella queda en blanc."); return; }
   }
-  celObert = { slot: slot, dia: dia }; pintaCasella();
+  celObert = { slot: slot, dia: dia, nenId: nenId || "" }; pintaCasella();
+}
+/* Sobre quins fills actua el 🙋 del menú obert: el del bloc que s'ha tocat,
+   o tots els de la casella si el menú s'ha obert sense fill (mode família). */
+function nensDelMenu(f, s, d){
+  if (celObert && celObert.nenId){
+    const n = (f.nens || []).find(x => x.id === celObert.nenId);
+    return (n && nenTeCasella(n, s, d)) ? [n] : [];
+  }
+  return nensDeCasella(f, s, d);
 }
 function tancaCasella(){ celObert = null; const m = $("#cel-menu"), v = $("#cel-vel"); if (m) m.classList.remove("obert"); if (v) v.classList.remove("obert"); }
 function pintaCasella(){
@@ -1662,7 +1715,7 @@ function pintaCasella(){
   const fr = FRANGES.find(x => x.id === s) || {};
   const btn = (on, txt, ac) => "<button class='cbtn" + (on ? " on" : "") + "' onclick=\"celAccio('" + ac + "')\">" + txt + (on ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>";
   let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
-  const nensCel = nensDeCasella(f, s, d);   // amb cursos barrejats, cada entrada és només dels nens que hi entren
+  const nensCel = nensDelMenu(f, s, d);   // el fill del bloc tocat (o tots, en mode família)
   const totsMarcats = nensCel.length > 0 && nensCel.every(n => te(n.marca, s, d));
   const etDemana = nensCel.length === 1 ? "\ud83d\ude4b " + esc(nensCel[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a"
     : nensCel.length < f.nens.length ? "\ud83d\ude4b " + esc(nensCel.map(n => n.nom.trim().split(/\s+/)[0]).join(" i ")) + " demanen pla\u00e7a"
@@ -1684,7 +1737,7 @@ function celAccio(ac){
     if (ultimToc.k === k && ara - ultimToc.t < 350) return;
     ultimToc = { k: k, t: ara };
     const f = lameva(); if (!f) return;
-    const nensCel = nensDeCasella(f, s, d);   // només els nens que tenen aquesta casella (l'hora d'entrada la fixa el curs)
+    const nensCel = nensDelMenu(f, s, d);   // el fill del bloc tocat (o tots, en mode família)
     if (!nensCel.length) return;
     const cel = s + "-" + d;
     const portatsAbans = te(f.cotxe, s, d) ? portaValids(f, s, d).map(r => {
@@ -1737,32 +1790,52 @@ function netejaGermana(f, slot, dia){
     barraAvis("\u2139\ufe0f L'entrada ha passat a les " + horaDe(slot) + " i el cotxe de les " + horaDe(g) + " s'ha tret: <b>" + esc(portats.join(" i ")) + "</b> es queden sense pla\u00e7a. Les seves fam\u00edlies ho veuran als Avisos quan desis.", "info");
   }
 }
-function pintaGraella(){
-  refrescaEstatG();
-  const f = lameva();
-  let h = "<div></div>" + DIES.map(d => "<div class='g-dia'>" + DIES_LBL[d] + "</div>").join("");
+/* Una graella per fill. Les DADES no canvien: el 🚗 i el 🚫 segueixen sent de
+   la família (es veuen a tots els blocs) i el 🙋 de cada fill és el seu.
+   Només canvia com es mostra. */
+function blocGraellaNen(f, n){
+  const pend = celesPendentsNen(f, n);
+  const nomC = n.nom.trim().split(/\s+/)[0];
+  let h = "<div class='gr-bloc'><div class='gr-cap'><span class='gr-nom'>\ud83d\udc66 " + esc(n.nom) + "</span>" +
+    (n.curs ? "<span class='gr-curs'>" + esc(n.curs) + "</span>"
+            : "<span class='gr-curs sensecurs'>\u26a0 sense curs</span>") +
+    "<span class='mp " + (pend.length ? "def" : "ok") + "'>" +
+    (pend.length ? "\u26a0 " + pend.length + (pend.length === 1 ? " pendent" : " pendents") : "\u2713 completa") + "</span></div>";
+  if (pend.length)
+    h += "<p class='hint' style='margin:0 2px 7px'>Falta respondre de <b>" + esc(nomC) + "</b>: " + esc(pend[0]) +
+         (pend.length > 1 ? " i " + (pend.length - 1) + (pend.length === 2 ? " m\u00e9s" : " m\u00e9s") : "") + ".</p>";
+  h += "<div class='graella'>";
+  h += "<div></div>" + DIES.map(d => "<div class='g-dia'>" + DIES_LBL[d] + "</div>").join("");
   FRANGES.forEach((fr, i) => {
     if (i === 0 || FRANGES[i-1].tipus !== fr.tipus)
       h += "<div class='g-grup'>" + (fr.tipus === "Entrada" ? "🌅 Entrada" : "🎒 Recollida") + "</div>";
     h += "<div class='g-hora'>" + fr.hora + "</div>";
     DIES.forEach(d => {
-      const cond = te(f.cotxe, fr.id, d);
-      const propi = te(f.propi, fr.id, d);
-      const marcats = f.nens.filter(n => te(n.marca, fr.id, d));
       let cls = "", cont = "";
-      if (cond){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
-      else if (propi){ cls = "propi"; cont = "<span class='c-ico'>🚫</span>"; }
-      else if (marcats.length){
-        const cobert = marcats.every(x => !!elPorta(f.id, x.id, fr.id, d));
-        cls = "nec" + (cobert ? " cobert" : "");
-        const inicialsNen = x => x.nom.trim().split(/\s+/).map(p => p[0].toUpperCase()).slice(0, 2).join("");
-        cont = "<span class='c-ico'>🙋</span><span class='c-nom'>" + marcats.slice(0, 2).map(x => esc(inicialsNen(x))).join("·") + (marcats.length > 2 ? "+" : "") + "</span>";
+      if (te(f.cotxe, fr.id, d)){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
+      else if (te(f.propi, fr.id, d)){ cls = "propi"; cont = "<span class='c-ico'>🚫</span>"; }
+      else if (te(n.marca, fr.id, d)){
+        cls = "nec" + (elPorta(f.id, n.id, fr.id, d) ? " cobert" : "");
+        cont = "<span class='c-ico'>🙋</span>";
       }
-      const noAplica = estatCasella(f, fr.id, d) !== "normal";
-      h += "<button class='cel " + cls + (noAplica ? " na" : "") + "' onclick=\"obreCasella('" + fr.id + "','" + d + "')\" aria-label='" + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
+      const noAplica = !nenTeCasella(n, fr.id, d) || estatCasella(f, fr.id, d) !== "normal";
+      h += "<button class='cel " + cls + (noAplica ? " na" : "") + "' onclick=\"obreCasella('" + fr.id + "','" + d + "','" + n.id + "')\"" +
+           " aria-label='" + esc(nomC) + " " + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
   });
-  $("#graella").innerHTML = h;
+  h += "</div>";
+  if (!esProgenitor)
+    h += "<div class='fila' style='margin-top:9px;justify-content:flex-end'>" +
+         "<button class='boto sec' style='color:#97301F' onclick=\"esborraGraellaNen('" + n.id + "')\">\ud83d\uddd1\ufe0f Esborra la graella de " + esc(nomC) + "</button></div>";
+  return h + "</div>";
+}
+function pintaGraella(){
+  refrescaEstatG();
+  const f = lameva();
+  const cont = $("#graella-blocs"); if (!cont) return;
+  cont.innerHTML = (f.nens || []).length
+    ? f.nens.map(n => blocGraellaNen(f, n)).join("")
+    : "<div class='targeta'><p class='lead'>Encara no hi ha cap nen. Afegiu-los al <b>Perfil</b> i aqu\u00ed hi sortir\u00e0 la graella de cadascun.</p></div>";
 }
 
 function pinta(slot, dia){
@@ -1950,7 +2023,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.2", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.3", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
