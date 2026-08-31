@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.4", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.4"));
+  T("lema i peu amb versió 4.5", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.5"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -54,6 +54,13 @@ console.log("0 · CABLEJAT ESTÀTIC");
   T("SQL v39: owner_id + es_titular i can_touch_family exigeix ser-ne el titular",
     sql39.includes("add column if not exists owner_id") && sql39.includes("function es_titular") &&
     /p_family = my_family\(\) and es_titular\(p_family\)/.test(sql39) && sql39.includes("trg_marca_titular"));
+  // v4.5: la llista de comptes llegeix auth.users — només via security definer i només l'admin
+  {
+    const sql42 = fs.readFileSync(path.join(__dirname, "supabase-v42.sql"), "utf-8");
+    T("SQL v42: llista_comptes és security definer, mira auth.users, exigeix l'admin i revoca public/anon",
+      sql42.includes("security definer") && sql42.includes("auth.users") &&
+      sql42.includes("role = 'admin'") && /revoke all on function public\.llista_comptes/.test(sql42));
+  }
   T("el client no deixa editar el progenitor (guards + banner)",
     html.includes("function nomesTitular") && html.includes("esProgenitor") && html.includes("prog-banner") &&
     (html.match(/if \(nomesTitular\(\)\) return;/g) || []).length >= 20);
@@ -407,6 +414,25 @@ function rpc(nom, p){
     pr.family_id = fid; pr.requested_group = g.id; pr.status = "aprovat";
     logBD(g.id, "alta família", fid, "Alta amb codi d'invitació");
     return dades(fid);
+  }
+  if (nom === "llista_comptes"){
+    // v4.5: correus d'auth.users — només l'admin del grup
+    if (!socAdmin()) return err("Només l'administrador pot veure la llista de comptes");
+    const g = grupMeu();
+    const rows = Object.values(DB.users).map(u => {
+      const pr = DB.profiles.find(x => x.id === u.id) || null;
+      const f = pr && pr.family_id ? famPerId(pr.family_id) : null;
+      // el fake no omple owner_id: el titular és el primer perfil vinculat (com el backfill del v39)
+      const titular = f ? (f.owner_id || (DB.profiles.find(x => x.family_id === f.id) || {}).id) : null;
+      return { pr, f, fila: {
+        correu: u.email, familia: f ? f.name : "",
+        rol_compte: !pr ? "sense perfil" : !pr.family_id ? "sense família" : (titular === u.id ? "titular" : "progenitor"),
+        rol_familia: f ? f.role : "", estat: pr ? pr.status : "", creat: "" } };
+    }).filter(x => (x.f && x.f.group_id === g) ||
+                   (x.pr && !x.pr.family_id && (!x.pr.requested_group || x.pr.requested_group === g)) ||
+                   !x.pr)
+      .map(x => x.fila);
+    return dades(rows);
   }
   if (nom === "esborra_familia"){
     const f = famPerId(p.p_family);
@@ -1038,23 +1064,26 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
       JSON.stringify(famDoc("Vila Puig").nens[0].marca) === marquesAbans);
     T("…ni el 🚗 ni el 🚫 de la família",
       JSON.stringify(famDoc("Vila Puig").cotxe) === cotxeAbans && JSON.stringify(famDoc("Vila Puig").propi) === propiAbans);
-    T("…i no salta cap avís de conflicte de curs",
-      !d.querySelector("#barra-avis").textContent.includes("desquadra"));
+    T("…i no salta cap avís de canvi de curs (primera tria d'un fill nou)",
+      !d.querySelector("#barra-avis").textContent.includes("Hem canviat el curs"));
     w.triaTab("graella"); await tic();
-    T("…tampoc a la Graella", !cos().includes("Has canviat el curs"));
+    T("…tampoc a la Graella", !cos().includes("Hem canviat el curs"));
     T("les caselles del fill nou surten pel camí normal (pendents de respondre)",
       w.celesPendents(famDoc("Vila Puig")).length > 0);
 
-    // ── i el cas que SÍ ha de saltar: canviar el curs d'un fill que JA tenia marques ──
+    // ── v4.5 · canvi de curs SENSE perdre la graella: cau només el que ja no existeix ──
     const gran = famDoc("Vila Puig").nens[0];
-    w.posa(gran.marca, "e8", "dl");          // vàlida amb 3r ESO (entren sempre a l'hora matinera)
-    w.triaCursNen(gran.id, "1r ESO"); await tic();   // amb 1r, dilluns ja no és matiner
+    w.posa(gran.marca, "e8", "dl");          // amb 3r ESO és vàlida (entren sempre a l'hora matinera)
+    w.posa(gran.marca, "r13", "dl");         // el migdia val per a tots els cursos
+    w.triaCursNen(gran.id, "1r ESO"); await tic();   // amb 1r, l'entrada matinera de dilluns ja no existeix
+    T("v4.5: la marca d'una casella que ja no existeix amb el nou horari cau", !w.te(gran.marca, "e8", "dl"));
+    T("…però les que segueixen sent vàlides es conserven", w.te(gran.marca, "r13", "dl"));
+    const ba = d.querySelector("#barra-avis").textContent;
+    T("…i s'avisa: «Hem canviat el curs de X. Falta respondre: …»",
+      ba.includes("Hem canviat el curs de Janot") && ba.includes("Falta respondre"));
     w.triaTab("graella"); await tic();
-    T("canviar el curs d'un fill amb marques SÍ avisa", cos().includes("Has canviat el curs"));
-    T("…i ofereix esborrar només les d'AQUELL fill",
-      cos().includes("esborraGraellaNen('" + gran.id + "')") && cos().includes("Esborra la graella de"));
-    T("…i l'avís de conflicte no ofereix mai esborrar la de tota la família",
-      !(d.querySelector("#g-estat-box") || { innerHTML: "" }).innerHTML.includes("esborraGraella()"));
+    T("…i la Graella només ofereix l'esborrat per fill (res de tota la família)",
+      cos().includes("esborraGraellaNen('" + gran.id + "')") && !cos().includes("Esborra tota la graella"));
     await surtIentra("admin@test.cat", "admin123");   // res d'això no s'ha desat: torna a l'estat de la BD
   }
   // Família de 4t ESO sense cap marca: la llista de pendents n'és la prova neta
@@ -1239,6 +1268,25 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("un usuari normal NO pot llegir invite_token (la cerca per codi va dins del security definer)", (rTok.data || []).length > 0 && rTok.data.every(x => !("invite_token" in x)));
   const sql38 = fs.readFileSync(path.join(__dirname, "supabase-v38.sql"), "utf-8");
   T("SQL v38: cos únic de vinculació privat + claim_family_per_codi dins security definer", sql38.includes("vincula_compte_a_familia") && sql38.includes("revoke execute on function public.vincula_compte_a_familia") && sql38.includes("claim_family_per_codi") && sql38.includes("security definer"));
+  await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10k · NOVETATS v4.5 (llista de comptes de l'admin: correu, família i rol)");
+  await surtIentra("admin@test.cat", "admin123");
+  afegeixUsuari("orfe@test.cat", "x");   // alta a mitges: és a auth.users però no té perfil — també ha de sortir
+  w.obreAdmin(); await tic();
+  T("el panell d'admin té l'apartat «Comptes registrats»", pant().includes("Comptes registrats") && pant().includes("mostraComptes()"));
+  await w.mostraComptes(); await tic(10);
+  const cbox = () => (d.querySelector("#comptes-box") || { innerHTML: "" }).innerHTML;
+  T("la llista duu l'admin amb correu, la seva família i el rol de titular",
+    cbox().includes("admin@test.cat") && cbox().includes("titular") && cbox().includes("Vila Puig"));
+  T("…i també els comptes que encara no tenen família", cbox().includes("orfe@test.cat"));
+  w.tancaAdmin(); await tic();
+  await surtIentra("grau@test.cat", "grau123");
+  w.obreAdmin(); await tic();
+  T("un usuari normal no veu l'apartat al seu panell", !pant().includes("Comptes registrats"));
+  const rNoAdmin = await fakeSupabaseClient().rpc("llista_comptes");
+  T("…i l'RPC el rebutja (els correus són a auth.users)", !!rNoAdmin.error && rNoAdmin.error.message.includes("administrador"));
+  w.tancaAdmin(); await tic();
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("11 · TANCA LA SESSIÓ");
