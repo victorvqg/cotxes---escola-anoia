@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.3</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.4</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -901,7 +901,6 @@ function pintaBarra(){
   if (ba && !ba.classList.contains("ocult") && ba.dataset.tipus !== "info"){
     const fb = lameva();
     if (fb && doblesDe(fb).length === 0 && celesPendents(fb).length === 0) barraAvisNeteja();
-  pintaGraellaAccions();
   } $("#barra").classList.toggle("amaga", !dirty); }
 
 function doblesDe(f){
@@ -1625,49 +1624,10 @@ function pintaGraellaTab(){
   $("#tab-cos").innerHTML =
     "<p class='lead' style='margin:2px 0 6px'><b>Toca una casella i tria</b> qu\u00e8 hi va: \ud83d\ude97 condu\u00efu i oferiu places \u00b7 \ud83d\ude4b el nen demana pla\u00e7a \u00b7 \ud83d\udeab aquell dia aneu pel vostre compte. L'hora d'entrada de cada dia la fixa el curs del nen.<br><span class='hint'>\ud83c\udf93 1r i 2n: entren a les " + horaDe("e8") + " dimarts i dimecres, i a les " + horaDe("e9") + " la resta de dies \u00b7 3r i 4t: entren sempre a les " + horaDe("e8") + ", i dimecres i divendres no hi ha tarda. Les caselles en blanc no cal respondre-les.</span></p>" +
     estatG +
-    "<div id='graella-blocs'></div>" +
-    "<div id='g-accions'></div>";
+    "<div id='graella-blocs'></div>";
   pintaGraella();
-  pintaGraellaAccions();
   bloquejaEdicio();
 }
-function pintaGraellaAccions(){
-  const el = $("#g-accions"); if (!el) return;
-  const f = lameva(); if (!f){ el.innerHTML = ""; return; }
-  const bloq = esProgenitor || (esStaff && !esAdmin && doc.adminFam && f.id === doc.adminFam);   // progenitor: només lectura · staff mai sobre la família admin
-  // un sol control de desar a tota l'app: la barra de baix; aquí només l'esborrat
-  el.innerHTML = bloq ? "" : "<div class='fila' style='margin-top:10px;justify-content:flex-end'>" +
-    "<button class='boto sec' style='color:#97301F' onclick='esborraGraella()'>\ud83d\uddd1\ufe0f Esborra tota la graella</button></div>";
-}
-let esborrantGraella = false;
-function esborraGraella(){
-  const f = lameva(); if (!f || esborrantGraella) return;
-  if (nomesTitular()) return;
-  mostraConfirm({
-    titol: "\ud83d\uddd1\ufe0f Esborrar tota la graella de " + esc(f.nom) + "?",
-    text: "Esborrar\u00e0s <b>TOTES les caselles de la setmana</b> de " + esc(f.nom) + " (\ud83d\ude97, \ud83d\ude4b i \ud83d\udeab) i els nens assignats al vostre cotxe. Els nens d'altres fam\u00edlies que port\u00e0veu es quedaran sense pla\u00e7a i ho veuran als Avisos. Els canvis sense desar tamb\u00e9 es perden. <b>Es desa a l'instant i no es pot desfer.</b>",
-    ok: "S\u00ed, esborra-ho tot", cancel: "Cancel\u00b7la",
-    alOk: () => esborraGraellaDeDebò(f)
-  });
-}
-async function esborraGraellaDeDebò(f){
-  if (esborrantGraella) return;
-  esborrantGraella = true; estat("Esborrant\u2026");
-  const d1 = await sb.from("weekly_marks").delete().eq("family_id", f.id);
-  const d2 = (d1 && d1.error) ? d1 : await sb.from("assignments").delete().eq("driver_family_id", f.id);
-  if ((d1 && d1.error) || (d2 && d2.error)){
-    estat("Error", true); avis("No s'ha pogut esborrar: " + esc(msgNeta((d1 && d1.error) || d2.error)));
-    esborrantGraella = false; return;
-  }
-  conflicteCurs = null;
-  await logActivitat("esborrat graella", "Graella esborrada del tot", f.id);
-  await sbGet();
-  dirty = false; pintaBarra(); estat("Graella esborrada", "ok");
-  esborrantGraella = false;
-  if (tabAct === "graella") pintaGraellaTab();
-  avis("\ud83d\uddd1\ufe0f <b>Graella esborrada</b> — la setmana \u00e9s en blanc.", true);
-}
-
 function pintaHorariComplet(){ if (tabAct === "perfil") pintaPerfil(); else pintaGraellaTab(); }
 function triaPinzell(p){ pinzell = p; pintaHorariComplet(); }
 
@@ -2023,7 +1983,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.3", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.4", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
