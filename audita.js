@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.21", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.21"));
+  T("lema i peu amb versió 4.22", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.22"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1140,6 +1140,29 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const nAvAbans = DB.notifications.length;
   await w.desa(); await tic(30);
   T("v4.21: un desat sense canvis reals no genera CAP avís", DB.notifications.length === nAvAbans);
+  // v4.22: un canvi a Qui puja ha de repintar les barres A L'INSTANT (fallaria si no repinta)
+  {
+    const DIES_T = ["dl", "dt", "dc", "dj", "dv"], FRANGES_T = ["e8", "e9", "r13", "e15", "r17"];
+    let cel22 = null;
+    DIES_T.forEach(dd => FRANGES_T.forEach(fr => {
+      if (cel22 || !w.te(w.lameva().cotxe, fr, dd)) return;
+      const cand = w.balanc(fr, dd).nens.find(n2 => !n2.portadaPerId && n2.famId !== w.lameva().id);
+      if (cand) cel22 = { s: fr, d: dd, n: cand };
+    }));
+    T("v4.22: hi ha un candidat pendent per provar el repintat", !!cel22);
+    const pend0 = parseInt((cos().match(/(\d+) nens? deman/) || [0, "0"])[1], 10);
+    const cob0 = w.statsCobertura().cob;
+    w.assigna(cel22.s, cel22.d, cel22.n.famId, cel22.n.nenId, true); await tic();
+    const esperat = pend0 - 1;
+    T("v4.22: marcar un nen a Qui puja repinta la línia de pendents a l'instant",
+      esperat === 0 ? cos().includes("cap nen pendent") : cos().includes("\u26a0 " + esperat + " nen"));
+    T("v4.22: …i la barra del grup del peu també puja a l'instant",
+      w.statsCobertura().cob === cob0 + 1 &&
+      d.querySelector("#peu-stats").innerHTML.includes((cob0 + 1) + " de " + w.statsCobertura().dem));
+    T("v4.22: una SOLA línia de pendents (fora la frase duplicada)",
+      !cos().includes("esperen pla") && (cos().match(/deman(a|en) pla\u00e7a als teus viatges/g) || []).length <= 1);
+    w.assigna(cel22.s, cel22.d, cel22.n.famId, cel22.n.nenId, false); await tic();   // desfem el canvi
+  }
   T("v4.10: cada viatge duu la capçalera del Quadre (hora gran + ENTRADA/RECOLLIDA + pastilla)",
     /class="m-tip [er]"/.test(cos()) && cos().includes('class="f-hora"') && /pla(ç|\u00e7)?a lliure|places lliures/.test(cos()));
   T("v4.10: cada nen surt amb la icona 🧒 i el nom en negreta", cos().includes("🧒 <b>"));
