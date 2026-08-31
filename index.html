@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.24</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.25</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1085,9 +1085,11 @@ async function entraApp(){
     estat("Connectat ✓", "ok");
     connectaRealtime();
     pantallaApp();
+    return true;
   } catch(e){
     estat("Sense connexió", true);
     avis("No puc connectar amb la base de dades ara mateix. Comprova la connexió i recarrega la pàgina.");
+    return false;
   }
 }
 
@@ -1161,7 +1163,16 @@ async function acceptaConsent(){
 }
 
 /* ── Pantalla: crea el grup o uneix-t'hi ── */
-function pantallaGrup(){
+async function pantallaGrup(){
+  /* v4.25: única font de veritat. Si el perfil JA té família, aquesta
+     pantalla no es mostra mai: s'entra directament a la seva família. */
+  try {
+    const pr0 = await sb.rpc("el_meu_perfil");
+    if (!pr0.error && pr0.data && pr0.data[0] && pr0.data[0].family_id){
+      perfil = pr0.data[0];
+      if (await entraApp()) return;
+    }
+  } catch(e){}
   document.body.classList.remove("dins");
   estat("El teu grup");
   $("#pantalla").innerHTML =
@@ -1209,7 +1220,18 @@ async function vinculaPerCodiFamilia(codi){
   avis(""); estat("Vinculant…");
   sessio = (await sb.auth.getSession()).data.session || sessio;   // única font de veritat abans de l'RPC
   const r = await sb.rpc("claim_family_per_codi", { p_token: codi });
-  if (r.error){ estat("Error", true); avis(esc(msgNeta(r.error))); return; }
+  if (r.error){
+    const m = (r.error && r.error.message) || "";
+    if (/ja té família|ja està vinculat/i.test(m)){
+      const nomErr = (m.match(/vinculat a la família (.+)$/) || [])[1] || "";
+      const correu = sessio && sessio.user ? sessio.user.email : "";
+      if (await recuperaSiJaTeFamilia()){
+        avis("El compte <b>" + esc(correu) + "</b> ja és de la família <b>" + esc(lameva() ? lameva().nom : nomErr) + "</b>. Un compte només pot ser d'una família. Perfil \u2192 \u00abDesvincula aquest compte\u00bb per canviar-ne.");
+        return;
+      }
+    }
+    estat("Error", true); avis(esc(msgNeta(r.error))); return;
+  }
   const fila = (r.data || [])[0];
   const pr = await sb.rpc("el_meu_perfil");
   if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
@@ -1387,7 +1409,7 @@ async function recuperaSiJaTeFamilia(){
   // no una variable del client. I sempre es comprova .error.
   const pr = await sb.rpc("el_meu_perfil");
   if (pr.error || !pr.data || !pr.data[0]) return false;
-  if (pr.data[0].family_id){ perfil = pr.data[0]; await entraApp(); return true; }
+  if (pr.data[0].family_id){ perfil = pr.data[0]; return await entraApp(); }   // v4.25: èxit REAL, no «hi ha família»
   return false;
 }
 async function recuperaIEntra(){
@@ -1417,12 +1439,17 @@ async function entraSel(){
   if (r.error){
     const m = (r.error && r.error.message) || "";
     if (/ja té família|ja està vinculat/i.test(m)){
-      if (await recuperaSiJaTeFamilia()) return;
-      const nomF = (m.match(/vinculat a la família (.+)$/) || [])[1] || "";
+      const nomErr = (m.match(/vinculat a la família (.+)$/) || [])[1] || "";
+      const correu = sessio && sessio.user ? sessio.user.email : "";
+      if (await recuperaSiJaTeFamilia()){
+        // ja és DINS de la seva família: s'explica per què el codi no ha vinculat
+        avis("El compte <b>" + esc(correu) + "</b> ja és de la família <b>" + esc(lameva() ? lameva().nom : nomErr) + "</b>. Un compte només pot ser d'una família. Perfil \u2192 \u00abDesvincula aquest compte\u00bb per canviar-ne.");
+        return;
+      }
       estat("Error", true);
-      avis("Aquest compte ja està vinculat" + (nomF ? " a la família <b>" + esc(nomF) + "</b>" : " a una altra família") + "." +
-        "<button class='boto' style='width:100%;margin:10px 0 6px' onclick='recuperaIEntra()'>Entra a la " + (nomF ? "família " + esc(nomF) : "meva família") + "</button>" +
-        "<span class='hint'>Si t'has equivocat de família: Perfil \u2192 Desvincula aquest compte.</span>", true);
+      avis("El compte <b>" + esc(correu) + "</b> ja és de la família <b>" + esc(nomErr || "(desconeguda)") + "</b>. Un compte només pot ser d'una família." +
+        "<button class='boto' style='width:100%;margin:10px 0 6px' onclick='recuperaIEntra()'>Entra a la " + (nomErr ? "família " + esc(nomErr) : "meva família") + "</button>" +
+        "<span class='hint'>Per canviar-ne: Perfil \u2192 Desvincula aquest compte.</span>");
       return;
     }
     estat("Error", true); avis("No s'ha pogut vincular: " + esc(msgNeta(r.error))); return;
@@ -2176,7 +2203,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.24", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.25", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });

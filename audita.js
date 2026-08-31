@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.24", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.24"));
+  T("lema i peu amb versió 4.25", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.25"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1640,6 +1640,17 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.copiaTextCodiFam(null); await tic();
   T("v4.24: dins d'una altra família, «Copia el codi» copia el codi d'AQUELLA família (mai buit)",
     d.querySelector("#avis").textContent.includes(codiDeFam(famDB("Grau"))));
+  await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10p · NOVETATS v4.25 (vincular amb codi coherent amb el perfil)");
+  await surtIentra("grau@test.cat", "grau123");
+  await w.pantallaGrup(); await tic(30);
+  T("v4.25: amb família, la pantalla «Uneix-te» no es mostra mai: s'entra directament",
+    pant().includes("Hola") && !pant().includes("Uneix-te amb un codi"));
+  await w.recuperaIEntra(); await tic(30);
+  T("v4.25: «Entra a la família» entra de debò (l'èxit és el d'entraApp, no el de tenir família)",
+    pant().includes("Hola") && pant().includes("Grau"));
+  T("v4.25: el missatge de conflicte és el pactat", html.includes("Un compte només pot ser d'una família"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("10n · NOVETATS v4.18 (Estadístiques per a l'admin)");
