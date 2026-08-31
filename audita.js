@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.14", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.14"));
+  T("lema i peu amb versió 4.15", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.15"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -54,6 +54,13 @@ console.log("0 · CABLEJAT ESTÀTIC");
   T("SQL v39: owner_id + es_titular i can_touch_family exigeix ser-ne el titular",
     sql39.includes("add column if not exists owner_id") && sql39.includes("function es_titular") &&
     /p_family = my_family\(\) and es_titular\(p_family\)/.test(sql39) && sql39.includes("trg_marca_titular"));
+  // v4.15: els avisos viuen a notifications amb columnes estructurades
+  {
+    const sql45 = fs.readFileSync(path.join(__dirname, "supabase-v45.sql"), "utf-8");
+    T("SQL v45: notifications guanya família, nen, canvi, detall i autor (idempotent)",
+      ["family_name", "child_name", "action", "detail", "actor_name"].every(c => sql45.includes(c)) &&
+      sql45.includes("add column if not exists"));
+  }
   // v4.13: esborrar un compte només via security definer, només l'admin, mai un mateix
   {
     const sql44 = fs.readFileSync(path.join(__dirname, "supabase-v44.sql"), "utf-8");
@@ -842,11 +849,30 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaVistaCal("quadre"); await tic(20);
   T("el quadre diu qui porta qui amb noms de pila", cos().includes("Marta VP") && cos().includes("porta") && cos().includes("Arlet"));
 
-  console.log("6c · AVISOS ENTRE COMPTES (el pare i la mare ho veuen)");
+  console.log("6c · AVISOS ENTRE COMPTES (v4.15: guardats a Supabase per a tot el grup)");
   await surtIentra("grau@test.cat", "grau123");
-  T("en entrar, les assignacions noves han generat avisos", w.avisosNous() >= 1 && w.avisosMeus().some(a => a.m.includes("el porta Marta Vila Prat")));
-  w.triaTab("avisos"); await tic();
-  T("la pàgina d'avisos llista qui porta els nens", cos().includes("Nous (") && cos().includes("Bru") && cos().includes("Dilluns 17.00"));
+  T("v4.15: l'assignació ha generat un avís A LA BASE DE DADES per a la família del nen",
+    w.avisosNous() >= 1 && DB.notifications.some(n2 => n2.family_id === famDB("Grau").id && (n2.message || "").includes("el porta Marta Vila Prat")));
+  w.triaTab("avisos"); await tic(10);
+  T("la pàgina d'avisos llista qui porta els nens, amb data i hora AMB SEGONS",
+    cos().includes("Bru") && cos().includes("Dilluns 17.00") && /\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(cos()));
+  T("v4.15: cada avís és una fila desplegable amb el detall i qui ho ha fet",
+    cos().includes("<details") && cos().includes("Qui ho ha fet"));
+  d.querySelector("#av-q").value = "Bru"; w.avFiltra();
+  T("v4.15: la cerca per nen filtra mentre s'escriu",
+    d.querySelector("#avisos-llista").innerHTML.includes("Bru") && (d.querySelector("#avisos-llista").innerHTML.match(/<details/g) || []).length >= 1);
+  d.querySelector("#av-q").value = "zzzzz"; w.avFiltra();
+  T("…i sense coincidències ho diu", d.querySelector("#avisos-llista").innerHTML.includes("Cap avís"));
+  w.avNeteja();
+  T("«Neteja el filtre» ho torna a mostrar tot", (d.querySelector("#avisos-llista").innerHTML.match(/<details/g) || []).length >= 1);
+  d.querySelector("#av-de").value = "2099-01-01"; w.avFiltra();
+  T("el filtre de dates també talla", d.querySelector("#avisos-llista").innerHTML.includes("Cap avís"));
+  w.avNeteja(); d.querySelector("#av-q").value = "Bru"; w.avFiltra();
+  const csvAv = w.avisosCsv();
+  T("v4.15: el CSV duu capçalera i NOMÉS el que passa el filtre",
+    csvAv.includes("data i hora") && csvAv.includes("Bru") &&
+    !csvAv.split("\n").slice(1).some(l => l && !l.toLowerCase().includes("bru")));
+  w.avNeteja();
   T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
   await surtIentra("admin@test.cat", "admin123");
   w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
@@ -854,9 +880,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await w.desa(); await tic(30);
   T("la desassignació queda a Supabase", !DB.assignments.some(a => a.child_id === nenDB(famDB("Grau").id, "Bru").id));
   await surtIentra("grau@test.cat", "grau123");
-  T("canvi detectat en entrar: en Bru ha perdut el cotxe", w.avisosNous() >= 1 && w.avisosMeus().some(a => a.m.includes("ja no t\u00e9 cotxe")), JSON.stringify(w.avisosMeus().slice(0,3)));
-  w.triaTab("avisos"); await tic();
-  T("la pàgina d'avisos: secció Nous, amb nom, dia i franja", cos().includes("Nous (") && cos().includes("Bru") && cos().includes("ja no té cotxe") && cos().includes("abans Marta Vila Prat") && cos().includes("Dilluns 17.00"), cos().slice(0, 400));
+  T("v4.15: la baixa del cotxe també és un avís a la BD (escrit en desar, no detectat al mòbil)",
+    w.avisosNous() >= 1 && DB.notifications.some(n2 => n2.family_id === famDB("Grau").id && (n2.message || "").includes("ja no té cotxe")));
+  w.triaTab("avisos"); await tic(10);
+  T("la pàgina mostra la baixa amb nom, dia, franja i el conductor d'abans",
+    cos().includes("Bru") && cos().includes("ja no té cotxe") && cos().includes("abans Marta Vila Prat") && cos().includes("Dilluns 17.00"), cos().slice(0, 400));
   T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
   const cliUsuari = fakeSupabaseClient(); // RLS: en Grau (rol usuari), directe contra la BD
   await cliUsuari.from("weekly_marks").delete().eq("family_id", idVila);

@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.14</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.15</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -540,7 +540,7 @@ async function sbGet(){
   let notisDB = [];
   if (perfil && perfil.family_id){
     const rn = await sb.from("notifications").select("*").eq("family_id", perfil.family_id).order("created_at", { ascending: false }).limit(30);
-    if (!rn.error) notisDB = (rn.data || []).map(r => ({ t: Date.parse(r.created_at) || 0, m: esc(r.message) }));
+    if (!rn.error) notisDB = (rn.data || []).map(r => ({ t: Date.parse(r.created_at) || 0, m: esc(r.message || ((r.action || "") + (r.child_name ? " \u00b7 " + r.child_name : ""))) }));
   }
   if (!dirty) esborratsPendents = [];
   doc = {
@@ -671,7 +671,6 @@ async function sincronitza(){
   syncEnCurs = true;
   try {
     await sbGet();
-    detectaAvisos();
     if ($("#tab-cos")) triaTab(tabAct); else pantallaApp();
   } catch(e){} finally { syncEnCurs = false; }
 }
@@ -766,40 +765,7 @@ function nomesTitular(){
   return true;
 }
 
-function fotoAssig(){
-  const f = lameva(); const m = {};
-  if (!f) return m;
-  (f.nens || []).forEach(n => FRANGES.forEach(fr => DIES.forEach(d => {
-    if (te(n.marca, fr.id, d)){ const c = elPorta(f.id, n.id, fr.id, d); m[n.id + "|" + fr.id + "|" + d] = c ? c.id : ""; }
-  })));
-  return m;
-}
-function detectaAvisos(){
-  const f = lameva(); if (!f) return;
-  const clau = "cx_vist_" + f.id;
-  const ara = fotoAssig();
-  const abansRaw = lsGet(clau);
-  if (abansRaw){
-    let abans = {}; try { abans = JSON.parse(abansRaw) || {}; } catch(e){}
-    const nomDe = id => { const n = (f.nens || []).find(x => x.id === id); return n ? n.nom.trim().split(/\s+/)[0] : id; };
-    const et = k => { const t = k.split("|"); const fr = FRANGES.find(x => x.id === t[1]); return nomDe(t[0]) + " \u00b7 " + DIES_NOM[t[2]] + " " + (fr ? fr.hora : t[1]); };
-    const nous = [];
-    Object.keys(ara).forEach(k => {
-      const v = ara[k], o = abans[k] || "";
-      if (v && v !== o){ const c = doc.families.find(x => x.id === v); nous.push("\ud83d\ude97 " + et(k) + " \u2192 el porta " + (c ? nomConductorComplet(c) : "un cotxe del grup")); }
-      else if (!v && o){ const c = doc.families.find(x => x.id === o); nous.push("\u23f3 " + et(k) + " \u2192 ja no t\u00e9 cotxe" + (c ? " (abans " + nomConductorComplet(c) + ")" : "")); }
-    });
-    if (nous.length){
-      let reg = []; try { reg = JSON.parse(lsGet("cx_avisos_" + f.id) || "[]"); } catch(e){}
-      nous.forEach(t => reg.unshift({ t: Date.now(), m: t }));
-      lsSet("cx_avisos_" + f.id, JSON.stringify(reg.slice(0, 50)));
-    }
-  }
-  lsSet(clau, JSON.stringify(ara));
-}
-function avisosMeus(){ const f = lameva(); if (!f) return []; try { return JSON.parse(lsGet("cx_avisos_" + f.id) || "[]"); } catch(e){ return []; } }
-function avisosTots(){ return avisosMeus().concat((doc && doc.notisDB) || []); }
-function avisosNous(){ const f = lameva(); if (!f) return 0; const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10); return avisosTots().filter(a => a.t > dar).length; }
+function avisosNous(){ const f = lameva(); if (!f) return 0; const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10); return ((doc && doc.notisDB) || []).filter(a => a.t > dar).length; }
 
 function nomConductor(f){
   if (!f) return "";
@@ -961,8 +927,37 @@ async function desa(){
   const b = $("#btn-desa"); b.disabled = true; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
   try {
     const f = lameva();
+    const abansA = await sb.from("assignments").select("*").eq("driver_family_id", f.id);
     await sbDesaFamilia(f);
     await logActivitat("canvi graella", "Horari desat", f.id);
+    // v4.15: els canvis d'assignacions generen avisos A LA BD per a la família del nen
+    {
+      const clauA = x => x.nen + "|" + x.slot + "|" + x.day;
+      const abansRefs = (abansA.error ? [] : (abansA.data || [])).map(r2 => ({ nen: r2.child_id, slot: r2.slot, day: r2.day }));
+      const despres = [];
+      FRANGES.forEach(fr => DIES.forEach(dia => {
+        if (!te(f.cotxe, fr.id, dia) || estatCasella(f, fr.id, dia) !== "normal") return;
+        portaValids(f, fr.id, dia).forEach(r2 => despres.push({ nen: r2.nen, slot: fr.id, day: dia }));
+      }));
+      const setAbans = new Set(abansRefs.map(clauA)), setDespres = new Set(despres.map(clauA));
+      const filesAv = [];
+      despres.filter(x => !setAbans.has(clauA(x))).forEach(x => filesAv.push({ x: x, puja: true }));
+      abansRefs.filter(x => !setDespres.has(clauA(x))).forEach(x => filesAv.push({ x: x, puja: false }));
+      const files2 = [];
+      filesAv.forEach(c => {
+        let famN = null, nomNen = "";
+        doc.families.forEach(ff => { const n2 = (ff.nens || []).find(z => z.id === c.x.nen); if (n2){ famN = ff; nomNen = n2.nom.trim().split(/\s+/)[0]; } });
+        if (!famN || famN.id === f.id) return;   // els fills propis no reben avís del cotxe de casa
+        const fr2 = FRANGES.find(z => z.id === c.x.slot);
+        const quan = DIES_NOM[c.x.day] + " " + (fr2 ? fr2.hora : c.x.slot);
+        files2.push({ family_id: famN.id, family_name: famN.nom, child_name: nomNen,
+          action: c.puja ? "\ud83d\ude97 puja al cotxe" : "\u23f3 es queda sense cotxe",
+          detail: quan + (c.puja ? " \u2192 el porta " + nomConductorComplet(f) : " \u2192 ja no t\u00e9 cotxe (abans " + nomConductorComplet(f) + ")"),
+          actor_name: f.nom,
+          message: (c.puja ? "\ud83d\ude97 " : "\u23f3 ") + nomNen + " \u00b7 " + quan + (c.puja ? " \u2192 el porta " + nomConductorComplet(f) : " \u2192 ja no t\u00e9 cotxe (abans " + nomConductorComplet(f) + ")") });
+      });
+      if (files2.length) await sb.from("notifications").insert(files2);
+    }
     // fills amb la graella esborrada: fora dels cotxes on estaven assignats + avís a tot el grup
     const resumEsborrats = [];
     for (const eb of esborratsPendents){
@@ -976,7 +971,7 @@ async function desa(){
       if (da && da.error) avis("\u26a0 No s'han pogut alliberar les places de " + esc(eb.nom) + ": " + esc(msgNeta(da.error)));
       const msg = "La fam\u00edlia " + f.nom + " ha esborrat la graella de " + eb.nom + "." +
         (nomsConds.length ? " Les places que ocupava als cotxes de " + nomsConds.join(" i ") + " tornen a estar lliures." : "");
-      await sb.from("notifications").insert(doc.families.map(ff => ({ family_id: ff.id, message: msg })));
+      await sb.from("notifications").insert(doc.families.map(ff => ({ family_id: ff.id, message: msg, family_name: f.nom, child_name: eb.nom, action: "\ud83d\uddd1\ufe0f graella esborrada", detail: msg, actor_name: f.nom })));
       await logActivitat("esborrat graella", "Graella de " + eb.nom + " esborrada", f.id);
       resumEsborrats.push("Graella de " + esc(eb.nom) + " esborrada." +
         (nAllib ? " " + nAllib + (nAllib === 1 ? " pla\u00e7a alliberada" : " places alliberades") + " als cotxes de " + nomsConds.map(esc).join(" i ") + "." : ""));
@@ -1046,7 +1041,6 @@ async function entraApp(){
     famId = (famId && lameva()) ? famId : perfil.family_id;
     estat("Connectat ✓", "ok");
     connectaRealtime();
-    detectaAvisos();
     pantallaApp();
   } catch(e){
     estat("Sense connexió", true);
@@ -2079,7 +2073,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.14", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.15", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2219,21 +2213,80 @@ function pintaRols(){
     "<p class='lead'>Toca el rol d'una fam\u00edlia per alternar <b>usuari \u2194 staff</b> (es desa a l'instant). El teu rol d'administrador \u00e9s fix. Recorda: el codi de staff nom\u00e9s funciona a les fam\u00edlies que aqu\u00ed tinguin el rol de staff.</p>" +
     files + "</div>";
 }
-function pintaAvisos(){
-  const f = lameva();
-  const reg = avisosTots().sort((a, b) => b.t - a.t);
-  const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10);
+var avisosLlista = [];   // files carregades de notifications (per filtrar i pel CSV)
+function dataHoraAv(iso){ const x = new Date(iso); const p2 = n2 => String(n2).padStart(2, "0"); return p2(x.getDate()) + "/" + p2(x.getMonth() + 1) + "/" + x.getFullYear() + " " + p2(x.getHours()) + ":" + p2(x.getMinutes()) + ":" + p2(x.getSeconds()); }
+function avisosFiltrats(){
+  const de = ($("#av-de") || {}).value || "", fins = ($("#av-a") || {}).value || "", q = (($("#av-q") || {}).value || "").trim().toLowerCase();
+  return avisosLlista.filter(r => {
+    const t = new Date(r.created_at).getTime();
+    if (de && t < new Date(de + "T00:00:00").getTime()) return false;
+    if (fins && t > new Date(fins + "T23:59:59").getTime()) return false;
+    if (q){
+      const blob = ((r.family_name || "") + " " + (r.child_name || "") + " " + (r.action || "") + " " + (r.detail || "") + " " + (r.message || "")).toLowerCase();
+      if (!blob.includes(q)) return false;
+    }
+    return true;
+  });
+}
+function pintaAvisosLlista(){
+  const el = $("#avisos-llista"); if (!el) return;
+  const files = avisosFiltrats();
+  el.innerHTML = files.length ? files.map(r =>
+    "<details class='conf fam-det'><summary>" + dataHoraAv(r.created_at) +
+      (r.family_name ? " \u00b7 " + esc(r.family_name) : "") +
+      (r.child_name ? " \u00b7 " + esc(r.child_name) : "") +
+      " \u00b7 " + esc(r.action || r.message || "") + "</summary>" +
+    "<div style='padding:4px 2px 8px'><div class='f-linia'>" + esc(r.detail || r.message || "") + "</div>" +
+    (r.actor_name ? "<div class='hint'>Qui ho ha fet: " + esc(r.actor_name) + "</div>" : "") +
+    "</div></details>").join("")
+    : "<p class='hint'>Cap av\u00eds amb aquest filtre.</p>";
+}
+function avFiltra(){ pintaAvisosLlista(); }
+function avNeteja(){ ["av-de", "av-a", "av-q"].forEach(id => { const e = $("#" + id); if (e) e.value = ""; }); pintaAvisosLlista(); }
+function avisosCsv(){
+  const camp = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  return "\uFEFF" + ["data i hora", "fam\u00edlia", "nen", "canvi", "detall", "qui ho ha fet"].map(camp).join(",") + "\n" +
+    avisosFiltrats().map(r => [dataHoraAv(r.created_at), r.family_name || "", r.child_name || "",
+      r.action || r.message || "", r.detail || r.message || "", r.actor_name || ""].map(camp).join(",")).join("\n");
+}
+function descarregaAvisosCsv(){
+  try {
+    const blob = new Blob([avisosCsv()], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "avisos-" + slug((doc && doc.grupNom) || "grup") + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    avis("\u2713 Avisos descarregats en CSV (nom\u00e9s els del filtre actual).", true);
+  } catch(e){ avis("Aquest navegador no deixa baixar el fitxer: prova-ho des d'un ordinador."); }
+}
+/* v4.15: els avisos viuen a la taula notifications de Supabase — cada família
+   llegeix els seus (RLS) i l'admin els de tot el grup. Filtres, hora amb
+   segons, fila desplegable i descàrrega en CSV del que passa el filtre. */
+async function pintaAvisos(){
+  const f = lameva(); if (!f) return;
   lsSet("cx_avisos_vist_" + f.id, String(Date.now()));
   pintaMenu();
-  const fila = a => { const dt = new Date(a.t); const hh = dt.toLocaleDateString("ca") + " " + dt.toTimeString().slice(0, 5); return "<div class='av-fila'><span class='av-quan'>" + hh + "</span><span>" + a.m + "</span></div>"; };
-  const nous = reg.filter(a => a.t > dar), vells = reg.filter(a => a.t <= dar);
   $("#tab-cos").innerHTML =
-    "<div class='targeta'><h2>\ud83d\udd14 Avisos de la teva fam\u00edlia</h2>" +
-    (reg.length
-      ? (nous.length ? "<div class='av-sec'>\U0001f195 Nous (" + nous.length + ")</div>" + nous.map(fila).join("") : "") +
-        (vells.length ? "<div class='av-sec'>Llegits</div>" + vells.map(fila).join("") : "")
-      : "<p class='lead'>Encara no hi ha cap av\u00eds. Aqu\u00ed veur\u00e0s els canvis que afecten els teus nens: qui els agafa o els deixa el cotxe, amb dia i franja.</p>") +
-    "<p class='hint' style='margin-top:8px'>Els avisos es detecten en aquest m\u00f2bil cada cop que l'app carrega les dades del grup.</p></div>";
+    "<div class='targeta'><h2>\ud83d\udd14 Avisos" + (esAdmin ? " de tot el grup" : " de la teva fam\u00edlia") + "</h2>" +
+    "<div class='fila' style='gap:8px;flex-wrap:wrap;margin:6px 0'>" +
+    "<input type='date' class='input' id='av-de' title='Des de' style='flex:1;min-width:128px' onchange='avFiltra()'>" +
+    "<input type='date' class='input' id='av-a' title='Fins a' style='flex:1;min-width:128px' onchange='avFiltra()'>" +
+    "<input class='input' id='av-q' placeholder='Cerca fam\u00edlia o nen\u2026' style='flex:2;min-width:150px' oninput='avFiltra()'></div>" +
+    "<div class='fila' style='gap:8px;margin:0 0 8px'>" +
+    "<button class='boto sec' onclick='avNeteja()'>Neteja el filtre</button>" +
+    "<button class='boto sec' onclick='descarregaAvisosCsv()'>\u2b07\ufe0f Descarrega</button></div>" +
+    "<div id='avisos-llista'><p class='hint'>Carregant\u2026</p></div></div>";
+  let q = sb.from("notifications").select("*");
+  if (!esAdmin) q = q.eq("family_id", f.id);
+  const r = await q.order("created_at", { ascending: false }).limit(500);
+  let files = r.error ? [] : (r.data || []);
+  if (esAdmin){
+    // l'admin veu totes les famílies: les còpies d'un mateix avís de grup es col·lapsen
+    const vist = new Set();
+    files = files.filter(x => { const k = (x.created_at || "") + "|" + (x.message || "") + "|" + (x.action || "") + "|" + (x.child_name || "") + "|" + (x.detail || ""); if (vist.has(k)) return false; vist.add(k); return true; });
+  }
+  avisosLlista = files;
+  pintaAvisosLlista();
 }
 function renomTel(v){
   const f = lameva(); if (!f) return;
@@ -2364,7 +2417,6 @@ async function pintaCalendari(){
 }
 
 function renderCal(){
-  detectaAvisos();
   let mapa = "<div></div>" + DIES.map(d =>
     "<button class='m-cel' style='background:none;min-height:auto' onclick=\"selDia('" + d + "')\"><span class='m-cap'>" + DIES_LBL[d] + "</span></button>").join("");
   FRANGES.forEach(fr => {
