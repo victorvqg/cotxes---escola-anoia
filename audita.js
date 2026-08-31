@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.26", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.26"));
+  T("lema i peu amb versió 4.27", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.27"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -854,7 +854,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.canviaPlaces(-1); w.canviaPlaces(-1); await tic();
   w.triaTab("cal"); await tic(30);
   T("si les places baixen, el comptador avisa del sobreeiximent (2/1)", cos().includes("2/1"));
-  T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges") && s.includes("3 places compartides"); })());
+  T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges oferts") && s.includes("3 places ocupades") && s.includes("lliure"); })());
   T("amb canvis pendents, l'Actualitza dels calendaris s'amaga (mana el Desa)", d.body.classList.contains("amb-barra") && cos().includes("cal-actualitza"));
   w.triaTab("perfil"); await tic();
   w.canviaPlaces(1); w.canviaPlaces(1); await tic();
@@ -1154,6 +1154,29 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const nAvAbans = DB.notifications.length;
   await w.desa(); await tic(30);
   T("v4.21: un desat sense canvis reals no genera CAP avís", DB.notifications.length === nAvAbans);
+  // v4.27: el peu d'estadístiques — oferts, coberts al 100 %, ocupades i lliures, d'UNA sola font
+  {
+    w.pintaBarra(); await tic();
+    const t27 = d.querySelector("#peu-stats").textContent;
+    let oferts = 0, cob = 0, ocu = 0, ofertes = 0, completes = 0;
+    w.doc.families.forEach(f2 => {
+      if (!w.celesPendents(f2).length) completes++;
+      ["dl", "dt", "dc", "dj", "dv"].forEach(dd => ["e8", "e9", "r13", "e15", "r17"].forEach(ss => {
+        if (!w.te(f2.cotxe, ss, dd)) return;
+        oferts++; ofertes += (f2.places || 0);
+        const vc = w.viatgeCobert(f2, ss, dd);
+        ocu += vc.ocupades; if (vc.cobert) cob++;
+      }));
+    });
+    T("v4.27: el peu duu les 6 xifres en ordre i quadren amb viatgeCobert (cap tercer recompte)",
+      t27.includes("(" + completes + " amb la setmana completa)") &&
+      t27.includes("🚗 " + oferts + " viatge") && t27.includes("/setmana") &&
+      t27.includes("✓ " + cob + " viatge") && t27.includes("al 100 %") &&
+      t27.includes("🤝 " + ocu + " ") && t27.includes("🪑 " + Math.max(0, ofertes - ocu) + " ") &&
+      t27.includes("lliure"));
+    T("v4.27: la regla del cobert és una sola funció compartida (barra per tu + peu)",
+      (html.match(/viatgeCobert\(/g) || []).length === 3);
+  }
   // v4.22: un canvi a Qui puja ha de repintar les barres A L'INSTANT (fallaria si no repinta)
   {
     const DIES_T = ["dl", "dt", "dc", "dj", "dv"], FRANGES_T = ["e8", "e9", "r13", "e15", "r17"];
@@ -1672,6 +1695,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("estad"); await tic();
   T("v4.18: a dalt la barra del grup i una barra per cada família",
     cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
+  T("v4.27: Estadístiques duu la mateixa fila del peu a dalt de tot",
+    /viatges? oferts?\/setmana/.test(cos()) && cos().includes("al 100 %") && cos().includes("amb la setmana completa"));
   T("v4.18: les barres de família són el càlcul d'El teu cotxe (statsCoberturaFam), reutilitzat", (function(){
     return w.doc.families.every(f2 => { const st2 = w.statsCoberturaFam(f2);
       return !st2.tot || cos().includes(st2.cob + " de " + st2.tot); });

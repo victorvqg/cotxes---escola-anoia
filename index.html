@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.26</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.27</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -843,17 +843,24 @@ function statsCobertura(){
    marcar nens a «Qui puges al teu cotxe?» mou la barra a l'instant. Les
    demandes dels fills es cobreixen quan algú els porta. pend = nens que
    esperen plaça als SEUS viatges (el recompte d'El teu cotxe). */
+/* Un viatge OFERT (el 🚗 d'una família en una casella) està COBERT quan cap
+   nen no s'hi queda esperant plaça o el cotxe ja és ple — la regla de la
+   barra «per tu» (v4.23), compartida amb el peu d'estadístiques (v4.27). */
+function viatgeCobert(f, slot, dia){
+  const refs = portaValids(f, slot, dia);
+  const esperen = balanc(slot, dia).nens.filter(n => (!n.portadaPerId || n.portadaPerId === f.id) &&
+    !refs.some(r2 => r2.fam === n.famId && r2.nen === n.nenId)).length;
+  return { esperen: esperen, ocupades: refs.length, cobert: !esperen || refs.length >= (f.places || 0) };
+}
 function statsCoberturaFam(f){
   let tot = 0, cob = 0, pend = 0;
   DIES.forEach(d2 => FRANGES.forEach(fr => {
     if (estatCasella(f, fr.id, d2) !== "normal") return;
     if (te(f.cotxe, fr.id, d2)){
       tot++;
-      const refs = portaValids(f, fr.id, d2);
-      const esperen = balanc(fr.id, d2).nens.filter(n => (!n.portadaPerId || n.portadaPerId === f.id) &&
-        !refs.some(r2 => r2.fam === n.famId && r2.nen === n.nenId)).length;
-      pend += esperen;
-      if (!esperen || refs.length >= (f.places || 0)) cob++;
+      const vc = viatgeCobert(f, fr.id, d2);
+      pend += vc.esperen;
+      if (vc.cobert) cob++;
     } else {
       (f.nens || []).forEach(n => {
         if (!te(n.marca, fr.id, d2) || !nenTeCasella(n, fr.id, d2)) return;
@@ -871,17 +878,35 @@ function barraCobHtml(titol, val, tot, sub, clic){
     "<div class='bc-pista'><div class='bc-ompl " + (tot && pct === 100 ? "fet" : (pct < 50 && tot ? "baix" : "")) + "' style='width:" + (tot ? pct : 0) + "%'></div><i style='left:25%'></i><i style='left:50%'></i><i style='left:75%'></i></div>" +
     (sub || "") + "</div>";
 }
-function pintaPeuStats(){
-  const el = $("#peu-stats"); if (!el) return;
-  if (!doc || !doc.families || !doc.families.length){ el.innerHTML = ""; return; }
+/* v4.27: la fila d'estadístiques del grup — la mateixa al peu i a dalt de
+   l'apartat Estadístiques. «Setmana completa» = el criteri de la pastilla ✓
+   de la Graella (cap casella pendent); «cobert al 100 %» = viatgeCobert. */
+function peuStatsHtml(){
+  if (!doc || !doc.families || !doc.families.length) return "";
   const pl = (n, s, p) => n + " " + (n === 1 ? s : p);
-  let nens = 0, viatges = 0, compartides = 0;
+  let nens = 0, oferts = 0, coberts = 0, ocupades = 0, ofertes = 0, completes = 0;
   doc.families.forEach(f => {
     nens += (f.nens || []).length;
+    if (!celesPendents(f).length) completes++;
     FRANGES.forEach(fr => DIES.forEach(d => {
-      if (te(f.cotxe, fr.id, d)){ viatges++; compartides += portaValids(f, fr.id, d).length; }
+      if (!te(f.cotxe, fr.id, d)) return;
+      oferts++; ofertes += (f.places || 0);
+      const vc = viatgeCobert(f, fr.id, d);
+      ocupades += vc.ocupades;
+      if (vc.cobert) coberts++;
     }));
   });
+  return "<span>\ud83d\udc6a " + pl(doc.families.length, "fam\u00edlia", "fam\u00edlies") + " (" + completes + " amb la setmana completa)</span>" +
+    "<span>\ud83e\uddd2 " + pl(nens, "nen", "nens") + "</span>" +
+    "<span>\ud83d\ude97 " + pl(oferts, "viatge ofert", "viatges oferts") + "/setmana</span>" +
+    "<span>\u2713 " + coberts + (coberts === 1 ? " viatge cobert" : " viatges coberts") + " al 100 %</span>" +
+    "<span>\ud83e\udd1d " + pl(ocupades, "pla\u00e7a ocupada", "places ocupades") + "</span>" +
+    "<span>\ud83e\ude91 " + pl(Math.max(0, ofertes - ocupades), "pla\u00e7a lliure", "places lliures") + "</span>";
+}
+function pintaPeuStats(){
+  const el = $("#peu-stats"); if (!el) return;
+  const fila = peuStatsHtml();
+  if (!fila){ el.innerHTML = ""; return; }
   // Barra de progrés de TOT EL GRUP (la del peu)
   const st = statsCobertura();
   const barra = barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.dem,
@@ -890,12 +915,7 @@ function pintaPeuStats(){
         : (st.nPend ? "<div class='bc-sub'>" + st.nPend + (st.nPend === 1 ? " nen encara" : " nens encara") + " sense cotxe en algun trajecte</div>" : ""))
       : ""),
     "obreResumDesDePeu()");
-  el.innerHTML =
-    "<span>\ud83d\udc6a " + pl(doc.families.length, "fam\u00edlia", "fam\u00edlies") + "</span>" +
-    "<span>\ud83e\uddd2 " + pl(nens, "nen", "nens") + "</span>" +
-    "<span>\ud83d\ude97 " + pl(viatges, "viatge en cotxe", "viatges en cotxe") + "/setmana</span>" +
-    "<span>\ud83e\udd1d " + pl(compartides, "pla\u00e7a compartida", "places compartides") + "</span>" +
-    barra;
+  el.innerHTML = fila + barra;
 }
 function obreResumDesDePeu(){ if (!potCal()) return; triaTab("cal"); triaVistaCal("resum"); }
 function pintaBarra(){
@@ -2210,7 +2230,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.26", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.27", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2407,6 +2427,7 @@ function pintaEstadistiques(){
   const files = famOrd().map(f2 => Object.assign({ f: f2 }, statsCoberturaFam(f2)))
     .sort((a, b) => (a.tot ? a.cob / a.tot : 2) - (b.tot ? b.cob / b.tot : 2));
   $("#tab-cos").innerHTML =
+    "<div class='targeta'><div class='peu-stats' style='justify-content:flex-start'>" + peuStatsHtml() + "</div></div>" +
     "<div class='targeta'>" + barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.dem, "", "") + "</div>" +
     "<p class='hint' style='margin:0 2px 8px'>Una barra per fam\u00edlia \u2014 la mateixa que cadascuna veu a \u00abEl teu cotxe\u00bb \u2014, de menys a m\u00e9s cobertura.</p>" +
     files.map(x => "<div class='targeta'>" +
