@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.25</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.26</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -481,7 +481,7 @@ function sbOk(){ return CONFIG.SUPABASE_URL.indexOf("https://") === 0 && CONFIG.
 function msgNeta(e){
   const m = (e && (e.message || e.msg)) || "";
   if (!m) return "error desconegut";
-  if (/row-level security/i.test(m)) return "La base de dades ho ha bloquejat (permisos). Si ho creus un error, avisa l'administrador.";
+  if (/row-level security/i.test(m)) return esProgenitor ? "Nom\u00e9s el titular de la fam\u00edlia pot fer canvis." : "La base de dades ho ha bloquejat (permisos). Si ho creus un error, avisa l'administrador.";
   if (/invalid login credentials/i.test(m)) return "Correu o contrasenya incorrectes. Si és la primera vegada que hi entres, prem «Crea un compte nou» (el botó de sota), no «Entra».";
   if (/email not confirmed/i.test(m)) return "Has de confirmar el correu: t'hem enviat un enllaç (mira també l'spam).";
   if (/user already registered/i.test(m)) return "Aquest correu ja té compte: prem «Entra» en lloc de crear-ne un de nou.";
@@ -1078,9 +1078,16 @@ async function entraApp(){
     const mevaFam = doc.families.find(x => x.id === perfil.family_id);
     esAdmin = !!(mevaFam && mevaFam.rol === "admin");
     esStaff = !!(mevaFam && mevaFam.rol === "staff");
-    // Progenitor = compte vinculat a la família que NO n'és el titular. Només lectura.
-    // Si owner_id encara no hi és (SQL v39 sense executar), ningú no és progenitor.
-    esProgenitor = !!(mevaFam && mevaFam.ownerId && sessio && sessio.user && sessio.user.id !== mevaFam.ownerId);
+    /* v4.26: si sóc titular o progenitor ho diu EL SERVIDOR — el_meu_perfil
+       retorna es_titular (SQL v48). Si el servidor no ho pot dir, per
+       defecte NOMÉS LECTURA: mai més un progenitor editant fins que la
+       base de dades el bloqueja. L'admin queda com fins ara. */
+    let esTitular = null;
+    try {
+      const prT = await sb.rpc("el_meu_perfil");
+      if (!prT.error && prT.data && prT.data[0]){ perfil = prT.data[0]; esTitular = prT.data[0].es_titular; }
+    } catch(e){}
+    esProgenitor = !esAdmin && esTitular !== true;
     famId = (famId && lameva()) ? famId : perfil.family_id;
     estat("Connectat ✓", "ok");
     connectaRealtime();
@@ -2203,7 +2210,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.25", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.26", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
