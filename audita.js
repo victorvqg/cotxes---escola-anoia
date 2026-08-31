@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.18", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.18"));
+  T("lema i peu amb versió 4.20", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.20"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -61,6 +61,14 @@ console.log("0 · CABLEJAT ESTÀTIC");
       sql46.includes("drop function if exists public.llista_comptes") &&
       sql46.includes("last_sign_in_at") && sql46.includes("ultim_acces") && sql46.includes("role = 'admin'"));
   }
+  // v4.19: RLS d'avisos només família/admin + trigger antiduplicats + una línia per avís
+  {
+    const sql47 = fs.readFileSync(path.join(__dirname, "supabase-v47.sql"), "utf-8");
+    T("SQL v47: lectura només família/admin (staff fora) i trigger antiduplicats de 2 segons",
+      sql47.includes("family_id = my_family() or is_admin()") &&
+      sql47.includes("notifications_dedupe") && sql47.includes("before insert on notifications"));
+  }
+  T("v4.19: el CSS força un avís per línia", html.includes("#avisos-llista details{display:block"));
   // v4.15: els avisos viuen a notifications amb columnes estructurades
   {
     const sql45 = fs.readFileSync(path.join(__dirname, "supabase-v45.sql"), "utf-8");
@@ -210,7 +218,7 @@ function execQuery(q){
     else if (t === "weekly_marks"){ const g = grupMeu(); rows = socMembre() ? DB.weekly_marks.filter(r => { const f = famPerId(r.family_id); return f && f.group_id === g; }) : []; }
     else if (t === "assignments") rows = socMembre() ? DB.assignments.filter(r => r.group_id === grupMeu()) : [];
     else if (t === "activity_log") rows = socAdmin() ? DB.activity_log.filter(r => r.group_id === grupMeu()) : [];
-    else if (t === "notifications") rows = DB.notifications.filter(r => r.family_id === mevaFamId() || socStaffAdmin());
+    else if (t === "notifications") rows = DB.notifications.filter(r => r.family_id === mevaFamId() || socAdmin());   // v47: staff fora
     let res = filtra(rows);
     if (q.ordre) res = res.slice().sort((a, b2) => (String(a[q.ordre.c] || "") < String(b2[q.ordre.c] || "") ? -1 : 1) * (q.ordre.asc ? 1 : -1));
     if (q.limitN != null) res = res.slice(0, q.limitN);
@@ -269,7 +277,12 @@ function execQuery(q){
         out.push(row); continue;
       }
       if (t === "notifications"){
-        DB.notifications.push(Object.assign({ id: randomUUID(), created_at: new Date().toISOString() }, row));
+        // v47: trigger antiduplicats — mateixa acció dins de 2 segons, una sola fila
+        const dup = DB.notifications.some(x => x.family_id === row.family_id &&
+          (x.message || "") === (row.message || "") && (x.action || "") === (row.action || "") &&
+          (x.child_name || "") === (row.child_name || "") && (x.detail || "") === (row.detail || "") &&
+          (Date.now() - Date.parse(x.created_at)) < 2000);
+        if (!dup) DB.notifications.push(Object.assign({ id: randomUUID(), created_at: new Date().toISOString() }, row));
         out.push(row); continue;
       }
       return err("taula no suportada al mock: " + t);
@@ -866,6 +879,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     cos().includes("Bru") && cos().includes("Dilluns 17.00") && /\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/.test(cos()));
   T("v4.15: cada avís és una fila desplegable amb el detall i qui ho ha fet",
     cos().includes("<details") && cos().includes("Qui ho ha fet"));
+  T("v4.19: un usuari normal NO té filtres, ni cerca, ni descàrrega, i el títol és el de la seva família",
+    !cos().includes('id="av-q"') && !cos().includes("Descarrega</button>") && cos().includes("Avisos de la teva família"));
+  T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
+  await surtIentra("admin@test.cat", "admin123");
+  w.triaTab("avisos"); await tic(10);
+  T("v4.19: l'admin SÍ que veu el bloc de tot el grup amb filtres i descàrrega",
+    cos().includes("Avisos de tot el grup") && cos().includes('id="av-q"') && cos().includes("Descarrega"));
   d.querySelector("#av-q").value = "Bru"; w.avFiltra();
   T("v4.15: la cerca per nen filtra mentre s'escriu",
     d.querySelector("#avisos-llista").innerHTML.includes("Bru") && (d.querySelector("#avisos-llista").innerHTML.match(/<details/g) || []).length >= 1);
@@ -881,8 +901,12 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     csvAv.includes("data i hora") && csvAv.includes("Bru") &&
     !csvAv.split("\n").slice(1).some(l => l && !l.toLowerCase().includes("bru")));
   w.avNeteja();
-  T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
-  await surtIentra("admin@test.cat", "admin123");
+  // v4.19: el trigger antiduplicats — la mateixa acció al mateix segon, una sola fila
+  const rowDup = { family_id: famDB("Grau").id, message: "DUPTEST", action: "x", child_name: "Jan", detail: "d" };
+  await fakeSupabaseClient().from("notifications").insert(rowDup);
+  await fakeSupabaseClient().from("notifications").insert(Object.assign({}, rowDup));
+  T("v4.19: una mateixa acció al mateix segon es guarda UNA sola vegada",
+    DB.notifications.filter(x => x.message === "DUPTEST").length === 1);
   w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
   w.assigna("r17", "dl", famDoc("Grau").id, idBru, false); await tic();
   await w.desa(); await tic(30);
@@ -1101,6 +1125,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     const peu = (d.querySelector("#peu-stats") || { innerHTML: "" }).innerHTML;
     return peu.includes("Trajectes coberts del grup") && st.dem > 0 && peu.includes(st.cob + " de " + st.dem);
   })());
+  d.querySelector("#tab-cos").insertAdjacentHTML("beforeend", "<i id='sentinella-repintat'></i>");
+  await w.desa(); await tic(30);
+  T("v4.20: després de desar, la pestanya oberta es repinta sola (barra i Qui puja al dia)",
+    !d.querySelector("#sentinella-repintat") && cos().includes("Trajectes coberts per tu"));
   T("v4.10: cada viatge duu la capçalera del Quadre (hora gran + ENTRADA/RECOLLIDA + pastilla)",
     /class="m-tip [er]"/.test(cos()) && cos().includes('class="f-hora"') && /pla(ç|\u00e7)?a lliure|places lliures/.test(cos()));
   T("v4.10: cada nen surt amb la icona 🧒 i el nom en negreta", cos().includes("🧒 <b>"));

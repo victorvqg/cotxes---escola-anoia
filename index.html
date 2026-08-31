@@ -247,6 +247,8 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .peu{font-size:13px;color:#7A8B97;text-align:center;padding:16px 20px;line-height:1.5}
 details.conf{margin-top:14px}
 details.conf summary{font:700 14.5px 'Baloo 2';color:#17456B;cursor:pointer;padding:6px 2px}
+#avisos-llista details{display:block;border-top:1px solid #F0F4F7;padding:3px 0;margin-top:0}
+#avisos-llista details:first-of-type{border-top:0}
 .amaga{display:none}
 .subtabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:5px;background:#DDE6EC;padding:4px;border-radius:12px;margin-bottom:12px}
 .subtab{border:none;background:transparent;color:#46596A;font:700 14px 'Baloo 2';padding:8px 6px;border-radius:9px}
@@ -360,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.18</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.20</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1002,6 +1004,9 @@ async function desa(){
     esborratsPendents = [];
     await sbGet();
     dirty = false; pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
+    // v4.20: la pestanya oberta es repinta amb les dades desades — el mateix
+    // repintat de sempre (pintaCotxe amb les seves barres, Resum/Quadre…)
+    if ($("#tab-cos")) triaTab(tabAct);
     if (resumEsborrats.length) avis("\ud83d\uddd1\ufe0f <b>" + resumEsborrats.join("<br>") + "</b>");
     else avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
   } catch(e){
@@ -2154,7 +2159,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.18", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.20", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2362,12 +2367,33 @@ function pintaEstadistiques(){
 /* v4.15: els avisos viuen a la taula notifications de Supabase — cada família
    llegeix els seus (RLS) i l'admin els de tot el grup. Filtres, hora amb
    segons, fila desplegable i descàrrega en CSV del que passa el filtre. */
+/* mateix segon + mateix contingut = un sol avís a pantalla (les còpies per
+   família dels avisos de grup, i qualsevol duplicat vell, es col·lapsen) */
+function dedupAvisos(files){
+  const vist = new Set();
+  return files.filter(x => {
+    const k = String(x.created_at || "").slice(0, 19) + "|" + (x.message || "") + "|" + (x.action || "") + "|" + (x.child_name || "") + "|" + (x.detail || "");
+    if (vist.has(k)) return false; vist.add(k); return true;
+  });
+}
+/* v4.19: el bloc de tot el grup (filtres, cerca i descàrrega) és NOMÉS de
+   l'admin. La resta de rols veuen només els avisos de la seva família, en
+   llista simple desplegable. */
 async function pintaAvisos(){
   const f = lameva(); if (!f) return;
   lsSet("cx_avisos_vist_" + f.id, String(Date.now()));
   pintaMenu();
+  if (!esAdmin){
+    $("#tab-cos").innerHTML =
+      "<div class='targeta'><h2>\ud83d\udd14 Avisos de la teva fam\u00edlia</h2>" +
+      "<div id='avisos-llista'><p class='hint'>Carregant\u2026</p></div></div>";
+    const r0 = await sb.from("notifications").select("*").eq("family_id", f.id).order("created_at", { ascending: false }).limit(200);
+    avisosLlista = dedupAvisos(r0.error ? [] : (r0.data || []));
+    pintaAvisosLlista();
+    return;
+  }
   $("#tab-cos").innerHTML =
-    "<div class='targeta'><h2>\ud83d\udd14 Avisos" + (esAdmin ? " de tot el grup" : " de la teva fam\u00edlia") + "</h2>" +
+    "<div class='targeta'><h2>\ud83d\udd14 Avisos de tot el grup</h2>" +
     "<div class='fila' style='gap:8px;flex-wrap:wrap;margin:6px 0'>" +
     "<input type='date' class='input' id='av-de' title='Des de' style='flex:1;min-width:128px' onchange='avFiltra()'>" +
     "<input type='date' class='input' id='av-a' title='Fins a' style='flex:1;min-width:128px' onchange='avFiltra()'>" +
@@ -2376,16 +2402,8 @@ async function pintaAvisos(){
     "<button class='boto sec' onclick='avNeteja()'>Neteja el filtre</button>" +
     "<button class='boto sec' onclick='descarregaAvisosCsv()'>\u2b07\ufe0f Descarrega</button></div>" +
     "<div id='avisos-llista'><p class='hint'>Carregant\u2026</p></div></div>";
-  let q = sb.from("notifications").select("*");
-  if (!esAdmin) q = q.eq("family_id", f.id);
-  const r = await q.order("created_at", { ascending: false }).limit(500);
-  let files = r.error ? [] : (r.data || []);
-  if (esAdmin){
-    // l'admin veu totes les famílies: les còpies d'un mateix avís de grup es col·lapsen
-    const vist = new Set();
-    files = files.filter(x => { const k = (x.created_at || "") + "|" + (x.message || "") + "|" + (x.action || "") + "|" + (x.child_name || "") + "|" + (x.detail || ""); if (vist.has(k)) return false; vist.add(k); return true; });
-  }
-  avisosLlista = files;
+  const r = await sb.from("notifications").select("*").order("created_at", { ascending: false }).limit(500);
+  avisosLlista = dedupAvisos(r.error ? [] : (r.data || []));
   pintaAvisosLlista();
 }
 function renomTel(v){
