@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.7", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.7"));
+  T("lema i peu amb versió 4.8", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.8"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1017,6 +1017,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el propi cotxe es veu amb comptador i s'assigna a «El teu cotxe»", cos().includes("Al teu cotxe") && cos().includes("/3"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el grup i el seu codi d'invitació", cos().includes("El vostre grup") && cos().includes(CODI));
+  T("v4.8: nom del grup i codi separats, amb botó de copiar i l'aclariment",
+    cos().includes("El vostre grup: ") && cos().includes("Codi d'invitació:") && cos().includes("Copia el codi") && cos().includes("Només cal el codi, no el nom del grup"));
+  w.copiaTextCodiGrup(null); await tic();
+  T("…i copiar avisa amb «Codi copiat: [codi]»",
+    d.querySelector("#avis").textContent.includes("Codi copiat") && d.querySelector("#avis").textContent.includes(CODI));
   const nenPerCurs = famDoc("Vila Puig").nens[0];
   w.triaCursNen(nenPerCurs.id, "1r ESO"); await tic();
   // v3.6: amb 1r ESO canvien les caselles vàlides (8.00 dt/dc, tardes de nou); es reomplen les noves

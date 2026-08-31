@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.7</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.8</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1547,8 +1547,9 @@ function pintaPerfil(){
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : "", f.nens.some(n => !(n.curs || "").trim()) ? "el curs de cada nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
     (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa aquest codi a l'altre progenitor o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia</span></span></div>" +
     "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
-    "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup<span class='p-sub'>codi d'invitaci\u00f3 del grup: passa'l a les fam\u00edlies que s'hi vulguin unir</span></span></div>" +
-    "<div class='nomgran' style='text-align:center'>" + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + " \u00b7 <span style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span></div>" +
+    "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup: " + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + "</span></div>" +
+    "<div class='fila' style='align-items:center;gap:8px;justify-content:center;flex-wrap:wrap'><span>Codi d'invitaci\u00f3:</span><span class='nomgran' style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
+    "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a les fam\u00edlies que s'hi vulguin unir. Nom\u00e9s cal el codi, no el nom del grup.</p>" +
     "<p class='hint' style='text-align:center;margin-top:14px'>Has entrat com a <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b></p>" +
     "<div style='text-align:center;margin-top:6px'>" +
     (perfil && perfil.family_id && f.id === perfil.family_id ? "<button class='enllac' onclick='desvinculaCompte()'>Desvincula aquest compte de la fam\u00edlia</button><br>" : "") +
@@ -1846,7 +1847,7 @@ function pantallaAdmin(){
   if (esAdmin){
     cos = "<p class='lead'>\ud83d\udee1\ufe0f Ets l'administrador del grup <b>" + esc(doc.grupNom || "") + "</b>. El teu rol ve de la base de dades: ja no hi ha codis secrets que activar.</p>" +
       "<div class='p-fila'><span class='p-lab'>Codis d'acc\u00e9s<span class='p-sub'>el del grup serveix per convidar fam\u00edlies; el de cada fam\u00edlia, per vincular-hi el segon compte. Nom\u00e9s els veus tu</span></span></div>" +
-      "<div class='fila' style='align-items:center;gap:8px'><div class='nomgran' style='letter-spacing:.14em;flex:1;text-align:center'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</div><button class='boto sec' onclick='copiaTextCodiGrup(this)'>copia</button></div>" +
+      "<div class='fila' style='align-items:center;gap:8px'><div class='nomgran' style='letter-spacing:.14em;flex:1;text-align:center'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</div><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
       "<div id='codis-box'><p class='hint'>Carregant\u2026</p></div>" +
       "<p class='hint'>Rols: a la pestanya \u00abFam\u00edlies\u00bb tens \u00abedita\u00bb a cada fam\u00edlia, i a \u00abRols\u00bb (men\u00fa \u2630) alternes usuari \u2194 staff.</p>" +
       "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de creaci\u00f3 de grup<span class='p-sub'>cal per crear un grup NOU. No \u00e9s dins l'app: viu a Supabase i nom\u00e9s el veus tu</span></span></div>" +
@@ -1882,7 +1883,11 @@ function fallbackCopia(t, ok){
   try { document.execCommand("copy"); } catch(e){}
   ta.remove(); ok();
 }
-function copiaTextCodiGrup(btn){ copiaText(grupActiu ? grupActiu.invite_code : "", btn); }
+function copiaTextCodiGrup(btn){
+  const c = grupActiu ? grupActiu.invite_code : "";
+  copiaText(c, btn);
+  avis("Codi copiat: <b style='letter-spacing:.14em'>" + esc(c) + "</b>", true);
+}
 async function carregaCodiCreacio(){
   const box = $("#codicreacio-box"); if (!box || !esAdmin) return;
   const r = await sb.rpc("codi_creacio_grup");
@@ -1981,7 +1986,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.7", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.8", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
