@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.10</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.11</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -456,7 +456,8 @@ let famId = "";                // família que s'edita ara (la meva o, admin/sta
 var doc = null;
 let pinzell = "cotxe", dirty = false;
 let esAdmin = false, esStaff = false;   // deriven del rol de la MEVA família a la BD
-let esProgenitor = false;      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
+let esProgenitor = false;
+let esborratsPendents = [];   // fills amb la graella esborrada pendent de desar: en desar s'alliberen els cotxes i s'avisa el grup      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
 let confObert = false;
 let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
 let tabAct = "graella";
@@ -536,11 +537,18 @@ async function sbGet(){
     if (!F.porta[cel]) F.porta[cel] = [];
     F.porta[cel].push({ fam: nenFam[r.child_id] || "", nen: r.child_id });
   });
+  let notisDB = [];
+  if (perfil && perfil.family_id){
+    const rn = await sb.from("notifications").select("*").eq("family_id", perfil.family_id).order("created_at", { ascending: false }).limit(30);
+    if (!rn.error) notisDB = (rn.data || []).map(r => ({ t: Date.parse(r.created_at) || 0, m: esc(r.message) }));
+  }
+  if (!dirty) esborratsPendents = [];
   doc = {
     families: fams,
     grupNom: grupActiu ? grupActiu.name : "",
     notice: grupActiu ? (grupActiu.notice || "") : "",
-    adminFam: (fams.find(x => x.rol === "admin") || { id: "" }).id
+    adminFam: (fams.find(x => x.rol === "admin") || { id: "" }).id,
+    notisDB: notisDB
   };
 }
 
@@ -647,7 +655,7 @@ function connectaRealtime(){
   desconnectaRealtime();
   try {
     const canal = sb.channel("grup-" + grupActiu.id);
-    ["families", "children", "weekly_marks", "assignments"].forEach(taula => {
+    ["families", "children", "weekly_marks", "assignments", "notifications"].forEach(taula => {
       canal.on("postgres_changes", { event: "*", schema: "public", table: taula }, sincronitza);
     });
     canal.subscribe();
@@ -790,7 +798,8 @@ function detectaAvisos(){
   lsSet(clau, JSON.stringify(ara));
 }
 function avisosMeus(){ const f = lameva(); if (!f) return []; try { return JSON.parse(lsGet("cx_avisos_" + f.id) || "[]"); } catch(e){ return []; } }
-function avisosNous(){ const f = lameva(); if (!f) return 0; const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10); return avisosMeus().filter(a => a.t > dar).length; }
+function avisosTots(){ return avisosMeus().concat((doc && doc.notisDB) || []); }
+function avisosNous(){ const f = lameva(); if (!f) return 0; const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10); return avisosTots().filter(a => a.t > dar).length; }
 
 function nomConductor(f){
   if (!f) return "";
@@ -954,6 +963,18 @@ async function desa(){
     const f = lameva();
     await sbDesaFamilia(f);
     await logActivitat("canvi graella", "Horari desat", f.id);
+    // fills amb la graella esborrada: fora dels cotxes on estaven assignats + avís a tot el grup
+    for (const eb of esborratsPendents){
+      const conds = doc.families.filter(c => c.id !== f.id &&
+        Object.values(c.porta || {}).some(arr => (arr || []).some(r => r.nen === eb.id)));
+      const da = await sb.from("assignments").delete().eq("child_id", eb.id);
+      if (da && da.error) avis("\u26a0 No s'han pogut alliberar les places de " + esc(eb.nom) + ": " + esc(msgNeta(da.error)));
+      const msg = "La fam\u00edlia " + f.nom + " ha esborrat la graella de " + eb.nom + "." +
+        (conds.length ? " Les places que ocupava als cotxes de " + conds.map(c => nomConductorComplet(c)).join(" i ") + " tornen a estar lliures." : "");
+      await sb.from("notifications").insert(doc.families.map(ff => ({ family_id: ff.id, message: msg })));
+      await logActivitat("esborrat graella", "Graella de " + eb.nom + " esborrada", f.id);
+    }
+    esborratsPendents = [];
     await sbGet();
     dirty = false; pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
     avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
@@ -1572,17 +1593,19 @@ function esborraGraellaNen(id){
   const teGermans = (f.nens || []).length > 1;
   mostraConfirm({
     titol: "\ud83d\uddd1\ufe0f Esborrar la graella de " + esc(nomC) + "?",
-    text: teGermans
-      ? "Es buidaran les caselles de <b>" + esc(nomC) + "</b>: els seus \ud83d\ude4b i, a les caselles que nom\u00e9s t\u00e9 " + esc(nomC) + ", tamb\u00e9 el \ud83d\ude97 i el \ud83d\udeab. Les caselles compartides amb els germans no es toquen (el \ud83d\ude97/\ud83d\udeab \u00e9s de tota la fam\u00edlia). Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>."
-      : "Es buidar\u00e0 <b>TOTA la graella de " + esc(nomC) + "</b>: \ud83d\ude97, \ud83d\ude4b i \ud83d\udeab. Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
+    text: "Es buidar\u00e0 <b>TOTA la graella de " + esc(nomC) + "</b>: \ud83d\ude97, \ud83d\ude4b i \ud83d\udeab, tamb\u00e9 les marques apagades." +
+      (teGermans ? " \u26a0 Les caselles que comparteix amb els germans quedaran <b>per respondre de nou</b>; les que nom\u00e9s s\u00f3n dels germans no es toquen." : "") +
+      " Si " + esc(nomC) + " pujava al cotxe d'una altra fam\u00edlia, en desar en quedar\u00e0 fora i les places s'alliberaran (tot el grup ho veur\u00e0 als Avisos). Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
     ok: "S\u00ed, buida-la", cancel: "Cancel\u00b7la",
     alOk: () => {
       FRANGES.forEach(fr => DIES.forEach(d => {
         treu(n.marca, fr.id, d);
-        if ((f.nens || []).some(x => x.id !== n.id && nenTeCasella(x, fr.id, d))) return;   // compartida: es queda
+        // només es conserva el que NO és seu i un germà sí que té
+        if (!nenTeCasella(n, fr.id, d) && (f.nens || []).some(x => x.id !== n.id && nenTeCasella(x, fr.id, d))) return;
         treu(f.cotxe, fr.id, d); treu(f.propi, fr.id, d);
         if (f.porta) delete f.porta[fr.id + "-" + d];
       }));
+      if (!esborratsPendents.some(x => x.id === n.id)) esborratsPendents.push({ id: n.id, nom: nomC });
       dirty = true; pintaBarra();
       if (tabAct === "graella") pintaGraellaTab(); else pintaHorariComplet();
       avis("\ud83d\uddd1\ufe0f <b>Graella de " + esc(nomC) + " buida.</b> Prem \u00abDesa els canvis\u00bb per confirmar-ho.", true);
@@ -1754,14 +1777,15 @@ function blocGraellaNen(f, n){
       h += "<div class='g-grup'>" + (fr.tipus === "Entrada" ? "🌅 Entrada" : "🎒 Recollida") + "</div>";
     h += "<div class='g-hora'>" + fr.hora + "</div>";
     DIES.forEach(d => {
+      const noAplica = !nenTeCasella(n, fr.id, d) || estatCasella(f, fr.id, d) !== "normal";
       let cls = "", cont = "";
-      if (te(f.cotxe, fr.id, d)){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
+      if (noAplica){ /* la casella no és seva: cap marca de família (ni apagada) a la seva targeta */ }
+      else if (te(f.cotxe, fr.id, d)){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
       else if (te(f.propi, fr.id, d)){ cls = "propi"; cont = "<span class='c-ico'>🚫</span>"; }
       else if (te(n.marca, fr.id, d)){
         cls = "nec" + (elPorta(f.id, n.id, fr.id, d) ? " cobert" : "");
         cont = "<span class='c-ico'>🙋</span>";
       }
-      const noAplica = !nenTeCasella(n, fr.id, d) || estatCasella(f, fr.id, d) !== "normal";
       h += "<button class='cel " + cls + (noAplica ? " na" : "") + "' onclick=\"obreCasella('" + fr.id + "','" + d + "','" + n.id + "')\"" +
            " aria-label='" + esc(nomC) + " " + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
@@ -1986,7 +2010,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.10", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.11", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2128,7 +2152,7 @@ function pintaRols(){
 }
 function pintaAvisos(){
   const f = lameva();
-  const reg = avisosMeus().slice().sort((a, b) => b.t - a.t);
+  const reg = avisosTots().sort((a, b) => b.t - a.t);
   const dar = parseInt(lsGet("cx_avisos_vist_" + f.id) || "0", 10);
   lsSet("cx_avisos_vist_" + f.id, String(Date.now()));
   pintaMenu();
