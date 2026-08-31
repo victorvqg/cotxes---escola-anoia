@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.22", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.22"));
+  T("lema i peu amb versió 4.23", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.23"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1161,7 +1161,16 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
       d.querySelector("#peu-stats").innerHTML.includes((cob0 + 1) + " de " + w.statsCobertura().dem));
     T("v4.22: una SOLA línia de pendents (fora la frase duplicada)",
       !cos().includes("esperen pla") && (cos().match(/deman(a|en) pla\u00e7a als teus viatges/g) || []).length <= 1);
-    w.assigna(cel22.s, cel22.d, cel22.n.famId, cel22.n.nenId, false); await tic();   // desfem el canvi
+    // v4.23: el viatge ofert compta com a cobert quan ningú hi espera (o el cotxe és ple)
+    w.assigna(cel22.s, cel22.d, cel22.n.famId, cel22.n.nenId, false); await tic();   // tornem al punt de partida: ≥1 nen esperant
+    const esperant23 = w.balanc(cel22.s, cel22.d).nens.filter(n2 => !n2.portadaPerId);
+    const stfA = w.statsCoberturaFam(w.lameva());
+    T("v4.23: amb nens esperant, el viatge ofert NO compta com a cobert", esperant23.length >= 1 && stfA.cob < stfA.tot);
+    esperant23.forEach(n2 => w.assigna(cel22.s, cel22.d, n2.famId, n2.nenId, true)); await tic();
+    const stfB = w.statsCoberturaFam(w.lameva());
+    T("v4.23: en quedar el viatge sense ningú esperant (o ple), la barra «per tu» puja i es repinta",
+      stfB.cob === stfA.cob + 1 && cos().includes(stfB.cob + " de " + stfB.tot));
+    esperant23.forEach(n2 => w.assigna(cel22.s, cel22.d, n2.famId, n2.nenId, false)); await tic();   // desfem-ho tot
   }
   T("v4.10: cada viatge duu la capçalera del Quadre (hora gran + ENTRADA/RECOLLIDA + pastilla)",
     /class="m-tip [er]"/.test(cos()) && cos().includes('class="f-hora"') && /pla(ç|\u00e7)?a lliure|places lliures/.test(cos()));
