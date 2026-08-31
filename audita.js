@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.10", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.10"));
+  T("lema i peu amb versió 4.12", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.12"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -54,6 +54,14 @@ console.log("0 · CABLEJAT ESTÀTIC");
   T("SQL v39: owner_id + es_titular i can_touch_family exigeix ser-ne el titular",
     sql39.includes("add column if not exists owner_id") && sql39.includes("function es_titular") &&
     /p_family = my_family\(\) and es_titular\(p_family\)/.test(sql39) && sql39.includes("trg_marca_titular"));
+  // v4.11: la família del nen pot treure'l del cotxe d'un altre conductor (SQL v43)
+  {
+    const sql43 = fs.readFileSync(path.join(__dirname, "supabase-v43.sql"), "utf-8");
+    T("SQL v43: política de DELETE a assignments per a la família del nen (via can_touch_family)",
+      /create policy .* on assignments for delete/.test(sql43) && sql43.includes("child_id") && sql43.includes("can_touch_family"));
+  }
+  T("v4.11: la sincronització en viu també escolta la taula notifications",
+    html.includes('"families", "children", "weekly_marks", "assignments", "notifications"'));
   // v4.5: la llista de comptes llegeix auth.users — només via security definer i només l'admin
   {
     const sql42 = fs.readFileSync(path.join(__dirname, "supabase-v42.sql"), "utf-8");
@@ -272,7 +280,8 @@ function execQuery(q){
       if (!q.filters.every(f => f(row))) return true;
       if (t === "children" && !potTocarFam(row.family_id)) return true;
       if (t === "weekly_marks" && !potTocarFam(row.family_id)) return true;
-      if (t === "assignments" && !potTocarFam(row.driver_family_id)) return true;
+      if (t === "assignments" && !potTocarFam(row.driver_family_id) &&
+          !potTocarFam((DB.children.find(c => c.id === row.child_id) || {}).family_id)) return true;   // SQL v43
       return false;
     });
     return dades(null);
@@ -977,6 +986,12 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
+  T("v4.12: el codi de família en tres línies, amb el botó «Copia el codi» COMPARTIT amb el del grup",
+    cos().includes("Copia el codi") && cos().includes("entrar a la fam") &&
+    (html.match(/copiaCodiAmbAvis\(/g) || []).length === 3);
+  w.copiaTextCodiFam(null); await tic();
+  T("…i copiar avisa amb «Codi copiat: [codi]»",
+    d.querySelector("#avis").textContent.includes("Codi copiat") && d.querySelector("#avis").textContent.includes(codiDeFam(famDB("Vila Puig"))));
   w.renomTel("600111222"); await tic();   // v4.1 va treure el curs de família (triaCurs): només queda el curs per nen
   // v3.6: canviar el curs pot deixar caselles noves per respondre (l'entrada passa a les 9.00); es reomplen
   const ompleForats = fx => ["e8", "e9", "r13", "e15", "r17"].forEach(s => ["dl", "dt", "dc", "dj", "dv"].forEach(dd => {
@@ -1177,24 +1192,40 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.4: la graella ja NO té el botó d'esborrar-ho tot", !cos().includes("Esborra tota la graella"));
   T("v4.4: el botó per fill segueix a la targeta de cada fill", cos().includes("Esborra la graella de"));
   T("v4.4: les funcions d'esborrat total ja no existeixen", !w.esborraGraella && !w.esborraGraellaDeDebò && !w.pintaGraellaAccions);
-  // ── v4.7 · «Esborra la graella de X» buida també el 🚗/🚫 de les caselles EXCLUSIVES del fill ──
+  // ── v4.11 · «Esborra la graella de X» ho buida TOT (també compartides), allibera cotxes i avisa el grup ──
   {
+    // en Janot ocupa una plaça al cotxe de la família Grau (r17 de dilluns)
+    DB.assignments.push({ id: randomUUID(), group_id: famDB("Grau").group_id, driver_family_id: famDB("Grau").id, child_id: idJan(), slot: "r17", day: "dl", updated_by: null });
+    await w.sbGet(); await tic(10);   // sbGet reconstrueix doc: les referències es prenen DESPRÉS
     const fVPg = famDoc("Vila Puig");
-    fVPg.nens.push({ id: "tmp-esb", nom: "Nil", curs: "1r ESO", marca: {} });   // germà: el migdia és compartit; la matinera de dilluns només és d'en Janot (3r)
-    const janG = fVPg.nens[0];
+    fVPg.nens.push({ id: "tmp-esb", nom: "Nil", curs: "1r ESO", marca: {} });   // germà: r13 compartit; e8-dl només d'en Janot; e9-dl només d'en Nil
+    const janG = fVPg.nens.find(x => x.id === idJan());
     w.posa(fVPg.cotxe, "e8", "dl");     // exclusiva d'en Janot
     w.posa(fVPg.propi, "r13", "dl");    // compartida amb en Nil
+    w.posa(fVPg.cotxe, "e9", "dl");     // NOMÉS d'en Nil: s'ha de conservar
     w.posa(janG.marca, "r17", "dl");    // 🙋 seu
+    w.triaTab("graella"); await tic();
+    T("v4.11: les caselles que no són seves NO mostren marques apagades (e9-dl és d'en Nil)",
+      cos().includes('aria-label="Janot Dilluns 8.35"></button>'));
     w.esborraGraellaNen(janG.id); await tic(10);
-    T("v4.7: el diàleg diu què es buidarà (amb germans: exclusives sí, compartides no)",
-      (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("compartides amb els germans"));
+    T("v4.11: el diàleg avisa que les compartides quedaran per respondre i que s'alliberaran places",
+      (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("per respondre de nou") &&
+      d.querySelector("#conf-box").textContent.includes("s'alliberaran"));
     d.querySelector("#conf-si").click(); await tic(10);
-    T("v4.7: cauen els 🙋 del fill i el 🚗/🚫 de les seves caselles exclusives",
-      !w.te(janG.marca, "r17", "dl") && !w.te(fVPg.cotxe, "e8", "dl"));
-    T("…però el 🚗/🚫 de les caselles compartides amb germans es queda", w.te(fVPg.propi, "r13", "dl"));
+    T("v4.11: la targeta queda en blanc del tot: 🙋, 🚗 exclusiu i 🚫 compartit",
+      !w.te(janG.marca, "r17", "dl") && !w.te(fVPg.cotxe, "e8", "dl") && !w.te(fVPg.propi, "r13", "dl"));
+    T("…i només es conserva el que és exclusiu del germà (e9-dl)", w.te(fVPg.cotxe, "e9", "dl"));
     T("…amb el missatge «Graella de X buida»", d.querySelector("#avis").textContent.includes("Graella de Janot buida"));
-    fVPg.nens = fVPg.nens.filter(x => x.id !== "tmp-esb");
-    await surtIentra("admin@test.cat", "admin123");   // res d'això no s'ha desat: torna a l'estat de la BD
+    fVPg.nens = fVPg.nens.filter(x => x.id !== "tmp-esb");   // el germà temporal fora ABANS de desar (que no s'insereixi a la BD)
+    await w.desa(); await tic(40);
+    T("v4.11: en desar, el fill surt del cotxe on estava assignat (les places s'alliberen)",
+      !DB.assignments.some(a => a.child_id === idJan()));
+    const grupG = famDB("Grau").group_id;
+    T("v4.11: TOT el grup rep l'avís, amb la família, el fill i el conductor",
+      DB.notifications.some(nt => nt.family_id === famDB("Grau").id && nt.message.includes("ha esborrat la graella de Janot") && nt.message.includes("Pere")) &&
+      DB.notifications.filter(nt => nt.message.includes("ha esborrat la graella de Janot")).length >= DB.families.filter(x => x.group_id === grupG).length);
+    w.triaTab("avisos"); await tic();
+    T("…i l'apartat Avisos el mostra", cos().includes("ha esborrat la graella de Janot"));
     w.triaTab("graella"); await tic();
   }
   // les proves següents esperen la graella de Vila Puig buida (abans la buidava el botó): es buida directament a la BD
