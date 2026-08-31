@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.16", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.16"));
+  T("lema i peu amb versió 4.18", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.18"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1092,6 +1092,15 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("a Famílies es veu el rol de cadascuna (+curs i telèfon)", cos().includes("· admin") && cos().includes("· staff") && cos().includes("2n ESO") && cos().includes("600111222"));
   w.triaTab("cotxe"); await tic();
   T("«El teu cotxe» llista els nens que hi puc carregar, amb caselles", cos().includes("Qui puges al teu cotxe?") && (cos().includes("demana pla") || cos().includes("demanen pla")));
+  T("v4.17: la barra de dalt és NOMÉS de la família (cotxes oferts + demandes dels fills)", (function(){
+    const stf = w.statsCoberturaFam(w.lameva());
+    return cos().includes("Trajectes coberts per tu") && stf.tot > 0 && cos().includes(stf.cob + " de " + stf.tot);
+  })());
+  T("v4.17: la barra del peu és la del grup (el mateix número que el Resum)", (function(){
+    const st = w.statsCobertura();
+    const peu = (d.querySelector("#peu-stats") || { innerHTML: "" }).innerHTML;
+    return peu.includes("Trajectes coberts del grup") && st.dem > 0 && peu.includes(st.cob + " de " + st.dem);
+  })());
   T("v4.10: cada viatge duu la capçalera del Quadre (hora gran + ENTRADA/RECOLLIDA + pastilla)",
     /class="m-tip [er]"/.test(cos()) && cos().includes('class="f-hora"') && /pla(ç|\u00e7)?a lliure|places lliures/.test(cos()));
   T("v4.10: cada nen surt amb la icona 🧒 i el nom en negreta", cos().includes("🧒 <b>"));
@@ -1542,6 +1551,26 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     d.querySelector("#avis").textContent.includes("orfe2@test.cat") &&
     d.querySelector("#avis").textContent.includes("orfe3@test.cat"));
   w.tancaAdmin(); await tic();
+
+  console.log("10n · NOVETATS v4.18 (Estadístiques per a l'admin)");
+  T("v4.18: el menú de l'admin té l'apartat Estadístiques", d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
+  w.triaTab("estad"); await tic();
+  T("v4.18: a dalt la barra del grup i una barra per cada família",
+    cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
+  T("v4.18: les barres de família són el càlcul d'El teu cotxe (statsCoberturaFam), reutilitzat", (function(){
+    return w.doc.families.every(f2 => { const st2 = w.statsCoberturaFam(f2);
+      return !st2.tot || cos().includes(st2.cob + " de " + st2.tot); });
+  })());
+  T("v4.18: ordenades de menys a més cobertura", (function(){
+    const pcts = [...cos().matchAll(/\d+ de \d+ · (\d+) %/g)].slice(1).map(m => +m[1]);
+    return pcts.length >= 1 && pcts.every((p2, i) => i === 0 || pcts[i - 1] <= p2);
+  })());
+  T("v4.18: cada família amb la seva línia d'estat de pendents", cos().includes("als seus viatges"));
+  await surtIentra("grau@test.cat", "grau123");
+  T("v4.18: fora de l'admin no hi ha Estadístiques al menú", !d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
+  w.triaTab("estad"); await tic();
+  T("…i la pestanya el retorna a la Graella", cos().includes("Toca una casella"));
+  await surtIentra("admin@test.cat", "admin123");
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);

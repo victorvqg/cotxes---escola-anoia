@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.16</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.18</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -832,6 +832,29 @@ function statsCobertura(){
   }));
   return { dem: dem, cob: cob, meus: meus, nPend: Object.keys(pendSet).length };
 }
+/* v4.17: cobertura d'UNA família — els seus trajectes són els cotxes que
+   ofereix (coberts per definició: els fa ella) i les demandes dels seus
+   fills (cobertes quan algú els porta). pend = nens que esperen plaça als
+   SEUS viatges (la mateixa lògica que el recompte d'El teu cotxe). */
+function statsCoberturaFam(f){
+  let tot = 0, cob = 0, pend = 0;
+  DIES.forEach(d2 => FRANGES.forEach(fr => {
+    if (estatCasella(f, fr.id, d2) !== "normal") return;
+    if (te(f.cotxe, fr.id, d2)){
+      tot++; cob++;
+      const refs = portaValids(f, fr.id, d2);
+      pend += balanc(fr.id, d2).nens.filter(n => (!n.portadaPerId || n.portadaPerId === f.id) &&
+        !refs.some(r2 => r2.fam === n.famId && r2.nen === n.nenId)).length;
+    } else {
+      (f.nens || []).forEach(n => {
+        if (!te(n.marca, fr.id, d2) || !nenTeCasella(n, fr.id, d2)) return;
+        tot++;
+        if (elPorta(f.id, n.id, fr.id, d2)) cob++;
+      });
+    }
+  }));
+  return { tot: tot, cob: cob, pend: pend };
+}
 function barraCobHtml(titol, val, tot, sub, clic){
   const pct = tot ? Math.round(val * 100 / tot) : 0;
   return "<div class='barra-cob'" + (clic ? " onclick=\"" + clic + "\"" : "") + ">" +
@@ -852,7 +875,7 @@ function pintaPeuStats(){
   });
   // Barra de progrés de TOT EL GRUP (la del peu)
   const st = statsCobertura();
-  const barra = barraCobHtml("\ud83c\udfaf Trajectes coberts de tot el grup", st.cob, st.dem,
+  const barra = barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.dem,
     (st.dem ? (st.cob === st.dem
         ? "<div class='bc-sub be'>\ud83c\udf89 100 % \u00b7 tots els nens tenen cotxe</div>"
         : (st.nPend ? "<div class='bc-sub'>" + st.nPend + (st.nPend === 1 ? " nen encara" : " nens encara") + " sense cotxe en algun trajecte</div>" : ""))
@@ -1416,6 +1439,7 @@ function pantallaApp(){
   const f = lameva();
   if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
+  if (tabAct === "estad" && !esAdmin) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff && !esProgenitor) tabAct = "perfil";
   $("#pantalla").innerHTML =
     "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet" + (esProgenitor ? " prog" : "") + "'>\u00b7 " + (esProgenitor ? "progenitor" : f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
@@ -1449,7 +1473,7 @@ function pintaMenu(){
     it("descarrega", "\ud83d\udda8\ufe0f", "Descarrega") +
     it("families", "👥", "Famílies") +
     ((esAdmin && doc.adminFam && f.id === doc.adminFam) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee1\ufe0f Admin</button>" : (esStaff && perfil && f.id === perfil.family_id) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee0\ufe0f Staff</button>" : "") +
-    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
+    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") + it("estad", "\ud83d\udcca", "Estad\u00edstiques") : "") +
     "<button class='c-item' onclick=\"tancaMenu(); tancaSessio();\">🚪 Tanca sessió</button>" +
     "<div class='c-sep'></div>" +
     "<p class='hint' style='padding:0 12px'>Perfil i Graella complets desbloquegen els Calendaris.</p>";
@@ -1459,7 +1483,7 @@ function tancaMenu(){ const v = $("#vel"), c = $("#calaix"); if (v) v.classList.
 
 function triaTab(t){
   tabAct = t; tancaMenu();
-  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cotxe: "🚗 El teu cotxe · qui hi puja", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", families: "👥 Famílies del grup", rols: "\ud83d\udee1\ufe0f Rols del grup" };
+  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cotxe: "🚗 El teu cotxe · qui hi puja", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", families: "👥 Famílies del grup", rols: "\ud83d\udee1\ufe0f Rols del grup", estad: "\ud83d\udcca Estad\u00edstiques del grup" };
   const el = $("#cap-titol");
   if (el) el.innerHTML = esc(tit[t] || "") + ((t === "cal" || t === "graella") && doc && doc.grupNom ? "<br><span style='font-size:13px;font-weight:400;opacity:.75'>Grup " + esc(doc.grupNom) + "</span>" : "");
   pintaMenu();
@@ -1470,6 +1494,7 @@ function triaTab(t){
   else if (t === "descarrega") pintaDescarrega();
   else if (t === "families") pintaFamilies();
   else if (t === "rols") pintaRols();
+  else if (t === "estad") pintaEstadistiques();
   else if (!potCal()) pintaBloqueig();
   else pintaCalendari();
 }
@@ -2129,7 +2154,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.16", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.18", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2314,6 +2339,25 @@ function descarregaAvisosCsv(){
     document.body.appendChild(a); a.click(); a.remove();
     avis("\u2713 Avisos descarregats en CSV (nom\u00e9s els del filtre actual).", true);
   } catch(e){ avis("Aquest navegador no deixa baixar el fitxer: prova-ho des d'un ordinador."); }
+}
+/* v4.18: Estadístiques per a l'admin — la barra de cada família és EXACTAMENT
+   la «Trajectes coberts per tu» que aquella família veu a El teu cotxe
+   (statsCoberturaFam, la mateixa funció), ordenades de menys a més cobertura
+   per veure primer qui va endarrerit. RLS: cap consulta nova — les marques i
+   assignacions de tot el grup ja són llegibles per qualsevol membre. */
+function pintaEstadistiques(){
+  if (!esAdmin){ triaTab("graella"); return; }
+  const st = statsCobertura();
+  const files = famOrd().map(f2 => Object.assign({ f: f2 }, statsCoberturaFam(f2)))
+    .sort((a, b) => (a.tot ? a.cob / a.tot : 2) - (b.tot ? b.cob / b.tot : 2));
+  $("#tab-cos").innerHTML =
+    "<div class='targeta'>" + barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.dem, "", "") + "</div>" +
+    "<p class='hint' style='margin:0 2px 8px'>Una barra per fam\u00edlia \u2014 la mateixa que cadascuna veu a \u00abEl teu cotxe\u00bb \u2014, de menys a m\u00e9s cobertura.</p>" +
+    files.map(x => "<div class='targeta'>" +
+      barraCobHtml("\ud83c\udfaf " + esc(x.f.nom), x.cob, x.tot,
+        (x.pend ? "<div class='bc-sub'>\u26a0 " + x.pend + (x.pend === 1 ? " nen pendent" : " nens pendents") + " als seus viatges</div>"
+                : "<div class='bc-sub be'>\u2713 cap nen pendent als seus viatges</div>"), "") +
+      "</div>").join("");
 }
 /* v4.15: els avisos viuen a la taula notifications de Supabase — cada família
    llegeix els seus (RLS) i l'admin els de tot el grup. Filtres, hora amb
@@ -2659,9 +2703,9 @@ function pintaCotxe(){
     $("#tab-cos").innerHTML = "<div class='targeta'><p class='lead'>Aquesta setmana no conduïu cap viatge. Marqueu 🚗 a la Graella i aquí us apareixeran, dia per dia, els nens que demanen plaça per pujar al vostre cotxe.</p></div>";
     return;
   }
-  const stc = statsCobertura();
+  const stf = statsCoberturaFam(meva);
   const barraTu = "<div class='targeta'>" +
-    barraCobHtml("\ud83c\udfaf Trajectes coberts per tu", stc.meus, stc.dem,
+    barraCobHtml("\ud83c\udfaf Trajectes coberts per tu", stf.cob, stf.tot,
       (pendTotals ? "<div class='bc-sub'>" + pendTotals + (pendTotals === 1 ? " nen espera" : " nens esperen") + " pla\u00e7a als teus viatges</div>"
                   : "<div class='bc-sub be'>\u2713 cap nen pendent als teus viatges</div>"), "") +
     "</div>";
