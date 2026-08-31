@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.6</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.9</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1547,8 +1547,9 @@ function pintaPerfil(){
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : "", f.nens.some(n => !(n.curs || "").trim()) ? "el curs de cada nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
     (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa aquest codi a l'altre progenitor o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia</span></span></div>" +
     "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
-    "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup<span class='p-sub'>codi d'invitaci\u00f3 del grup: passa'l a les fam\u00edlies que s'hi vulguin unir</span></span></div>" +
-    "<div class='nomgran' style='text-align:center'>" + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + " \u00b7 <span style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span></div>" +
+    "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup: " + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + "</span></div>" +
+    "<div class='fila' style='align-items:center;gap:8px;justify-content:center;flex-wrap:wrap'><span>Codi d'invitaci\u00f3:</span><span class='nomgran' style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
+    "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a les fam\u00edlies que s'hi vulguin unir. Nom\u00e9s cal el codi, no el nom del grup.</p>" +
     "<p class='hint' style='text-align:center;margin-top:14px'>Has entrat com a <b>" + esc(sessio && sessio.user ? sessio.user.email : "") + "</b></p>" +
     "<div style='text-align:center;margin-top:6px'>" +
     (perfil && perfil.family_id && f.id === perfil.family_id ? "<button class='enllac' onclick='desvinculaCompte()'>Desvincula aquest compte de la fam\u00edlia</button><br>" : "") +
@@ -1558,23 +1559,33 @@ function pintaPerfil(){
   bloquejaEdicio();
 }
 
-/* Esborra NOMÉS les marques d'un fill. La graella de la resta de la família
-   (el 🚗, el 🚫 i els germans) no es toca. Es fa en memòria: cal «Desa els
-   canvis», i així es pot desfer sense desar. */
+/* v4.7: esborra la graella d'UN fill. Els seus \ud83d\ude4b cauen a tot arreu i, a les
+   caselles que NOMÉS té ell (cap germà les té), també el \ud83d\ude97/\ud83d\udeab de la família
+   i els nens que hi portàveu. A les caselles compartides amb germans el \ud83d\ude97/\ud83d\udeab
+   es queda: és la resposta de tota la família i els germans encara la fan
+   servir. En memòria: cal «Desa els canvis», i es pot desfer sense desar. */
 function esborraGraellaNen(id){
   const f = lameva(); if (!f) return;
   if (nomesTitular()) return;
   const n = f.nens.find(x => x.id === id); if (!n) return;
   const nomC = n.nom.trim().split(/\s+/)[0];
+  const teGermans = (f.nens || []).length > 1;
   mostraConfirm({
     titol: "\ud83d\uddd1\ufe0f Esborrar la graella de " + esc(nomC) + "?",
-    text: "S'esborraran <b>nom\u00e9s les caselles marcades de " + esc(nomC) + "</b> (\ud83d\ude4b). La resta de la fam\u00edlia es queda igual: el vostre \ud83d\ude97, el \ud83d\udeab i les marques dels altres fills. Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
-    ok: "S\u00ed, esborra les seves", cancel: "Cancel\u00b7la",
+    text: teGermans
+      ? "Es buidaran les caselles de <b>" + esc(nomC) + "</b>: els seus \ud83d\ude4b i, a les caselles que nom\u00e9s t\u00e9 " + esc(nomC) + ", tamb\u00e9 el \ud83d\ude97 i el \ud83d\udeab. Les caselles compartides amb els germans no es toquen (el \ud83d\ude97/\ud83d\udeab \u00e9s de tota la fam\u00edlia). Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>."
+      : "Es buidar\u00e0 <b>TOTA la graella de " + esc(nomC) + "</b>: \ud83d\ude97, \ud83d\ude4b i \ud83d\udeab. Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
+    ok: "S\u00ed, buida-la", cancel: "Cancel\u00b7la",
     alOk: () => {
-      FRANGES.forEach(fr => DIES.forEach(d => treu(n.marca, fr.id, d)));
+      FRANGES.forEach(fr => DIES.forEach(d => {
+        treu(n.marca, fr.id, d);
+        if ((f.nens || []).some(x => x.id !== n.id && nenTeCasella(x, fr.id, d))) return;   // compartida: es queda
+        treu(f.cotxe, fr.id, d); treu(f.propi, fr.id, d);
+        if (f.porta) delete f.porta[fr.id + "-" + d];
+      }));
       dirty = true; pintaBarra();
       if (tabAct === "graella") pintaGraellaTab(); else pintaHorariComplet();
-      avis("\ud83d\uddd1\ufe0f Marques de <b>" + esc(nomC) + "</b> esborrades. Prem \u00abDesa els canvis\u00bb.", true);
+      avis("\ud83d\uddd1\ufe0f <b>Graella de " + esc(nomC) + " buida.</b> Prem \u00abDesa els canvis\u00bb per confirmar-ho.", true);
     }
   });
 }
@@ -1836,7 +1847,7 @@ function pantallaAdmin(){
   if (esAdmin){
     cos = "<p class='lead'>\ud83d\udee1\ufe0f Ets l'administrador del grup <b>" + esc(doc.grupNom || "") + "</b>. El teu rol ve de la base de dades: ja no hi ha codis secrets que activar.</p>" +
       "<div class='p-fila'><span class='p-lab'>Codis d'acc\u00e9s<span class='p-sub'>el del grup serveix per convidar fam\u00edlies; el de cada fam\u00edlia, per vincular-hi el segon compte. Nom\u00e9s els veus tu</span></span></div>" +
-      "<div class='fila' style='align-items:center;gap:8px'><div class='nomgran' style='letter-spacing:.14em;flex:1;text-align:center'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</div><button class='boto sec' onclick='copiaTextCodiGrup(this)'>copia</button></div>" +
+      "<div class='fila' style='align-items:center;gap:8px'><div class='nomgran' style='letter-spacing:.14em;flex:1;text-align:center'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</div><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
       "<div id='codis-box'><p class='hint'>Carregant\u2026</p></div>" +
       "<p class='hint'>Rols: a la pestanya \u00abFam\u00edlies\u00bb tens \u00abedita\u00bb a cada fam\u00edlia, i a \u00abRols\u00bb (men\u00fa \u2630) alternes usuari \u2194 staff.</p>" +
       "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de creaci\u00f3 de grup<span class='p-sub'>cal per crear un grup NOU. No \u00e9s dins l'app: viu a Supabase i nom\u00e9s el veus tu</span></span></div>" +
@@ -1872,7 +1883,11 @@ function fallbackCopia(t, ok){
   try { document.execCommand("copy"); } catch(e){}
   ta.remove(); ok();
 }
-function copiaTextCodiGrup(btn){ copiaText(grupActiu ? grupActiu.invite_code : "", btn); }
+function copiaTextCodiGrup(btn){
+  const c = grupActiu ? grupActiu.invite_code : "";
+  copiaText(c, btn);
+  avis("Codi copiat: <b style='letter-spacing:.14em'>" + esc(c) + "</b>", true);
+}
 async function carregaCodiCreacio(){
   const box = $("#codicreacio-box"); if (!box || !esAdmin) return;
   const r = await sb.rpc("codi_creacio_grup");
@@ -1971,7 +1986,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.6", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.9", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2681,8 +2696,8 @@ function descarregaHorariNen(fid, nid){
   }); });
   const lleg = [["#2e8047", "cotxe compartit (el nom \u00e9s qui condueix)"], ["#1d4a6e", "amb la seva fam\u00edlia"], ["#9aa6b0", "pel seu compte / no hi ha classe"], ["#d64545", "pendent de conductor"]];
   const subN = "Amb qui va cada dia \u00b7 " + fam.nom + (doc.grupNom ? " \u00b7 Grup " + doc.grupNom : "");
-  fullActual = { titol: "Horari de " + nen.nom, sub: subN, cont: cont, fitxer: "horari-" + slug(nen.nom) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
-  mostraFull(fullHorariHtml("Horari de " + nen.nom, subN, cont, "FULL DEL NEN", lleg));
+  fullActual = { titol: "Horari de " + jo + " " + fam.nom, sub: subN, cont: cont, fitxer: "horari-" + slug(nen.nom) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari de " + jo + " " + fam.nom, subN, cont, "FULL DEL NEN", lleg));
 }
 
 function descarregaHorariConductor(){
@@ -2703,8 +2718,8 @@ function descarregaHorariConductor(){
   }); });
   const lleg = [["#2e8047", "viatges que condueixes (amb els nens i les places que et queden)"], ["#9aa6b0", "pel vostre compte"]];
   const subC = "Qui puges a cada viatge \u00b7 " + f.nom + (doc.grupNom ? " \u00b7 Grup " + doc.grupNom : "");
-  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: subC, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
-  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), subC, cont, "FULL DEL CONDUCTOR", lleg));
+  fullActual = { titol: "Horari del conductor \u2014 " + nomConductorComplet(f), sub: subC, cont: cont, fitxer: "horari-conductor-" + slug(nomConductorComplet(f)) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductorComplet(f), subC, cont, "FULL DEL CONDUCTOR", lleg));
 }
 
 function pintaDescarrega(){
@@ -2713,23 +2728,13 @@ function pintaDescarrega(){
   (f.nens || []).forEach(n2 => {
     const p = nenPendents(f, n2);
     const nomC = esc(n2.nom.trim().split(/\s+/)[0]);
-    h += "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udda8\ufe0f Horari de " + nomC + "</button>";
+    h += "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udda8\ufe0f Horari de " + nomC + " " + esc(f.nom) + "</button>";
     if (p) h += "<p class='hint' style='margin:4px 0 0'>\u26a0 " + nomC + " t\u00e9 " + (p === 1 ? "1 trajecte" : p + " trajectes") + " sense conductor: al full " + (p === 1 ? "surt" : "surten") + " en vermell com a \u00abpendent\u00bb.</p>";
   });
   const condueix = FRANGES.some(fr => DIES.some(d => te(f.cotxe, fr.id, d)));
   h += condueix
-    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udda8\ufe0f Horari del conductor (" + esc(nomConductor(f)) + ")</button>"
+    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udda8\ufe0f Horari del conductor (" + esc(nomConductorComplet(f)) + ")</button>"
     : "<p class='hint' style='margin:10px 0 0'>Aquesta setmana no condu\u00efu cap dia: no hi ha horari de conductor a generar.</p>";
-  if (condueix){
-    let resum = "";
-    DIES.forEach(d => FRANGES.forEach(fr => {
-      if (!te(f.cotxe, fr.id, d)) return;
-      const portats = nensDeCasella(f, fr.id, d).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
-      const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
-      resum += "<div class='d-fila'><span class='d-hora'>" + DIES_LBL[d] + " " + fr.hora + "</span><span class='d-txt'>portes <b>" + portats.length + (portats.length === 1 ? " nen" : " nens") + "</b>" + (portats.length ? " (" + esc(portats.join(", ")) + ")" : "") + " \u00b7 et " + (lliures === 1 ? "queda <b>1 pla\u00e7a</b> lliure" : "queden <b>" + lliures + " places</b> lliures") + "</span></div>";
-    }));
-    h += "<div class='p-fila' style='margin-top:10px'><span class='p-lab'>Qu\u00e8 portar\u00e0s a cada viatge<span class='p-sub'>\u00e9s el resum que surt escrit dins el full del conductor</span></span></div>" + resum;
-  }
   h += "</div>";
   $("#tab-cos").innerHTML = h;
 }

@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.6", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.6"));
+  T("lema i peu amb versió 4.9", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.9"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -763,15 +763,19 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("calendari per nen: es veu qui el porta (persona)", cos().includes("el porta Marta VP"));
   w.triaTab("descarrega"); await tic();
   T("apartat «Descarrega»: horaris dels meus nens i del conductor", pant().includes("Descarrega") && cos().includes("Horari de Jan") && cos().includes("Horari de Mia") && cos().includes("Horari del conductor"));
+  T("v4.9: el botó de l'horari del nen duu els cognoms de la família", cos().includes("Horari de Jan " + w.lameva().nom));
+  T("v4.9: el botó del conductor duu els cognoms sencers, no inicials", cos().includes(w.nomConductorComplet(w.lameva())));
   const miaViu = famDoc("Vila Prat").nens.find(n => n.nom === "Mia");
   w.commuta(miaViu.marca, "r13", "dl"); w.triaTab("descarrega"); await tic();
   T("nen amb pendents: el botó hi és SEMPRE, amb l'avís del vermell", cos().includes("Horari de Mia") && cos().includes("1 trajecte") && cos().includes("pendent"));
   w.commuta(miaViu.marca, "r13", "dl"); w.triaTab("descarrega"); await tic();
   w.descarregaHorariNen(famDoc("Vila Prat").id, idJan()); await tic();
   T("el full del nen s'obre a pantalla, llest per imprimir o desar en PDF", !d.querySelector("#full-horari").classList.contains("ocult") && d.querySelector("#full-horari").innerHTML.includes("Horari de Jan") && d.querySelector("#full-horari").innerHTML.includes("Imprimeix") && d.querySelector("#full-horari").innerHTML.includes("FULL DEL NEN") && d.querySelector("#full-horari").innerHTML.includes("ENTRADA · MATÍ"));
+  T("v4.9: el títol del full del nen duu els cognoms", d.querySelector("#full-horari").innerHTML.includes("Horari de Jan " + w.lameva().nom));
   w.tancaFull(); await tic();
   w.descarregaHorariConductor(); await tic();
   T("el full del conductor: qui puja a cada viatge", d.querySelector("#full-horari").innerHTML.includes("Horari del conductor") && d.querySelector("#full-horari").innerHTML.includes("porta ") && d.querySelector("#full-horari").innerHTML.includes("lliure"));
+  T("v4.9: el títol del full del conductor duu els cognoms sencers", d.querySelector("#full-horari").innerHTML.includes(w.nomConductorComplet(w.lameva())));
   await w.comparteixFull(); await tic();
   T("sense canvas ni share (laboratori): consell honest de la captura", d.querySelector("#avis").textContent.includes("captura de pantalla"));
   w.tancaFull(); await tic();
@@ -945,7 +949,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("en desar, el botó Desa del perfil desapareix", !cos().includes("Desa els canvis"));
   w.canviaPlaces(-1); await w.desa(); await tic(30);  // tornem a deixar 3 places
   w.triaTab("descarrega"); await tic();
-  T("Descarrega explica cada viatge del conductor (quants nens i places lliures)", cos().includes("Horari del conductor") && /portes <b>\d+ nen/.test(cos()) && cos().includes("lliure"));
+  T("v4.9: Descarrega ja NO duplica el resum de viatges (només va dins el full del conductor)", cos().includes("Horari del conductor") && !/portes <b>\d+ nen/.test(cos()) && !cos().includes("Què portaràs"));
   w.obreAdmin(); await tic();
   T("el panell admin té logs i còpia de seguretat", pant().includes("Mostra els logs") && pant().includes("seguretat (JSON)"));
   await w.mostraLogs(); await tic(20);
@@ -1017,6 +1021,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el propi cotxe es veu amb comptador i s'assigna a «El teu cotxe»", cos().includes("Al teu cotxe") && cos().includes("/3"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el grup i el seu codi d'invitació", cos().includes("El vostre grup") && cos().includes(CODI));
+  T("v4.8: nom del grup i codi separats, amb botó de copiar i l'aclariment",
+    cos().includes("El vostre grup: ") && cos().includes("Codi d'invitació:") && cos().includes("Copia el codi") && cos().includes("Només cal el codi, no el nom del grup"));
+  w.copiaTextCodiGrup(null); await tic();
+  T("…i copiar avisa amb «Codi copiat: [codi]»",
+    d.querySelector("#avis").textContent.includes("Codi copiat") && d.querySelector("#avis").textContent.includes(CODI));
   const nenPerCurs = famDoc("Vila Puig").nens[0];
   w.triaCursNen(nenPerCurs.id, "1r ESO"); await tic();
   // v3.6: amb 1r ESO canvien les caselles vàlides (8.00 dt/dc, tardes de nou); es reomplen les noves
@@ -1162,6 +1171,26 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.4: la graella ja NO té el botó d'esborrar-ho tot", !cos().includes("Esborra tota la graella"));
   T("v4.4: el botó per fill segueix a la targeta de cada fill", cos().includes("Esborra la graella de"));
   T("v4.4: les funcions d'esborrat total ja no existeixen", !w.esborraGraella && !w.esborraGraellaDeDebò && !w.pintaGraellaAccions);
+  // ── v4.7 · «Esborra la graella de X» buida també el 🚗/🚫 de les caselles EXCLUSIVES del fill ──
+  {
+    const fVPg = famDoc("Vila Puig");
+    fVPg.nens.push({ id: "tmp-esb", nom: "Nil", curs: "1r ESO", marca: {} });   // germà: el migdia és compartit; la matinera de dilluns només és d'en Janot (3r)
+    const janG = fVPg.nens[0];
+    w.posa(fVPg.cotxe, "e8", "dl");     // exclusiva d'en Janot
+    w.posa(fVPg.propi, "r13", "dl");    // compartida amb en Nil
+    w.posa(janG.marca, "r17", "dl");    // 🙋 seu
+    w.esborraGraellaNen(janG.id); await tic(10);
+    T("v4.7: el diàleg diu què es buidarà (amb germans: exclusives sí, compartides no)",
+      (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("compartides amb els germans"));
+    d.querySelector("#conf-si").click(); await tic(10);
+    T("v4.7: cauen els 🙋 del fill i el 🚗/🚫 de les seves caselles exclusives",
+      !w.te(janG.marca, "r17", "dl") && !w.te(fVPg.cotxe, "e8", "dl"));
+    T("…però el 🚗/🚫 de les caselles compartides amb germans es queda", w.te(fVPg.propi, "r13", "dl"));
+    T("…amb el missatge «Graella de X buida»", d.querySelector("#avis").textContent.includes("Graella de Janot buida"));
+    fVPg.nens = fVPg.nens.filter(x => x.id !== "tmp-esb");
+    await surtIentra("admin@test.cat", "admin123");   // res d'això no s'ha desat: torna a l'estat de la BD
+    w.triaTab("graella"); await tic();
+  }
   // les proves següents esperen la graella de Vila Puig buida (abans la buidava el botó): es buida directament a la BD
   DB.weekly_marks = DB.weekly_marks.filter(m => m.family_id !== idVila);
   DB.assignments = DB.assignments.filter(a => a.driver_family_id !== idVila);
