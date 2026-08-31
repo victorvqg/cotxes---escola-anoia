@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.5", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.5"));
+  T("lema i peu amb versió 4.6", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.6"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -624,10 +624,14 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   bp = w.balanc("e15", "dc");
   T("esborra neteja també 🚫/🚗 i el nen", bp.conds.length === 0 && bp.propis.length === 0 && bp.nens.length === 0);
 
-  console.log("3c · LA SETMANA S'HA DE COMPLETAR PER DESAR");
+  console.log("3c · LA SETMANA INCOMPLETA AVISA PERÒ ES DESA (v4.6)");
   T("hi ha canvis → surt la barra de desar", !d.querySelector("#barra").classList.contains("amaga"));
-  await w.desa(); await tic(10);
-  T("no es deixa desar amb franges buides — l'avís surt A LA BARRA", !d.querySelector("#barra-avis").classList.contains("ocult") && d.querySelector("#barra-avis").textContent.includes("No es pot desar") && !d.querySelector("#barra").classList.contains("amaga"));
+  await w.desa(); await tic(30);
+  T("v4.6: amb franges buides ES DESA igualment i l'avís queda a la barra",
+    d.querySelector("#barra").classList.contains("amaga") &&
+    !d.querySelector("#barra-avis").classList.contains("ocult") &&
+    d.querySelector("#barra-avis").textContent.includes("Es desa igualment") &&
+    DB.activity_log.some(l => l.action === "canvi graella"));
   const vv = famDoc("Vila Prat");
   const grups = [["e8", "e9"], ["r13"], ["e15"], ["r17"]];
   for (const dd of ["dl", "dt", "dc", "dj", "dv"])
@@ -1092,6 +1096,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const polId = famDoc("Família Nova").nens[0].id;
   w.triaCursNen(polId, "4t ESO"); await tic();
   await w.desa(); await tic(30);
+  T("v4.6: el canvi de curs es desa encara que quedin caselles pendents (abans el bloqueig ho impedia)",
+    (DB.children.find(c => c.id === polId) || {}).curs === "4t ESO" &&
+    d.querySelector("#barra-avis").textContent.includes("Es desa igualment"));
   const pendN = w.celesPendents(famDoc("Família Nova"));
   T("4t ESO: les tardes de dimecres i divendres NO són pendents", !pendN.some(x => /Dimecres (15|17)|Divendres (15|17)/.test(x)), pendN.join(" | "));
   T("però el migdia de dimecres SÍ que cal respondre'l", pendN.some(x => x.includes("Dimecres 13.00")), pendN.join(" | "));
@@ -1145,6 +1152,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.obreCasella("e8", "dl"); await tic();
   T("però dilluns no (1r/2n entren a les 9.00)", !d.querySelector("#cel-menu").classList.contains("obert"));
   w.triaTab("perfil"); await tic();
+  // v4.6: el desat amb pendents ara SÍ es desa — cal tornar el curs real d'en
+  // Janot abans, que si no quedava 1r ESO a la BD (abans ho tapava el bloqueig)
+  w.triaCursNen(idJan(), "3r ESO"); await tic();
   await w.desa(); await tic(30);
 
   console.log("10g · NOVETATS v4.4 (un sol botó d'esborrar: fora «Esborra tota la graella»)");

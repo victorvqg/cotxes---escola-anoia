@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.5</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.6</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -923,12 +923,13 @@ async function desa(){
       if (tabAct !== "graella") triaTab("graella");
       return;
     }
+    /* v4.6: la setmana incompleta JA NO bloqueja el desat. Abans un canvi de
+       curs que obria caselles noves ho deixava tot a l'ostatge (ni el curs nou
+       ni les marques conservades no es podien desar, i en sortir es perdien).
+       Ara es desa el que hi ha respost i l'avís — que s'apaga sol en
+       completar — llista el que falta. Els Calendaris segueixen tancats fins
+       que la setmana és completa (potCal), com sempre. */
     const pend = celesPendents(fg);
-    if (pend.length){
-      barraAvis("\u26a0 <b>No es pot desar encara</b>: falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab; de les entrades " + horaDe("e8") + "/" + horaDe("e9") + " nom\u00e9s en cal una per nen). Primera: " + esc(pend[0]) + ". L'av\u00eds s'apagar\u00e0 sol quan la setmana sigui completa.");
-      if (tabAct !== "graella") triaTab("graella");
-      return;
-    }
     // Marques que han quedat en caselles en blanc (p. ex. en canviar el curs):
     // en desar s'esborren; si hi havia un 🚗 amb nens a bord, avís de passatgers
     const caiguts = [];
@@ -941,7 +942,10 @@ async function desa(){
         if (nn && te(nn.marca, fr.id, dia)) caiguts.push(nn.nom);
       });
     }));
-    if (caiguts.length)
+    if (pend.length){
+      barraAvis("\u26a0 Falten <b>" + pend.length + "</b> caselles per respondre (\ud83d\ude97, \ud83d\ude4b o \ud83d\udeab; de les entrades " + horaDe("e8") + "/" + horaDe("e9") + " nom\u00e9s en cal una per nen). Primera: " + esc(pend[0]) + ". <b>Es desa igualment</b>; l'av\u00eds s'apagar\u00e0 sol quan la setmana sigui completa.");
+      if (tabAct !== "graella") triaTab("graella");
+    } else if (caiguts.length)
       barraAvis("\u2139\ufe0f " + esc(caiguts.join(" i ")) + " " + (caiguts.length === 1 ? "queda" : "queden") + " sense pla\u00e7a: aquella casella ara est\u00e0 en blanc pel vostre curs. Les seves fam\u00edlies ho veuran als Avisos.", "info");
     else barraAvisNeteja();
   }
@@ -1967,7 +1971,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.5", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.6", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
