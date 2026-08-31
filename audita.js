@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.8", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.8"));
+  T("lema i peu amb versió 4.9", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.9"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -763,15 +763,19 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("calendari per nen: es veu qui el porta (persona)", cos().includes("el porta Marta VP"));
   w.triaTab("descarrega"); await tic();
   T("apartat «Descarrega»: horaris dels meus nens i del conductor", pant().includes("Descarrega") && cos().includes("Horari de Jan") && cos().includes("Horari de Mia") && cos().includes("Horari del conductor"));
+  T("v4.9: el botó de l'horari del nen duu els cognoms de la família", cos().includes("Horari de Jan " + w.lameva().nom));
+  T("v4.9: el botó del conductor duu els cognoms sencers, no inicials", cos().includes(w.nomConductorComplet(w.lameva())));
   const miaViu = famDoc("Vila Prat").nens.find(n => n.nom === "Mia");
   w.commuta(miaViu.marca, "r13", "dl"); w.triaTab("descarrega"); await tic();
   T("nen amb pendents: el botó hi és SEMPRE, amb l'avís del vermell", cos().includes("Horari de Mia") && cos().includes("1 trajecte") && cos().includes("pendent"));
   w.commuta(miaViu.marca, "r13", "dl"); w.triaTab("descarrega"); await tic();
   w.descarregaHorariNen(famDoc("Vila Prat").id, idJan()); await tic();
   T("el full del nen s'obre a pantalla, llest per imprimir o desar en PDF", !d.querySelector("#full-horari").classList.contains("ocult") && d.querySelector("#full-horari").innerHTML.includes("Horari de Jan") && d.querySelector("#full-horari").innerHTML.includes("Imprimeix") && d.querySelector("#full-horari").innerHTML.includes("FULL DEL NEN") && d.querySelector("#full-horari").innerHTML.includes("ENTRADA · MATÍ"));
+  T("v4.9: el títol del full del nen duu els cognoms", d.querySelector("#full-horari").innerHTML.includes("Horari de Jan " + w.lameva().nom));
   w.tancaFull(); await tic();
   w.descarregaHorariConductor(); await tic();
   T("el full del conductor: qui puja a cada viatge", d.querySelector("#full-horari").innerHTML.includes("Horari del conductor") && d.querySelector("#full-horari").innerHTML.includes("porta ") && d.querySelector("#full-horari").innerHTML.includes("lliure"));
+  T("v4.9: el títol del full del conductor duu els cognoms sencers", d.querySelector("#full-horari").innerHTML.includes(w.nomConductorComplet(w.lameva())));
   await w.comparteixFull(); await tic();
   T("sense canvas ni share (laboratori): consell honest de la captura", d.querySelector("#avis").textContent.includes("captura de pantalla"));
   w.tancaFull(); await tic();
@@ -945,7 +949,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("en desar, el botó Desa del perfil desapareix", !cos().includes("Desa els canvis"));
   w.canviaPlaces(-1); await w.desa(); await tic(30);  // tornem a deixar 3 places
   w.triaTab("descarrega"); await tic();
-  T("Descarrega explica cada viatge del conductor (quants nens i places lliures)", cos().includes("Horari del conductor") && /portes <b>\d+ nen/.test(cos()) && cos().includes("lliure"));
+  T("v4.9: Descarrega ja NO duplica el resum de viatges (només va dins el full del conductor)", cos().includes("Horari del conductor") && !/portes <b>\d+ nen/.test(cos()) && !cos().includes("Què portaràs"));
   w.obreAdmin(); await tic();
   T("el panell admin té logs i còpia de seguretat", pant().includes("Mostra els logs") && pant().includes("seguretat (JSON)"));
   await w.mostraLogs(); await tic(20);

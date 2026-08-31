@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.8</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.9</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1986,7 +1986,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.8", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.9", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2696,8 +2696,8 @@ function descarregaHorariNen(fid, nid){
   }); });
   const lleg = [["#2e8047", "cotxe compartit (el nom \u00e9s qui condueix)"], ["#1d4a6e", "amb la seva fam\u00edlia"], ["#9aa6b0", "pel seu compte / no hi ha classe"], ["#d64545", "pendent de conductor"]];
   const subN = "Amb qui va cada dia \u00b7 " + fam.nom + (doc.grupNom ? " \u00b7 Grup " + doc.grupNom : "");
-  fullActual = { titol: "Horari de " + nen.nom, sub: subN, cont: cont, fitxer: "horari-" + slug(nen.nom) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
-  mostraFull(fullHorariHtml("Horari de " + nen.nom, subN, cont, "FULL DEL NEN", lleg));
+  fullActual = { titol: "Horari de " + jo + " " + fam.nom, sub: subN, cont: cont, fitxer: "horari-" + slug(nen.nom) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL NEN", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari de " + jo + " " + fam.nom, subN, cont, "FULL DEL NEN", lleg));
 }
 
 function descarregaHorariConductor(){
@@ -2718,8 +2718,8 @@ function descarregaHorariConductor(){
   }); });
   const lleg = [["#2e8047", "viatges que condueixes (amb els nens i les places que et queden)"], ["#9aa6b0", "pel vostre compte"]];
   const subC = "Qui puges a cada viatge \u00b7 " + f.nom + (doc.grupNom ? " \u00b7 Grup " + doc.grupNom : "");
-  fullActual = { titol: "Horari del conductor \u2014 " + nomConductor(f), sub: subC, cont: cont, fitxer: "horari-conductor-" + slug(nomConductor(f)) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
-  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductor(f), subC, cont, "FULL DEL CONDUCTOR", lleg));
+  fullActual = { titol: "Horari del conductor \u2014 " + nomConductorComplet(f), sub: subC, cont: cont, fitxer: "horari-conductor-" + slug(nomConductorComplet(f)) + (doc.grupNom ? "-" + slug(doc.grupNom) : "") + ".jpg", distintiu: "FULL DEL CONDUCTOR", llegenda: lleg };
+  mostraFull(fullHorariHtml("Horari del conductor \u2014 " + nomConductorComplet(f), subC, cont, "FULL DEL CONDUCTOR", lleg));
 }
 
 function pintaDescarrega(){
@@ -2728,23 +2728,13 @@ function pintaDescarrega(){
   (f.nens || []).forEach(n2 => {
     const p = nenPendents(f, n2);
     const nomC = esc(n2.nom.trim().split(/\s+/)[0]);
-    h += "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udda8\ufe0f Horari de " + nomC + "</button>";
+    h += "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udda8\ufe0f Horari de " + nomC + " " + esc(f.nom) + "</button>";
     if (p) h += "<p class='hint' style='margin:4px 0 0'>\u26a0 " + nomC + " t\u00e9 " + (p === 1 ? "1 trajecte" : p + " trajectes") + " sense conductor: al full " + (p === 1 ? "surt" : "surten") + " en vermell com a \u00abpendent\u00bb.</p>";
   });
   const condueix = FRANGES.some(fr => DIES.some(d => te(f.cotxe, fr.id, d)));
   h += condueix
-    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udda8\ufe0f Horari del conductor (" + esc(nomConductor(f)) + ")</button>"
+    ? "<button class='boto sec' style='width:100%;margin-top:12px' onclick='descarregaHorariConductor()'>\ud83d\udda8\ufe0f Horari del conductor (" + esc(nomConductorComplet(f)) + ")</button>"
     : "<p class='hint' style='margin:10px 0 0'>Aquesta setmana no condu\u00efu cap dia: no hi ha horari de conductor a generar.</p>";
-  if (condueix){
-    let resum = "";
-    DIES.forEach(d => FRANGES.forEach(fr => {
-      if (!te(f.cotxe, fr.id, d)) return;
-      const portats = nensDeCasella(f, fr.id, d).map(x => x.nom.trim().split(/\s+/)[0]).concat(nomsPortats(f, fr.id, d));
-      const lliures = Math.max(0, (f.places || 0) - portaValids(f, fr.id, d).length);
-      resum += "<div class='d-fila'><span class='d-hora'>" + DIES_LBL[d] + " " + fr.hora + "</span><span class='d-txt'>portes <b>" + portats.length + (portats.length === 1 ? " nen" : " nens") + "</b>" + (portats.length ? " (" + esc(portats.join(", ")) + ")" : "") + " \u00b7 et " + (lliures === 1 ? "queda <b>1 pla\u00e7a</b> lliure" : "queden <b>" + lliures + " places</b> lliures") + "</span></div>";
-    }));
-    h += "<div class='p-fila' style='margin-top:10px'><span class='p-lab'>Qu\u00e8 portar\u00e0s a cada viatge<span class='p-sub'>\u00e9s el resum que surt escrit dins el full del conductor</span></span></div>" + resum;
-  }
   h += "</div>";
   $("#tab-cos").innerHTML = h;
 }
