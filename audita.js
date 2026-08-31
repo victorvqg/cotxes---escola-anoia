@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.3", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.3"));
+  T("lema i peu amb versió 4.4", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.4"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -943,7 +943,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
-  w.renomTel("600111222"); w.triaCurs("2n ESO"); await tic();
+  w.renomTel("600111222"); await tic();   // v4.1 va treure el curs de família (triaCurs): només queda el curs per nen
   // v3.6: canviar el curs pot deixar caselles noves per respondre (l'entrada passa a les 9.00); es reomplen
   const ompleForats = fx => ["e8", "e9", "r13", "e15", "r17"].forEach(s => ["dl", "dt", "dc", "dj", "dv"].forEach(dd => {
     if (w.estatCasella(fx, s, dd) !== "normal" || w.respon(fx, s, dd)) return;
@@ -953,7 +953,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   }));
   ompleForats(famDoc("Vila Puig"));
   await w.desa(); await tic(30);
-  T("telèfon i curs es desen a la BD", famDB("Vila Puig").phone === "600111222" && famDB("Vila Puig").curs === "2n ESO");
+  T("el telèfon es desa a la BD", famDB("Vila Puig").phone === "600111222");
   w.triaTab("families"); await tic();
   T("a Famílies es veu el rol de cadascuna (+curs i telèfon)", cos().includes("· admin") && cos().includes("· staff") && cos().includes("2n ESO") && cos().includes("600111222"));
   w.triaTab("cotxe"); await tic();
@@ -1067,12 +1067,12 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("4t ESO: les tardes de dimecres i divendres NO són pendents", !pendN.some(x => /Dimecres (15|17)|Divendres (15|17)/.test(x)), pendN.join(" | "));
   T("però el migdia de dimecres SÍ que cal respondre'l", pendN.some(x => x.includes("Dimecres 13.00")), pendN.join(" | "));
   T("i la tarda de dilluns també", pendN.some(x => x.includes("Dilluns 14.35")), pendN.join(" | "));
-  T("si el nen fos de 1r, dimecres a la tarda SÍ que caldria", (function(){ w.triaCursNen(polId, "1r ESO"); const p2 = w.celesPendents(famDoc("Família Nova")); w.triaCursNen(polId, "4t ESO"); return p2.some(x => x.includes("Dimecres 15.00")); })());
+  T("si el nen fos de 1r, dimecres a la tarda SÍ que caldria", (function(){ w.triaCursNen(polId, "1r ESO"); const p2 = w.celesPendents(famDoc("Família Nova")); w.triaCursNen(polId, "4t ESO"); return p2.some(x => x.includes("Dimecres 14.35")); })());
   await w.desa(); await tic(30);
   w.triaFam(famDB("Vila Puig").id); await tic(20);
   w.triaTab("graella"); await tic();
   w.obreCasella("e9", "dt"); await tic();
-  T("família de 3r/4t: la casella de les 9.00 no s'obre MAI (entren sempre a les 8.00)", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("entren sempre a les 8.00"));
+  T("família de 3r/4t: la casella de les 8.35 no s'obre MAI (entren sempre a les 7.35)", !d.querySelector("#cel-menu").classList.contains("obert") && d.querySelector("#avis").textContent.includes("entren sempre a les 7.35"));
   w.obreCasella("e9", "dv"); await tic();
   T("…tampoc divendres (cap dia)", !d.querySelector("#cel-menu").classList.contains("obert"));
   w.obreCasella("e8", "dl"); await tic();
@@ -1091,7 +1091,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   {
     const fam = famDoc("Vila Puig");
     const gr = cos();
-    T("hi ha un bloc de graella per cada fill", (gr.match(/class='gr-bloc'/g) || []).length === fam.nens.length);
+    T("hi ha un bloc de graella per cada fill", (gr.match(/class="gr-bloc"/g) || []).length === fam.nens.length);
     T("cada bloc porta el nom del fill i el seu curs",
       fam.nens.every(n => gr.includes(n.nom) && (!n.curs || gr.includes(n.curs))));
     T("cada bloc té el seu «Esborra la graella de [nom]»",
@@ -1118,23 +1118,17 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("perfil"); await tic();
   await w.desa(); await tic(30);
 
-  console.log("10g · NOVETATS v3.6 (esborrar tota la graella: confirmació, BD, repintat i doble toc)");
+  console.log("10g · NOVETATS v4.4 (un sol botó d'esborrar: fora «Esborra tota la graella»)");
   w.triaTab("graella"); await tic();
-  T("la graella té el botó d'esborrar-ho tot", cos().includes("Esborra tota la graella"));
-  w.esborraGraella(); await tic(10);
-  T("abans d'esborrar demana confirmació, amb el nom de la família", (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("Esborrar tota la graella") && d.querySelector("#conf-box").textContent.includes("Vila Puig"));
-  d.querySelector("#conf-no").click(); await tic(10);
-  T("si cancel·les, les marques segueixen a la BD", DB.weekly_marks.some(m => m.family_id === idVila));
-  w.esborraGraella(); await tic(10);
-  d.querySelector("#conf-si").click(); await tic(40);
-  T("en confirmar, s'esborren marques i assignacions de la BD", !DB.weekly_marks.some(m => m.family_id === idVila) && !DB.assignments.some(a => a.driver_family_id === idVila));
-  T("la graella es repinta buida a pantalla (i s'avisa)", !cos().includes("cel on") && d.querySelector("#avis").textContent.includes("Graella esborrada"));
-  T("l'esborrat queda al registre d'activitat", DB.activity_log.some(l => l.action === "esborrat graella"));
-  // doble toc: mentre s'esborra, el botó no obre una segona confirmació
-  const pEsb = w.esborraGraellaDeDebò(famDoc("Vila Puig"));
-  w.esborraGraella();
-  T("el doble toc queda bloquejat mentre s'esborra", !d.querySelector("#conf-box"));
-  await pEsb; await tic(30);
+  T("v4.4: la graella ja NO té el botó d'esborrar-ho tot", !cos().includes("Esborra tota la graella"));
+  T("v4.4: el botó per fill segueix a la targeta de cada fill", cos().includes("Esborra la graella de"));
+  T("v4.4: les funcions d'esborrat total ja no existeixen", !w.esborraGraella && !w.esborraGraellaDeDebò && !w.pintaGraellaAccions);
+  // les proves següents esperen la graella de Vila Puig buida (abans la buidava el botó): es buida directament a la BD
+  DB.weekly_marks = DB.weekly_marks.filter(m => m.family_id !== idVila);
+  DB.assignments = DB.assignments.filter(a => a.driver_family_id !== idVila);
+  await w.sbGet(); await tic(20);
+  w.triaTab("graella"); await tic();
+  T("v4.4: amb la BD buida, la graella es repinta en blanc", !cos().includes("c-ico"));
 
   console.log("10h · NOVETATS v3.7 (fulls: nom del conductor a la casella, grup a la capçalera, print CSS)");
   const mp = html.slice(html.indexOf("@media print"), html.indexOf("@page"));
@@ -1187,7 +1181,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   // ── B · un sol control de desar a la Graella ──
   w.triaPinzell("cotxe"); await tic(400); w.pinta("r13", "dl"); await tic();   // canvi pendent
   const graHtml = cos();
-  T("amb canvis pendents: UN sol control de desar (la barra) i el botó d'esborrar present", (graHtml.match(/Desa els canvis/g) || []).length === 0 && graHtml.includes("Esborra tota la graella") && !d.querySelector("#barra").classList.contains("amaga"));
+  T("amb canvis pendents: UN sol control de desar (la barra) i cap botó d'esborrar-ho tot", (graHtml.match(/Desa els canvis/g) || []).length === 0 && !graHtml.includes("Esborra tota la graella") && !d.querySelector("#barra").classList.contains("amaga"));
   await tic(400); w.pinta("r13", "dl"); await tic();   // desfà el canvi
   // ── C · vinculació robusta (claim idempotent, una altra família, desvincula, alta atòmica) ──
   const sbFake = fakeSupabaseClient();
