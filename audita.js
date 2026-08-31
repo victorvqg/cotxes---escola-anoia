@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.23", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.23"));
+  T("lema i peu amb versió 4.25", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.25"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1103,7 +1103,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
   T("v4.12: el codi de família en tres línies, amb el botó «Copia el codi» COMPARTIT amb el del grup",
     cos().includes("Copia el codi") && cos().includes("entrar a la fam") &&
-    (html.match(/copiaCodiAmbAvis\(/g) || []).length === 3);
+    (html.match(/copiaCodiAmbAvis\(/g) || []).length === 4);   // grup + família + codis del panell (v4.24) + la definició
   w.copiaTextCodiFam(null); await tic();
   T("…i copiar avisa amb «Codi copiat: [codi]»",
     d.querySelector("#avis").textContent.includes("Codi copiat") && d.querySelector("#avis").textContent.includes(codiDeFam(famDB("Vila Puig"))));
@@ -1622,6 +1622,36 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     d.querySelector("#avis").textContent.includes("orfe2@test.cat") &&
     d.querySelector("#avis").textContent.includes("orfe3@test.cat"));
   w.tancaAdmin(); await tic();
+
+  console.log("10o · NOVETATS v4.24 (el «copia» dels codis copia només el codi)");
+  w.obreAdmin(); await tic(30);
+  const cbx = d.querySelector("#codis-box");
+  T("v4.24: la llista de codis és carregada", !!(cbx && cbx._dades && cbx._dades.length));
+  w.copiaCodiFamIdx(0, null); await tic();
+  T("v4.24: «copia» copia NOMÉS el codi, amb l'avís",
+    d.querySelector("#avis").textContent.includes("Codi copiat") &&
+    d.querySelector("#avis").textContent.includes(cbx._dades[0].codi) &&
+    !d.querySelector("#avis").textContent.includes(cbx._dades[0].nom));
+  T("v4.24: el «copia-ho tot» es queda amb nom · codi per línia", html.includes('x.nom + " \\u00b7 " + x.codi).join("\\n")') || /copiaCodisTot/.test(html));
+  w.tancaAdmin(); await tic();
+  // comprovació: «Copia el codi» del Perfil copia el codi de la família ACTIVA (admin dins d'una altra)
+  w.adminEdita(famDB("Grau").id); await tic(30);
+  w.triaTab("perfil"); await tic(30);
+  w.copiaTextCodiFam(null); await tic();
+  T("v4.24: dins d'una altra família, «Copia el codi» copia el codi d'AQUELLA família (mai buit)",
+    d.querySelector("#avis").textContent.includes(codiDeFam(famDB("Grau"))));
+  await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10p · NOVETATS v4.25 (vincular amb codi coherent amb el perfil)");
+  await surtIentra("grau@test.cat", "grau123");
+  await w.pantallaGrup(); await tic(30);
+  T("v4.25: amb família, la pantalla «Uneix-te» no es mostra mai: s'entra directament",
+    pant().includes("Hola") && !pant().includes("Uneix-te amb un codi"));
+  await w.recuperaIEntra(); await tic(30);
+  T("v4.25: «Entra a la família» entra de debò (l'èxit és el d'entraApp, no el de tenir família)",
+    pant().includes("Hola") && pant().includes("Grau"));
+  T("v4.25: el missatge de conflicte és el pactat", html.includes("Un compte només pot ser d'una família"));
+  await surtIentra("admin@test.cat", "admin123");
 
   console.log("10n · NOVETATS v4.18 (Estadístiques per a l'admin)");
   T("v4.18: el menú de l'admin té l'apartat Estadístiques", d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
