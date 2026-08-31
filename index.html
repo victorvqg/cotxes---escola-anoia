@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.12</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.13</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1992,18 +1992,61 @@ async function mostraLogs(){
   }).join("");
   box.innerHTML = files || "<p class='hint'>Encara no hi ha activitat registrada.</p>";
 }
+var comptesCache = [];
 async function mostraComptes(){
   if (!esAdmin) return;
   const box = $("#comptes-box"); if (!box) return;
   box.innerHTML = "<p class='hint'>Carregant\u2026</p>";
   const r = await sb.rpc("llista_comptes");
   if (r.error){ box.innerHTML = "<p class='hint'>\u26a0 No s'ha pogut carregar la llista: " + esc(msgNeta(r.error)) + "</p>"; return; }
-  const files = (r.data || []).map(c =>
-    "<div class='d-fila'><span class='d-txt'><b>" + esc(c.correu || "") + "</b> \u00b7 " +
-    (c.familia ? esc(c.familia) + " \u00b7 " + esc(c.rol_compte || "") + (c.rol_familia ? " \u00b7 " + esc(c.rol_familia) : "")
-               : "<i>" + esc(c.rol_compte || "sense fam\u00edlia") + "</i>") +
-    (c.estat && c.estat !== "aprovat" ? " \u00b7 " + esc(c.estat) : "") + "</span></div>").join("");
-  box.innerHTML = files || "<p class='hint'>Cap compte registrat.</p>";
+  comptesCache = r.data || [];
+  let h = "", divisor = false;
+  comptesCache.forEach((c, i) => {
+    if (!divisor && !c.familia){ divisor = true; h += "<p class='hint' style='margin:8px 2px 2px'>\u2014 comptes sense fam\u00edlia \u2014</p>"; }
+    const meu = sessio && sessio.user && String(c.correu || "").toLowerCase() === String(sessio.user.email || "").toLowerCase();
+    const dades = "<b>" + esc(c.correu || "") + "</b>" +
+      (c.familia ? " \u00b7 " + esc(c.familia) + " \u00b7 " + esc(c.rol_compte || "") + (c.rol_familia ? " \u00b7 " + esc(c.rol_familia) : "")
+                 : " \u00b7 <i>" + esc(c.rol_compte || "sense fam\u00edlia") + "</i>") +
+      (c.estat && c.estat !== "aprovat" ? " \u00b7 " + esc(c.estat) : "");
+    h += "<details class='conf fam-det'><summary>" + dades + "</summary>" +
+      "<div style='padding:4px 2px 8px'><div class='f-linia'>" + dades + "</div>" +
+      "<div style='text-align:right;margin-top:6px'><button class='boto sec' style='color:#97301F'" +
+      (meu ? " disabled" : " onclick='esborraCompteUI(" + i + ")'") +
+      ">Esborra el compte</button>" + (meu ? "<div class='hint'>El compte de l'administrador connectat no es pot esborrar.</div>" : "") + "</div></div></details>";
+  });
+  box.innerHTML = h || "<p class='hint'>Cap compte registrat.</p>";
+}
+/* Esborrar un compte: diàleg segons el cas + confirmació escrivint el correu (v4.13) */
+var correuEsbEsperat = null;
+function verificaCorreuEsb(v){ const b = $("#conf-si"); if (b) b.disabled = String(v || "").trim().toLowerCase() !== correuEsbEsperat; }
+function esborraCompteUI(i){
+  const c = comptesCache[i]; if (!c || !esAdmin) return;
+  const esTit = c.rol_compte === "titular";
+  const teProg = esTit && comptesCache.some((x, j) => j !== i && x.familia === c.familia && x.familia);
+  let cas;
+  if (!c.familia) cas = "S'esborrar\u00e0 el compte i prou (no est\u00e0 vinculat a cap fam\u00edlia).";
+  else if (!esTit) cas = "S'esborrar\u00e0 el compte i quedar\u00e0 desvinculat. La fam\u00edlia <b>" + esc(c.familia) + "</b> es queda igual.";
+  else if (teProg) cas = "S'esborrar\u00e0 el compte i <b>l'altre compte de la fam\u00edlia " + esc(c.familia) + " passar\u00e0 a ser el titular</b>. La fam\u00edlia es queda igual.";
+  else cas = "<b style='color:#97301F'>\u26a0 \u00c9s l'\u00fanic compte de la fam\u00edlia " + esc(c.familia) + ": s'esborrar\u00e0 TAMB\u00c9 la fam\u00edlia sencera \u2014 els fills, la seva graella i les places que ocupaven als cotxes d'altres fam\u00edlies. No es pot desfer.</b>";
+  correuEsbEsperat = String(c.correu || "").trim().toLowerCase();
+  mostraConfirm({
+    titol: "\ud83d\uddd1\ufe0f Esborrar el compte " + esc(c.correu) + "?",
+    text: cas + "<br><br>Per confirmar-ho, escriu el correu del compte:" +
+      "<input class='input' id='esb-correu' style='margin-top:6px' autocomplete='off' placeholder='" + esc(c.correu) + "' oninput='verificaCorreuEsb(this.value)'>",
+    ok: "Esborra el compte", cancel: "Cancel\u00b7la",
+    alOk: () => esborraCompteDeDebo(c.correu)
+  });
+  const b = $("#conf-si"); if (b) b.disabled = true;
+}
+async function esborraCompteDeDebo(correu){
+  estat("Esborrant\u2026");
+  const r = await sb.rpc("esborra_compte", { p_correu: correu });
+  if (r.error){ estat("Error", true); avis("No s'ha pogut esborrar: " + esc(msgNeta(r.error))); return; }
+  estat("Compte esborrat", "ok");
+  avis("\ud83d\uddd1\ufe0f <b>Compte " + esc(correu) + " esborrat.</b>" +
+    (r.data && r.data.length ? "<br>\u00b7 " + r.data.map(esc).join("<br>\u00b7 ") : ""));
+  await sbGet();
+  mostraComptes();
 }
 async function copiaSeguretat(){
   if (!esAdmin || !doc) return;
@@ -2012,7 +2055,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.12", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.13", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });

@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.12", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.12"));
+  T("lema i peu amb versió 4.13", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.13"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -54,6 +54,14 @@ console.log("0 · CABLEJAT ESTÀTIC");
   T("SQL v39: owner_id + es_titular i can_touch_family exigeix ser-ne el titular",
     sql39.includes("add column if not exists owner_id") && sql39.includes("function es_titular") &&
     /p_family = my_family\(\) and es_titular\(p_family\)/.test(sql39) && sql39.includes("trg_marca_titular"));
+  // v4.13: esborrar un compte només via security definer, només l'admin, mai un mateix
+  {
+    const sql44 = fs.readFileSync(path.join(__dirname, "supabase-v44.sql"), "utf-8");
+    T("SQL v44: esborra_compte és security definer, esborra d'auth.users, exigeix l'admin, refusa l'autoesborrat i revoca public/anon",
+      sql44.includes("security definer") && sql44.includes("delete from auth.users") &&
+      sql44.includes("role = 'admin'") && sql44.includes("el teu propi compte") &&
+      /revoke all on function public\.esborra_compte/.test(sql44) && sql44.includes("'baixa compte'"));
+  }
   // v4.11: la família del nen pot treure'l del cotxe d'un altre conductor (SQL v43)
   {
     const sql43 = fs.readFileSync(path.join(__dirname, "supabase-v43.sql"), "utf-8");
@@ -106,7 +114,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
      l'operació sencera. Va passar amb 'desvinculació', 'codi regenerat' i
      'esborrat graella'. Aquesta prova ho enganxa abans que ho faci un usuari. */
   {
-    const sql40 = fs.readFileSync(path.join(__dirname, "supabase-v40.sql"), "utf-8");
+    const sql40 = fs.readFileSync(path.join(__dirname, "supabase-v44.sql"), "utf-8");   // v44 amplia el CHECK del v40: la llista bona és la seva
     const i0 = sql40.indexOf("add constraint activity_log_action_check");
     const i1 = sql40.indexOf("));", i0);
     const bloc = (i0 >= 0 && i1 > i0) ? sql40.slice(i0, i1) : "";
@@ -141,7 +149,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
     }
     const totes = [...new Set([...delJs, ...delSql])];
     const fora = totes.filter(a => !permeses.has(a));
-    T("SQL v40: el CHECK d'activity_log llista 15 accions", permeses.size === 15, permeses.size + ": " + [...permeses].join(" | "));
+    T("SQL v44: el CHECK d'activity_log llista 16 accions (les 15 del v40 + 'baixa compte')", permeses.size === 16 && permeses.has("baixa compte"), permeses.size + ": " + [...permeses].join(" | "));
     T("cap de les " + totes.length + " accions que escriu el codi queda fora del CHECK", fora.length === 0, "fora: " + fora.join(", "));
   }
 }
@@ -442,6 +450,47 @@ function rpc(nom, p){
                    !x.pr)
       .map(x => x.fila);
     return dades(rows);
+  }
+  if (nom === "esborra_compte"){
+    // v4.13: només l'admin, mai sobre si mateix; esborra en cadena segons el cas
+    if (!socAdmin()) return err("Només l'administrador pot esborrar comptes");
+    const correu = String(p.p_correu || "").trim().toLowerCase();
+    const u = Object.values(DB.users).find(x => (x.email || "").toLowerCase() === correu);
+    if (!u) return err("No hi ha cap compte amb el correu " + p.p_correu);
+    if (u.id === currentUserId) return err("No pots esborrar el teu propi compte d'administrador");
+    const fets = ["compte " + correu + " esborrat"];
+    const pr = DB.profiles.find(x => x.id === u.id) || null;
+    const f = pr && pr.family_id ? famPerId(pr.family_id) : null;
+    if (f){
+      const titular = f.owner_id || (DB.profiles.find(x => x.family_id === f.id) || {}).id;
+      const altre = DB.profiles.find(x => x.family_id === f.id && x.id !== u.id);
+      if (titular === u.id && altre){
+        f.owner_id = altre.id;
+        fets.push("l'altre compte de la família " + f.name + " passa a titular");
+      } else if (titular === u.id){
+        const nensF = DB.children.filter(c => c.family_id === f.id).map(c => c.id);
+        DB.profiles.forEach(x => { if (x.family_id === f.id){ x.family_id = null; x.status = "pendent"; } });
+        DB.children = DB.children.filter(c => c.family_id !== f.id);
+        DB.weekly_marks = DB.weekly_marks.filter(m => m.family_id !== f.id);
+        DB.assignments = DB.assignments.filter(a => a.driver_family_id !== f.id && !nensF.includes(a.child_id));
+        DB.notifications = DB.notifications.filter(nt => nt.family_id !== f.id);
+        DB.families = DB.families.filter(x => x.id !== f.id);
+        logBD(grupMeu(), "baixa família", null, f.name + " esborrada (compte esborrat)");
+        fets.push("família " + f.name + " esborrada, amb " + nensF.length + " fill(s), la seva graella i les places que ocupaven als cotxes");
+      } else {
+        fets.push("compte desvinculat de la família " + f.name + " (la família es queda igual)");
+      }
+    }
+    DB.notification_reads = DB.notification_reads.filter(x => x.user_id !== u.id);
+    DB.join_requests = DB.join_requests.filter(x => x.user_id !== u.id);
+    DB.weekly_marks.forEach(m => { if (m.updated_by === u.id) m.updated_by = null; });
+    DB.assignments.forEach(a => { if (a.updated_by === u.id) a.updated_by = null; });
+    DB.activity_log.forEach(l => { if (l.actor_id === u.id) l.actor_id = null; });
+    DB.families.forEach(x => { if (x.owner_id === u.id) x.owner_id = null; });
+    DB.profiles = DB.profiles.filter(x => x.id !== u.id);
+    delete DB.users[u.id];
+    logBD(grupMeu(), "baixa compte", null, correu);
+    return dades(fets);
   }
   if (nom === "esborra_familia"){
     const f = famPerId(p.p_family);
@@ -1362,8 +1411,53 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("un usuari normal no veu l'apartat al seu panell", !pant().includes("Comptes registrats"));
   const rNoAdmin = await fakeSupabaseClient().rpc("llista_comptes");
   T("…i l'RPC el rebutja (els correus són a auth.users)", !!rNoAdmin.error && rNoAdmin.error.message.includes("administrador"));
+  const rEsbNo = await fakeSupabaseClient().rpc("esborra_compte", { p_correu: "orfe@test.cat" });
+  T("v4.13: un usuari normal tampoc no pot esborrar comptes (RPC només admin)", !!rEsbNo.error);
   w.tancaAdmin(); await tic();
   await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10l · NOVETATS v4.13 (comptes en desplegable + esborrar un compte amb implicacions)");
+  w.obreAdmin(); await tic();
+  await w.mostraComptes(); await tic(10);
+  const cb13 = () => (d.querySelector("#comptes-box") || { innerHTML: "" }).innerHTML;
+  T("v4.13: cada compte és una fila desplegable amb el botó vermell d'esborrar",
+    cb13().includes("<details") && cb13().includes("Esborra el compte"));
+  T("v4.13: els comptes sense família van agrupats al final, rere un separador",
+    cb13().indexOf("comptes sense fam") > cb13().indexOf("admin@test.cat"));
+  const rowAdmin = cb13().split("</details>").find(x => x.includes("admin@test.cat")) || "";
+  const rowOrfe = cb13().split("</details>").find(x => x.includes("orfe@test.cat")) || "";
+  T("v4.13: el compte de l'admin connectat té el botó desactivat (els altres no)",
+    rowAdmin.includes("disabled") && rowOrfe && !rowOrfe.includes("disabled"));
+  // esborrar el compte sense família: diàleg + confirmació escrivint el correu
+  const iOrfe = w.comptesCache.findIndex(x => x.correu === "orfe@test.cat");
+  w.esborraCompteUI(iOrfe); await tic(5);
+  T("v4.13: el diàleg demana escriure el correu i el botó comença desactivat",
+    (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("escriu el correu") && d.querySelector("#conf-si").disabled);
+  w.verificaCorreuEsb("malament@x.cat");
+  T("…amb un correu equivocat continua desactivat", d.querySelector("#conf-si").disabled);
+  w.verificaCorreuEsb("orfe@test.cat");
+  T("…i amb el correu bo s'activa", !d.querySelector("#conf-si").disabled);
+  d.querySelector("#conf-si").click(); await tic(30);
+  T("v4.13: el compte sense família s'esborra i prou, amb el missatge i la llista",
+    !Object.values(DB.users).some(x => x.email === "orfe@test.cat") &&
+    d.querySelector("#avis").textContent.includes("orfe@test.cat") && d.querySelector("#avis").textContent.includes("esborrat"));
+  // titular AMB progenitor: l'altre compte passa a titular (Família Nova té codi8 i codi8b)
+  const fid8 = DB.profiles.find(x => x.email === "codi8@test.cat").family_id;
+  const r1 = await fakeSupabaseClient().rpc("esborra_compte", { p_correu: "codi8@test.cat" });
+  T("v4.13: en esborrar el titular amb 2n compte, l'altre passa a titular i la família es queda",
+    !r1.error && (r1.data || []).some(x => x.includes("passa a titular")) &&
+    DB.families.some(x => x.id === fid8) &&
+    DB.families.find(x => x.id === fid8).owner_id === DB.profiles.find(x => x.email === "codi8b@test.cat").id);
+  // titular ÚNIC: cau la família sencera
+  const r2 = await fakeSupabaseClient().rpc("esborra_compte", { p_correu: "codi8b@test.cat" });
+  T("v4.13: en esborrar l'últim titular, cau la família sencera (fills i graella inclosos)",
+    !r2.error && !DB.families.some(x => x.id === fid8) && !DB.children.some(c => c.family_id === fid8) &&
+    (r2.data || []).some(x => x.includes("família")));
+  const rSelf = await fakeSupabaseClient().rpc("esborra_compte", { p_correu: "admin@test.cat" });
+  T("v4.13: l'admin no es pot esborrar a si mateix (la funció ho refusa)", !!rSelf.error);
+  T("v4.13: l'esborrat queda al registre d'activitat ('baixa compte')",
+    DB.activity_log.some(l => l.action === "baixa compte"));
+  w.tancaAdmin(); await tic();
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
