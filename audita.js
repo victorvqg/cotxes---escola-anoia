@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.13", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.13"));
+  T("lema i peu amb versió 4.14", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.14"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1241,7 +1241,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.4: la graella ja NO té el botó d'esborrar-ho tot", !cos().includes("Esborra tota la graella"));
   T("v4.4: el botó per fill segueix a la targeta de cada fill", cos().includes("Esborra la graella de"));
   T("v4.4: les funcions d'esborrat total ja no existeixen", !w.esborraGraella && !w.esborraGraellaDeDebò && !w.pintaGraellaAccions);
-  // ── v4.11 · «Esborra la graella de X» ho buida TOT (també compartides), allibera cotxes i avisa el grup ──
+  // ── v4.14 · esborrar la graella d'un fill: pregunta pels 🚗/🚫 compartits, allibera cotxes i resumeix ──
   {
     // en Janot ocupa una plaça al cotxe de la família Grau (r17 de dilluns)
     DB.assignments.push({ id: randomUUID(), group_id: famDB("Grau").group_id, driver_family_id: famDB("Grau").id, child_id: idJan(), slot: "r17", day: "dl", updated_by: null });
@@ -1251,26 +1251,38 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     const janG = fVPg.nens.find(x => x.id === idJan());
     w.posa(fVPg.cotxe, "e8", "dl");     // exclusiva d'en Janot
     w.posa(fVPg.propi, "r13", "dl");    // compartida amb en Nil
-    w.posa(fVPg.cotxe, "e9", "dl");     // NOMÉS d'en Nil: s'ha de conservar
+    w.posa(fVPg.cotxe, "e9", "dl");     // NOMÉS d'en Nil: mai no es toca
     w.posa(janG.marca, "r17", "dl");    // 🙋 seu
     w.triaTab("graella"); await tic();
-    T("v4.11: les caselles que no són seves NO mostren marques apagades (e9-dl és d'en Nil)",
+    T("v4.14: les caselles que no són seves NO mostren marques apagades (e9-dl és d'en Nil)",
       cos().includes('aria-label="Janot Dilluns 8.35"></button>'));
+    // camí A · «Només el que és seu»
     w.esborraGraellaNen(janG.id); await tic(10);
-    T("v4.11: el diàleg avisa que les compartides quedaran per respondre i que s'alliberaran places",
-      (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("per respondre de nou") &&
-      d.querySelector("#conf-box").textContent.includes("s'alliberaran"));
+    T("v4.14: amb germans i 🚗/🚫 compartit, el diàleg PREGUNTA i esmenta el germà",
+      (d.querySelector("#conf-box") || { textContent: "" }).textContent.includes("Vols treure'ls també") &&
+      d.querySelector("#conf-box").textContent.includes("Afectarà la graella de Nil") &&
+      !!d.querySelector("#conf-si2"));
+    d.querySelector("#conf-si2").click(); await tic(10);
+    T("v4.14 «Només el que és seu»: cauen els 🙋 i el 🚗 exclusiu, però el 🚫 compartit es queda",
+      !w.te(janG.marca, "r17", "dl") && !w.te(fVPg.cotxe, "e8", "dl") && w.te(fVPg.propi, "r13", "dl") && w.te(fVPg.cotxe, "e9", "dl"));
+    // camí B · «Treu-ho tot»
+    w.posa(fVPg.cotxe, "e8", "dl"); w.posa(janG.marca, "r17", "dl");
+    w.esborraGraellaNen(janG.id); await tic(10);
     d.querySelector("#conf-si").click(); await tic(10);
-    T("v4.11: la targeta queda en blanc del tot: 🙋, 🚗 exclusiu i 🚫 compartit",
+    T("v4.14 «Treu-ho tot»: la targeta queda en blanc del tot (compartides incloses)",
       !w.te(janG.marca, "r17", "dl") && !w.te(fVPg.cotxe, "e8", "dl") && !w.te(fVPg.propi, "r13", "dl"));
     T("…i només es conserva el que és exclusiu del germà (e9-dl)", w.te(fVPg.cotxe, "e9", "dl"));
     T("…amb el missatge «Graella de X buida»", d.querySelector("#avis").textContent.includes("Graella de Janot buida"));
     fVPg.nens = fVPg.nens.filter(x => x.id !== "tmp-esb");   // el germà temporal fora ABANS de desar (que no s'insereixi a la BD)
     await w.desa(); await tic(40);
-    T("v4.11: en desar, el fill surt del cotxe on estava assignat (les places s'alliberen)",
+    T("v4.14: en desar, el fill surt del cotxe on estava assignat (les places s'alliberen)",
       !DB.assignments.some(a => a.child_id === idJan()));
+    T("v4.14: el missatge final resumeix les places alliberades i el conductor",
+      d.querySelector("#avis").textContent.includes("Graella de Janot esborrada") &&
+      d.querySelector("#avis").textContent.includes("alliberad") &&
+      d.querySelector("#avis").textContent.includes("Pere"));
     const grupG = famDB("Grau").group_id;
-    T("v4.11: TOT el grup rep l'avís, amb la família, el fill i el conductor",
+    T("v4.14: TOT el grup rep l'avís, amb la família, el fill i el conductor",
       DB.notifications.some(nt => nt.family_id === famDB("Grau").id && nt.message.includes("ha esborrat la graella de Janot") && nt.message.includes("Pere")) &&
       DB.notifications.filter(nt => nt.message.includes("ha esborrat la graella de Janot")).length >= DB.families.filter(x => x.group_id === grupG).length);
     w.triaTab("avisos"); await tic();

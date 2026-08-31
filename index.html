@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.13</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.14</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -964,20 +964,28 @@ async function desa(){
     await sbDesaFamilia(f);
     await logActivitat("canvi graella", "Horari desat", f.id);
     // fills amb la graella esborrada: fora dels cotxes on estaven assignats + avís a tot el grup
+    const resumEsborrats = [];
     for (const eb of esborratsPendents){
-      const conds = doc.families.filter(c => c.id !== f.id &&
-        Object.values(c.porta || {}).some(arr => (arr || []).some(r => r.nen === eb.id)));
+      let nAllib = 0; const nomsConds = [];
+      doc.families.forEach(c => {
+        if (c.id === f.id) return;
+        const q = Object.values(c.porta || {}).reduce((t, arr) => t + (arr || []).filter(r => r.nen === eb.id).length, 0);
+        if (q){ nAllib += q; nomsConds.push(nomConductorComplet(c)); }
+      });
       const da = await sb.from("assignments").delete().eq("child_id", eb.id);
       if (da && da.error) avis("\u26a0 No s'han pogut alliberar les places de " + esc(eb.nom) + ": " + esc(msgNeta(da.error)));
       const msg = "La fam\u00edlia " + f.nom + " ha esborrat la graella de " + eb.nom + "." +
-        (conds.length ? " Les places que ocupava als cotxes de " + conds.map(c => nomConductorComplet(c)).join(" i ") + " tornen a estar lliures." : "");
+        (nomsConds.length ? " Les places que ocupava als cotxes de " + nomsConds.join(" i ") + " tornen a estar lliures." : "");
       await sb.from("notifications").insert(doc.families.map(ff => ({ family_id: ff.id, message: msg })));
       await logActivitat("esborrat graella", "Graella de " + eb.nom + " esborrada", f.id);
+      resumEsborrats.push("Graella de " + esc(eb.nom) + " esborrada." +
+        (nAllib ? " " + nAllib + (nAllib === 1 ? " pla\u00e7a alliberada" : " places alliberades") + " als cotxes de " + nomsConds.map(esc).join(" i ") + "." : ""));
     }
     esborratsPendents = [];
     await sbGet();
     dirty = false; pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
-    avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
+    if (resumEsborrats.length) avis("\ud83d\uddd1\ufe0f <b>" + resumEsborrats.join("<br>") + "</b>");
+    else avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
   } catch(e){
     estat("No s'ha desat", true);
     $("#barra-txt").textContent = "No s'ha pogut desar: " + msgNeta(e) + ". Torna-ho a provar.";
@@ -1591,27 +1599,43 @@ function esborraGraellaNen(id){
   if (nomesTitular()) return;
   const n = f.nens.find(x => x.id === id); if (!n) return;
   const nomC = n.nom.trim().split(/\s+/)[0];
-  const teGermans = (f.nens || []).length > 1;
-  mostraConfirm({
-    titol: "\ud83d\uddd1\ufe0f Esborrar la graella de " + esc(nomC) + "?",
-    text: "Es buidar\u00e0 <b>TOTA la graella de " + esc(nomC) + "</b>: \ud83d\ude97, \ud83d\ude4b i \ud83d\udeab, tamb\u00e9 les marques apagades." +
-      (teGermans ? " \u26a0 Les caselles que comparteix amb els germans quedaran <b>per respondre de nou</b>; les que nom\u00e9s s\u00f3n dels germans no es toquen." : "") +
-      " Si " + esc(nomC) + " pujava al cotxe d'una altra fam\u00edlia, en desar en quedar\u00e0 fora i les places s'alliberaran (tot el grup ho veur\u00e0 als Avisos). Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
-    ok: "S\u00ed, buida-la", cancel: "Cancel\u00b7la",
-    alOk: () => {
-      FRANGES.forEach(fr => DIES.forEach(d => {
-        treu(n.marca, fr.id, d);
-        // només es conserva el que NO és seu i un germà sí que té
-        if (!nenTeCasella(n, fr.id, d) && (f.nens || []).some(x => x.id !== n.id && nenTeCasella(x, fr.id, d))) return;
-        treu(f.cotxe, fr.id, d); treu(f.propi, fr.id, d);
-        if (f.porta) delete f.porta[fr.id + "-" + d];
-      }));
-      if (!esborratsPendents.some(x => x.id === n.id)) esborratsPendents.push({ id: n.id, nom: nomC });
-      dirty = true; pintaBarra();
-      if (tabAct === "graella") pintaGraellaTab(); else pintaHorariComplet();
-      avis("\ud83d\uddd1\ufe0f <b>Graella de " + esc(nomC) + " buida.</b> Prem \u00abDesa els canvis\u00bb per confirmar-ho.", true);
-    }
-  });
+  const germans = (f.nens || []).filter(x => x.id !== n.id);
+  /* buida la graella del fill. ambCompartides=false: el 🚗/🚫 de caselles que
+     comparteix amb germans es queda (només cau el que és exclusivament seu). */
+  const buida = (ambCompartides) => {
+    FRANGES.forEach(fr => DIES.forEach(d => {
+      treu(n.marca, fr.id, d);
+      const compartida = germans.some(x => nenTeCasella(x, fr.id, d));
+      if (!nenTeCasella(n, fr.id, d) && compartida) return;   // casella viva NOMÉS del germà: mai no es toca
+      if (!ambCompartides && compartida) return;              // «només el que és seu»
+      treu(f.cotxe, fr.id, d); treu(f.propi, fr.id, d);
+      if (f.porta) delete f.porta[fr.id + "-" + d];
+    }));
+    if (!esborratsPendents.some(x => x.id === n.id)) esborratsPendents.push({ id: n.id, nom: nomC });
+    dirty = true; pintaBarra();
+    if (tabAct === "graella") pintaGraellaTab(); else pintaHorariComplet();
+    avis("\ud83d\uddd1\ufe0f <b>Graella de " + esc(nomC) + " buida.</b> Prem \u00abDesa els canvis\u00bb per confirmar-ho.", true);
+  };
+  const teCompartidesMarcades = germans.length && FRANGES.some(fr => DIES.some(d =>
+    (te(f.cotxe, fr.id, d) || te(f.propi, fr.id, d)) &&
+    nenTeCasella(n, fr.id, d) && germans.some(x => nenTeCasella(x, fr.id, d))));
+  if (teCompartidesMarcades){
+    const nomsG = germans.map(x => x.nom.trim().split(/\s+/)[0]).join(" i ");
+    mostraConfirm({
+      titol: "\ud83d\uddd1\ufe0f Esborrar la graella de " + esc(nomC) + "?",
+      text: "Els \ud83d\ude4b de " + esc(nomC) + " s'esborren segur. Per\u00f2 <b>el \ud83d\ude97 i el \ud83d\udeab s\u00f3n de tota la fam\u00edlia</b>. Vols treure'ls tamb\u00e9? <b>Afectar\u00e0 la graella de " + esc(nomsG) + "</b>: les caselles compartides li quedaran per respondre de nou. Si " + esc(nomC) + " pujava al cotxe d'una altra fam\u00edlia, en desar en quedar\u00e0 fora i les places s'alliberaran. Despr\u00e9s cal pr\u00e9mer \u00abDesa els canvis\u00bb.",
+      ok: "Treu-ho tot", ok2: "Nom\u00e9s el que \u00e9s seu", cancel: "Cancel\u00b7la",
+      alOk: () => buida(true), alOk2: () => buida(false)
+    });
+  } else {
+    mostraConfirm({
+      titol: "\ud83d\uddd1\ufe0f Esborrar la graella de " + esc(nomC) + "?",
+      text: "Es buidar\u00e0 <b>TOTA la graella de " + esc(nomC) + "</b>: \ud83d\ude97, \ud83d\ude4b i \ud83d\udeab, tamb\u00e9 les marques apagades." +
+        " Si " + esc(nomC) + " pujava al cotxe d'una altra fam\u00edlia, en desar en quedar\u00e0 fora i les places s'alliberaran (tot el grup ho veur\u00e0 als Avisos). Despr\u00e9s cal pr\u00e9mer <b>\u00abDesa els canvis\u00bb</b>.",
+      ok: "S\u00ed, buida-la", cancel: "Cancel\u00b7la",
+      alOk: () => buida(true)
+    });
+  }
 }
 function estatGHtml(f){
   const pend = celesPendents(f);
@@ -2055,7 +2079,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.13", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.14", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2266,12 +2290,14 @@ function mostraConfirm(o){
   const box = document.createElement("div"); box.className = "targeta conf-box"; box.id = "conf-box";
   box.innerHTML = "<h2 style='margin:0 0 6px'>" + o.titol + "</h2><p class='lead'>" + o.text + "</p>" +
     "<div class='fila' style='margin-top:12px;gap:8px'><button class='boto sec' id='conf-no' style='flex:1'>" + o.cancel + "</button>" +
+    (o.ok2 ? "<button class='boto sec' id='conf-si2' style='flex:1'>" + o.ok2 + "</button>" : "") +
     "<button class='boto' id='conf-si' style='flex:1;background:#B3372C'>" + o.ok + "</button></div>";
   document.body.appendChild(vel); document.body.appendChild(box);
   const tanca = () => { vel.remove(); box.remove(); };
   vel.onclick = tanca;
   box.querySelector("#conf-no").onclick = tanca;
   box.querySelector("#conf-si").onclick = async () => { tanca(); await o.alOk(); };
+  if (o.ok2) box.querySelector("#conf-si2").onclick = async () => { tanca(); await o.alOk2(); };
 }
 function desvinculaCompte(){
   const f = lameva(); if (!f || !perfil || !perfil.family_id) return;
