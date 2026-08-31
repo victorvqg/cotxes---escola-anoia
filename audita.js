@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.25", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.25"));
+  T("lema i peu amb versió 4.26", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.26"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -60,6 +60,13 @@ console.log("0 · CABLEJAT ESTÀTIC");
     T("SQL v46: llista_comptes amb ultim_acces (last_sign_in_at), drop+create i porta d'admin intacta",
       sql46.includes("drop function if exists public.llista_comptes") &&
       sql46.includes("last_sign_in_at") && sql46.includes("ultim_acces") && sql46.includes("role = 'admin'"));
+  }
+  // v4.26: el servidor diu si el compte és el titular (el_meu_perfil + es_titular)
+  {
+    const sql48 = fs.readFileSync(path.join(__dirname, "supabase-v48.sql"), "utf-8");
+    T("SQL v48: el_meu_perfil retorna es_titular (drop+create, security definer)",
+      sql48.includes("drop function if exists public.el_meu_perfil") &&
+      sql48.includes("es_titular(p.family_id)") && sql48.includes("security definer"));
   }
   // v4.19: RLS d'avisos només família/admin + trigger antiduplicats + una línia per avís
   {
@@ -403,7 +410,14 @@ function rpc(nom, p){
   }
   if (nom === "el_meu_perfil"){
     const pr = meu();
-    return dades(pr ? [Object.assign({}, pr)] : []);
+    if (!pr) return dades([]);
+    const fila = Object.assign({}, pr);
+    if (pr.family_id){
+      const f = famPerId(pr.family_id);
+      const tit = f ? (f.owner_id || (DB.profiles.find(x => x.family_id === f.id) || {}).id) : null;
+      fila.es_titular = !tit || tit === currentUserId;   // com es_titular() del v39
+    } else fila.es_titular = true;
+    return dades([fila]);
   }
   // v3.9: cos ÚNIC de vinculació (idempotent, nom si és una altra, màxim 2 comptes)
   const vinculaAFamilia = (f, via) => {
@@ -1671,6 +1685,32 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.18: fora de l'admin no hi ha Estadístiques al menú", !d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
   w.triaTab("estad"); await tic();
   T("…i la pestanya el retorna a la Graella", cos().includes("Toca una casella"));
+  await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10q · NOVETATS v4.26 (progenitor només lectura decidit pel servidor)");
+  const famLliure = DB.families.find(f2 => f2.role !== "admin" &&
+    DB.profiles.filter(x => x.family_id === f2.id).length === 0);
+  // 1r compte: reclama la família (owner NULL → el primer compte és el titular)
+  afegeixUsuari("titu@test.cat", "titu123");
+  await surtIentra("titu@test.cat", "titu123");
+  await acceptaConsentiment();
+  const rTitu26 = await fakeSupabaseClient().rpc("claim_family", { p_family: famLliure.id, p_token: codiDeFam(famLliure) });
+  // 2n compte: entra a la mateixa família → progenitor
+  afegeixUsuari("pepe@test.cat", "pepe123");
+  await surtIentra("pepe@test.cat", "pepe123");
+  await acceptaConsentiment();
+  const rClaim26 = await fakeSupabaseClient().rpc("claim_family", { p_family: famLliure.id, p_token: codiDeFam(famLliure) });
+  T("v4.26: el segon compte es vincula a la família", !rTitu26.error && !rClaim26.error);
+  await surtIentra("pepe@test.cat", "pepe123");
+  T("v4.26: el servidor diu que NO és titular i entra en només lectura (banner de progenitor)",
+    pant().includes("progenitor"));
+  w.triaTab("graella"); await tic();
+  T("v4.26: cap botó d'esborrar a la graella del progenitor", !cos().includes("Esborra la graella de"));
+  await w.desa(); await tic(10);
+  T("v4.26: «Desa» del progenitor queda aturat amb el missatge del titular",
+    d.querySelector("#avis").textContent.includes("Només el titular"));
+  T("v4.26: l'error de RLS es tradueix per a progenitors",
+    w.msgNeta({ message: "new row violates row-level security policy" }).includes("Només el titular"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("11 · TANCA LA SESSIÓ");
