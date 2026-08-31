@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.21</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.22</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -2169,7 +2169,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.21", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.22", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2738,12 +2738,10 @@ function pintaCotxe(){
   const stf = statsCoberturaFam(meva);
   const barraTu = "<div class='targeta'>" +
     barraCobHtml("\ud83c\udfaf Trajectes coberts per tu", stf.cob, stf.tot,
-      (pendTotals ? "<div class='bc-sub'>" + pendTotals + (pendTotals === 1 ? " nen espera" : " nens esperen") + " pla\u00e7a als teus viatges</div>"
+      (pendTotals ? "<div class='bc-sub'>\u26a0 " + pendTotals + (pendTotals === 1 ? " nen demana" : " nens demanen") + " pla\u00e7a als teus viatges. Marca la seva casella i prem \u00abDesa els canvis\u00bb.</div>"
                   : "<div class='bc-sub be'>\u2713 cap nen pendent als teus viatges</div>"), "") +
     "</div>";
-  $("#tab-cos").innerHTML = barraTu +
-    (pendTotals ? "<div class='targeta' style='border-left:4px solid #d64545;margin-bottom:10px'><b>⚠ " + pendTotals + (pendTotals === 1 ? " nen demana" : " nens demanen") + " plaça als teus viatges</b><br><span class='hint'>Marca la seva casella i prem «Desa els canvis».</span></div>"
-                : "<p class='hint' style='margin:0 2px 10px'>Tots els nens que demanen plaça als teus viatges ja hi són assignats. ✓</p>") + h;
+  $("#tab-cos").innerHTML = barraTu + h;
   bloquejaEdicio();
 }
 function repintaCotxe(){ if (tabAct === "cotxe") pintaCotxe(); else pintaDia(); }
