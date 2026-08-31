@@ -360,7 +360,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.11</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.12</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1566,8 +1566,9 @@ function pintaPerfil(){
     "<div>" + filesNens + "</div>" +
     "<div class='fila'><input class='input' id='nou-nen' placeholder='Afegeix un altre nen' maxlength='20' onkeydown=\"if(event.key==='Enter')afegeixNen()\"><button class='boto sec' onclick='afegeixNen()'>Afegeix</button></div>" +
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : "", f.nens.some(n => !(n.curs || "").trim()) ? "el curs de cada nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
-    (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia<span class='p-sub'>passa aquest codi a l'altre progenitor o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia</span></span></div>" +
-    "<div class='nomgran' style='letter-spacing:.14em;text-align:center'>" + esc(f.codiFam) + "</div>" : "") +
+    (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia</span></div>" +
+    "<div class='fila' style='align-items:center;gap:8px;justify-content:center;flex-wrap:wrap'><span class='nomgran' style='letter-spacing:.14em'>" + esc(f.codiFam) + "</span><button class='boto sec' onclick='copiaTextCodiFam(this)'>Copia el codi</button></div>" +
+    "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a l'altre progenitor o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia.</p>" : "") +
     "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup: " + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + "</span></div>" +
     "<div class='fila' style='align-items:center;gap:8px;justify-content:center;flex-wrap:wrap'><span>Codi d'invitaci\u00f3:</span><span class='nomgran' style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
     "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a les fam\u00edlies que s'hi vulguin unir. Nom\u00e9s cal el codi, no el nom del grup.</p>" +
@@ -1907,11 +1908,12 @@ function fallbackCopia(t, ok){
   try { document.execCommand("copy"); } catch(e){}
   ta.remove(); ok();
 }
-function copiaTextCodiGrup(btn){
-  const c = grupActiu ? grupActiu.invite_code : "";
+function copiaCodiAmbAvis(c, btn){
   copiaText(c, btn);
   avis("Codi copiat: <b style='letter-spacing:.14em'>" + esc(c) + "</b>", true);
 }
+function copiaTextCodiGrup(btn){ copiaCodiAmbAvis(grupActiu ? grupActiu.invite_code : "", btn); }
+function copiaTextCodiFam(btn){ const f = lameva(); copiaCodiAmbAvis(f && f.codiFam ? f.codiFam : "", btn); }
 async function carregaCodiCreacio(){
   const box = $("#codicreacio-box"); if (!box || !esAdmin) return;
   const r = await sb.rpc("codi_creacio_grup");
@@ -2010,7 +2012,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.11", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.12", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });

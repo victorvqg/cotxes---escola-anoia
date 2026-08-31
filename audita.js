@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.11", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.11"));
+  T("lema i peu amb versió 4.12", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.12"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -986,6 +986,12 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
+  T("v4.12: el codi de família en tres línies, amb el botó «Copia el codi» COMPARTIT amb el del grup",
+    cos().includes("Copia el codi") && cos().includes("entrar a la fam") &&
+    (html.match(/copiaCodiAmbAvis\(/g) || []).length === 3);
+  w.copiaTextCodiFam(null); await tic();
+  T("…i copiar avisa amb «Codi copiat: [codi]»",
+    d.querySelector("#avis").textContent.includes("Codi copiat") && d.querySelector("#avis").textContent.includes(codiDeFam(famDB("Vila Puig"))));
   w.renomTel("600111222"); await tic();   // v4.1 va treure el curs de família (triaCurs): només queda el curs per nen
   // v3.6: canviar el curs pot deixar caselles noves per respondre (l'entrada passa a les 9.00); es reomplen
   const ompleForats = fx => ["e8", "e9", "r13", "e15", "r17"].forEach(s => ["dl", "dt", "dc", "dj", "dv"].forEach(dd => {
