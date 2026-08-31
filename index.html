@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.20</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.21</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -539,6 +539,8 @@ async function sbGet(){
     if (!F.porta[cel]) F.porta[cel] = [];
     F.porta[cel].push({ fam: nenFam[r.child_id] || "", nen: r.child_id });
   });
+  // v4.21: instantània del que s'ha carregat — la base per detectar canvis REALS en desar
+  fams.forEach(F => { F.portaBase = JSON.parse(JSON.stringify(F.porta || {})); });
   let notisDB = [];
   if (perfil && perfil.family_id){
     const rn = await sb.from("notifications").select("*").eq("family_id", perfil.family_id).order("created_at", { ascending: false }).limit(30);
@@ -952,13 +954,19 @@ async function desa(){
   const b = $("#btn-desa"); b.disabled = true; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
   try {
     const f = lameva();
-    const abansA = await sb.from("assignments").select("*").eq("driver_family_id", f.id);
+    /* v4.21: l'«abans» és el que hi havia CARREGAT a pantalla (portaBase),
+       no una lectura en viu de la BD: un desat sense canvis reals no genera
+       cap avís encara que la BD balli (desats a mitges, dos dispositius). */
+    const abansRefs = [];
+    Object.keys(f.portaBase || {}).forEach(cel => {
+      const t2 = cel.split("-");
+      (f.portaBase[cel] || []).forEach(r2 => abansRefs.push({ nen: r2.nen, slot: t2[0], day: t2[1] }));
+    });
     await sbDesaFamilia(f);
     await logActivitat("canvi graella", "Horari desat", f.id);
     // v4.15: els canvis d'assignacions generen avisos A LA BD per a la família del nen
     {
       const clauA = x => x.nen + "|" + x.slot + "|" + x.day;
-      const abansRefs = (abansA.error ? [] : (abansA.data || [])).map(r2 => ({ nen: r2.child_id, slot: r2.slot, day: r2.day }));
       const despres = [];
       FRANGES.forEach(fr => DIES.forEach(dia => {
         if (!te(f.cotxe, fr.id, dia) || estatCasella(f, fr.id, dia) !== "normal") return;
@@ -981,7 +989,9 @@ async function desa(){
           actor_name: f.nom,
           message: (c.puja ? "\ud83d\ude97 " : "\u23f3 ") + nomNen + " \u00b7 " + quan + (c.puja ? " \u2192 el porta " + nomConductorComplet(f) : " \u2192 ja no t\u00e9 cotxe (abans " + nomConductorComplet(f) + ")") });
       });
-      if (files2.length) await sb.from("notifications").insert(files2);
+      const vistK = new Set();
+      const files2u = files2.filter(x => { const k = x.family_id + "|" + (x.child_name || "") + "|" + (x.action || "") + "|" + (x.detail || ""); if (vistK.has(k)) return false; vistK.add(k); return true; });
+      if (files2u.length) await sb.from("notifications").insert(files2u);
     }
     // fills amb la graella esborrada: fora dels cotxes on estaven assignats + avís a tot el grup
     const resumEsborrats = [];
@@ -2159,7 +2169,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.20", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.21", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2383,7 +2393,11 @@ async function pintaAvisos(){
   const f = lameva(); if (!f) return;
   lsSet("cx_avisos_vist_" + f.id, String(Date.now()));
   pintaMenu();
-  if (!esAdmin){
+  /* v4.21: el bloc de tot el grup NOMÉS quan la família activa és la de
+     l'admin. L'admin dins d'una altra família veu exactament el que veu
+     aquella família. */
+  const grupSencer = esAdmin && doc && doc.adminFam && f.id === doc.adminFam;
+  if (!grupSencer){
     $("#tab-cos").innerHTML =
       "<div class='targeta'><h2>\ud83d\udd14 Avisos de la teva fam\u00edlia</h2>" +
       "<div id='avisos-llista'><p class='hint'>Carregant\u2026</p></div></div>";

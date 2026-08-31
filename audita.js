@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.20", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.20"));
+  T("lema i peu amb versió 4.21", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.21"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -907,6 +907,12 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await fakeSupabaseClient().from("notifications").insert(Object.assign({}, rowDup));
   T("v4.19: una mateixa acció al mateix segon es guarda UNA sola vegada",
     DB.notifications.filter(x => x.message === "DUPTEST").length === 1);
+  // v4.21: l'admin DINS d'una altra família veu el que veu aquella família
+  w.adminEdita(famDB("Grau").id); await tic(20);
+  w.triaTab("avisos"); await tic(10);
+  T("v4.21: dins d'una altra família no hi ha bloc de grup ni filtres, només els avisos d'aquella família",
+    cos().includes("Avisos de la teva família") && !cos().includes('id="av-q"') && !cos().includes("Avisos de tot el grup"));
+  await surtIentra("admin@test.cat", "admin123");
   w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
   w.assigna("r17", "dl", famDoc("Grau").id, idBru, false); await tic();
   await w.desa(); await tic(30);
@@ -1129,6 +1135,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await w.desa(); await tic(30);
   T("v4.20: després de desar, la pestanya oberta es repinta sola (barra i Qui puja al dia)",
     !d.querySelector("#sentinella-repintat") && cos().includes("Trajectes coberts per tu"));
+  T("v4.21: la base de comparació és la instantània carregada (portaBase)",
+    w.doc.families.every(f2 => f2.portaBase !== undefined));
+  const nAvAbans = DB.notifications.length;
+  await w.desa(); await tic(30);
+  T("v4.21: un desat sense canvis reals no genera CAP avís", DB.notifications.length === nAvAbans);
   T("v4.10: cada viatge duu la capçalera del Quadre (hora gran + ENTRADA/RECOLLIDA + pastilla)",
     /class="m-tip [er]"/.test(cos()) && cos().includes('class="f-hora"') && /pla(ç|\u00e7)?a lliure|places lliures/.test(cos()));
   T("v4.10: cada nen surt amb la icona 🧒 i el nom en negreta", cos().includes("🧒 <b>"));
