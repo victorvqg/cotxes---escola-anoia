@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.22</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.23</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -836,19 +836,24 @@ function statsCobertura(){
   }));
   return { dem: dem, cob: cob, meus: meus, nPend: Object.keys(pendSet).length };
 }
-/* v4.17: cobertura d'UNA família — els seus trajectes són els cotxes que
-   ofereix (coberts per definició: els fa ella) i les demandes dels seus
-   fills (cobertes quan algú els porta). pend = nens que esperen plaça als
-   SEUS viatges (la mateixa lògica que el recompte d'El teu cotxe). */
+/* v4.23: cobertura d'UNA família — els seus trajectes són els cotxes que
+   ofereix i les demandes dels seus fills. Un viatge OFERT compta com a
+   cobert NOMÉS quan cap nen no s'hi queda esperant plaça (tots els que la
+   demanen tenen cotxe, meu o d'un altre) o quan el cotxe ja és ple: així,
+   marcar nens a «Qui puges al teu cotxe?» mou la barra a l'instant. Les
+   demandes dels fills es cobreixen quan algú els porta. pend = nens que
+   esperen plaça als SEUS viatges (el recompte d'El teu cotxe). */
 function statsCoberturaFam(f){
   let tot = 0, cob = 0, pend = 0;
   DIES.forEach(d2 => FRANGES.forEach(fr => {
     if (estatCasella(f, fr.id, d2) !== "normal") return;
     if (te(f.cotxe, fr.id, d2)){
-      tot++; cob++;
+      tot++;
       const refs = portaValids(f, fr.id, d2);
-      pend += balanc(fr.id, d2).nens.filter(n => (!n.portadaPerId || n.portadaPerId === f.id) &&
+      const esperen = balanc(fr.id, d2).nens.filter(n => (!n.portadaPerId || n.portadaPerId === f.id) &&
         !refs.some(r2 => r2.fam === n.famId && r2.nen === n.nenId)).length;
+      pend += esperen;
+      if (!esperen || refs.length >= (f.places || 0)) cob++;
     } else {
       (f.nens || []).forEach(n => {
         if (!te(n.marca, fr.id, d2) || !nenTeCasella(n, fr.id, d2)) return;
@@ -2169,7 +2174,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.22", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.23", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
