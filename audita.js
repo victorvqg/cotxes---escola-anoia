@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.55: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.55"') && !/versió 4\.54|versio_app: "4\.54"/.test(html));
+  T("v4.56: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.56"') && !/versió 4\.55|versio_app: "4\.55"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.55» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.56» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.55"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.56"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -846,15 +846,31 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const promesaDesa = w.desa();   // sense await: comprovem l'estat MENTRE desa
   T("v4.50: mentre desa, el botó diu «Desant…» i queda desactivat (no es pot prémer dues vegades)",
     d.querySelector("#btn-desa").disabled === true && d.querySelector("#btn-desa").textContent === "Desant…");
+  T("v4.56: mentre desa, la franja de l'esquerra diu EXACTAMENT el mateix que el botó — mai «Desant…» en un costat i una altra cosa a l'altre",
+    d.querySelector("#barra-txt").textContent === "Desant…" &&
+    d.querySelector("#barra-txt").textContent === d.querySelector("#btn-desa").textContent);
   await promesaDesa; await tic(30);
   T("v4.6: amb franges buides ES DESA igualment i l'avís queda a la barra",
     !d.querySelector("#barra-avis").classList.contains("ocult") &&
     d.querySelector("#barra-avis").textContent.includes("Es desa igualment") &&
     DB.activity_log.some(l => l.action === "canvi graella"));
-  T("v4.50: en desar bé, la barra es queda visible amb el botó «✓ Desat» apagat (fins al proper canvi)",
+  T("v4.50: en desar bé, el botó mostra «✓ Desat» apagat",
     !d.querySelector("#barra").classList.contains("amaga") &&
     d.querySelector("#btn-desa").disabled === true &&
     d.querySelector("#btn-desa").textContent === "✓ Desat");
+  T("v4.56: ...i la franja diu EL MATEIX («✓ Desat» als dos costats) — abans es quedava encallada dient «Desant…» mentre el botó ja deia «✓ Desat»",
+    d.querySelector("#barra-txt").textContent === "✓ Desat");
+  await tic(2600);
+  T("v4.56: 2,5 s després de desar, sense tornar a tocar res, la barra s'amaga DE DEBÒ (display:none via .amaga) — abans es quedava visible per sempre",
+    d.querySelector("#barra").classList.contains("amaga"));
+  w.triaPinzell("cotxe"); await tic(400); w.pinta("r13", "dv");
+  T("v4.56: en tornar a editar, la barra reapareix activa amb «Desa els canvis» (i la franja «Canvis sense desar»)",
+    !d.querySelector("#barra").classList.contains("amaga") &&
+    d.querySelector("#btn-desa").disabled === false &&
+    d.querySelector("#btn-desa").textContent === "Desa els canvis" &&
+    d.querySelector("#barra-txt").textContent === "Canvis sense desar");
+  // neteja: desfem la marca de prova perquè no alteri els recomptes del grup més avall
+  w.triaPinzell("esborra"); await tic(400); w.pinta("r13", "dv");
   const vv = famDoc("Vila Prat");
   const grups = [["e8", "e9"], ["r13"], ["e15"], ["r17"]];
   for (const dd of ["dl", "dt", "dc", "dj", "dv"])

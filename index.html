@@ -383,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.55";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.56";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -460,7 +460,9 @@ let famsReclamables = [];      // famílies sense compte (pantalla de tria, comp
 let famId = "";                // família que s'edita ara (la meva o, admin/staff, una altra)
 var doc = null;
 let pinzell = "cotxe", dirty = false;
-let justDesat = false;   // v4.50: el botó es queda «✓ Desat» apagat fins al proper canvi
+let justDesat = false;   // v4.50: «✓ Desat» un instant després de desar; v4.56: es torna a false sol (timerJustDesat) i llavors la barra s'amaga
+let desant = false;      // v4.56: mentre desa() és en curs — botó i franja en un únic flux
+let timerJustDesat = null;   // v4.56: amaga «✓ Desat» de debò (display:none) al cap de 2,5 s
 let esAdmin = false, esStaff = false;   // deriven del rol de la MEVA família a la BD
 let esProgenitor = false;
 let esborratsPendents = [];   // fills amb la graella esborrada pendent de desar: en desar s'alliberen els cotxes i s'avisa el grup      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
@@ -958,16 +960,24 @@ function pintaBarra(){
     const fb = lameva();
     if (fb && doblesDe(fb).length === 0 && celesPendents(fb).length === 0) barraAvisNeteja();
   }
-  if (dirty){
+  /* v4.56: únic flux Desant → Desat → amagar — el botó (#btn-desa) i la
+     franja (#barra-txt) es pinten SEMPRE junts des d'aquí, mai per separat,
+     perquè no puguin quedar-se dient coses diferents (o contradictòries). */
+  const bd = $("#btn-desa"), bt = $("#barra-txt");
+  if (desant){
+    if (bd){ bd.disabled = true; bd.textContent = "Desant…"; }
+    if (bt) bt.textContent = "Desant…";
+  } else if (dirty){
     // v4.50: mentre hi ha canvis pendents el botó és sempre actiu — encara que
     // just abans mostrés «✓ Desat» apagat (canvi nou després de desar)
     justDesat = false;
-    const bd = $("#btn-desa");
     if (bd){ bd.disabled = false; bd.textContent = "Desa els canvis"; }
-    const bt = $("#barra-txt");
     if (bt) bt.textContent = "Canvis sense desar";
+  } else if (justDesat){
+    if (bd){ bd.disabled = true; bd.textContent = "✓ Desat"; }
+    if (bt) bt.textContent = "✓ Desat";
   }
-  $("#barra").classList.toggle("amaga", !dirty && !justDesat);
+  $("#barra").classList.toggle("amaga", !dirty && !desant && !justDesat);
 }
 
 function doblesDe(f){
@@ -1017,7 +1027,8 @@ async function desa(){
       barraAvis("\u2139\ufe0f " + esc(caiguts.join(" i ")) + " " + (caiguts.length === 1 ? "queda" : "queden") + " sense pla\u00e7a: aquella casella ara est\u00e0 en blanc pel vostre curs. Les seves fam\u00edlies ho veuran als Avisos.", "info");
     else barraAvisNeteja();
   }
-  const b = $("#btn-desa"); b.disabled = true; b.textContent = "Desant…"; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
+  clearTimeout(timerJustDesat);
+  desant = true; pintaBarra(); estat("Desant…");
   try {
     const f = lameva();
     // v4.46: cognoms de família canviats → reescriu els fills que en seguien el patró
@@ -1136,8 +1147,9 @@ async function desa(){
     }
     esborratsPendents = [];
     await sbGet();
-    dirty = false; justDesat = true; b.textContent = "✓ Desat";
+    dirty = false; desant = false; justDesat = true;
     pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
+    timerJustDesat = setTimeout(() => { justDesat = false; pintaBarra(); }, 2500);
     // v4.20: la pestanya oberta es repinta amb les dades desades — el mateix
     // repintat de sempre (pintaCotxe amb les seves barres, Resum…)
     if ($("#tab-cos")) triaTab(tabAct);
@@ -1145,11 +1157,16 @@ async function desa(){
     else if (fillsCognomsActualitzats) avis("✓ <b>Cognoms actualitzats a la família i als fills</b> — els canvis ja són visibles per a tothom.", true);
     else avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
   } catch(e){
+    // v4.56: el botó torna a quedar actiu SEMPRE, encara que dirty sigui fals
+    // (p. ex. un error de permisos en desar sense cap edició local pendent) —
+    // per això aquí NO passem per pintaBarra() (que només el reactiva si hi
+    // ha canvis), sinó que ho forcem directament perquè es pugui reintentar.
+    desant = false;
+    const bdErr = $("#btn-desa");
+    if (bdErr){ bdErr.disabled = false; bdErr.textContent = "Desa els canvis"; }
     estat("No s'ha desat", true);
     $("#barra-txt").textContent = "No s'ha pogut desar: " + msgNeta(e) + ". Torna-ho a provar.";
     avis("No s'ha pogut desar. Torna-ho a provar.", "temp");
-    b.disabled = false;
-    b.textContent = "Desa els canvis";
   }
 }
 
@@ -1753,7 +1770,7 @@ function refrescaFamilies(){
 function canviaFam(){
   if (!esAdmin && !esStaff) return;
   if (dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
-  dirty = false; justDesat = false; pintaBarra();
+  clearTimeout(timerJustDesat); dirty = false; justDesat = false; pintaBarra();
   famId = "";
   pantallaTria();
 }
@@ -2797,7 +2814,7 @@ async function desvinculaCompteDeDebo(){
   const pr = await sb.rpc("el_meu_perfil");
   if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
   else if (perfil){ perfil.family_id = null; perfil.status = "pendent"; }
-  dirty = false; justDesat = false; pintaBarra(); famId = ""; esAdmin = esStaff = false;
+  clearTimeout(timerJustDesat); dirty = false; justDesat = false; pintaBarra(); famId = ""; esAdmin = esStaff = false;
   estat("Desvinculat \u2713", "ok");
   avis("Compte desvinculat \u2713 Tria la teva fam\u00edlia (o una altra) per tornar a entrar.", true);
   await pantallaTria();   // torna a «Qui sou?»
@@ -2816,7 +2833,7 @@ async function esborraFamDeDebò(f){
   estat("Esborrant…");
   const r = await sb.rpc("esborra_familia", { p_family: f.id });
   if (r.error){ estat("Error", true); avis("No s'ha pogut esborrar: " + esc(msgNeta(r.error))); return; }
-  dirty = false; justDesat = false; pintaBarra();
+  clearTimeout(timerJustDesat); dirty = false; justDesat = false; pintaBarra();
   const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
   if (pr.data && pr.data[0]) perfil = pr.data[0];
   estat("Desat ✓", "ok");
@@ -2825,7 +2842,7 @@ async function esborraFamDeDebò(f){
 }
 async function tancaSessio(senseDretes){
   if (!senseDretes && dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
-  dirty = false; justDesat = false; pintaBarra();
+  clearTimeout(timerJustDesat); dirty = false; justDesat = false; pintaBarra();
   desconnectaRealtime();
   try { await sb.auth.signOut(); } catch(e){}
   sessio = null; perfil = null; doc = null; famId = ""; grupActiu = null; grupTrobat = null;
