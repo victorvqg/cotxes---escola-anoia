@@ -68,6 +68,7 @@ h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bot
 .g-grup{grid-column:1/-1;font:700 12.5px 'Baloo 2';color:#17456B;text-transform:uppercase;letter-spacing:.06em;padding:7px 2px 1px}
 .g-hora{font-size:14px;font-weight:700;color:#33424F;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
 .cel.na{opacity:.38;border-style:dashed}
+.cel.suggerida{border-color:#17456B;box-shadow:0 0 0 2px rgba(23,69,107,.25)}
 .cel{min-height:54px;border-radius:12px;border:1.5px solid #D6E0E7;background:#FAFCFD;line-height:1;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 .cel .c-ico{font-size:17px;line-height:1}
 .cel .c-nom{font:800 12px 'Baloo 2';letter-spacing:.04em;max-width:100%;overflow:hidden;white-space:nowrap;color:#6E4E00}
@@ -382,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.49";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.50";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -459,6 +460,7 @@ let famsReclamables = [];      // famílies sense compte (pantalla de tria, comp
 let famId = "";                // família que s'edita ara (la meva o, admin/staff, una altra)
 var doc = null;
 let pinzell = "cotxe", dirty = false;
+let justDesat = false;   // v4.50: el botó es queda «✓ Desat» apagat fins al proper canvi
 let esAdmin = false, esStaff = false;   // deriven del rol de la MEVA família a la BD
 let esProgenitor = false;
 let esborratsPendents = [];   // fills amb la graella esborrada pendent de desar: en desar s'alliberen els cotxes i s'avisa el grup      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
@@ -744,6 +746,13 @@ function responNen(f, n, slot, dia){
 /* Les caselles que li falten a UN fill. celesPendents(f) segueix sent la font
    de veritat per desar i per desbloquejar els Calendaris; aquesta és per
    mostrar de qui són. */
+/* v4.50: cap casella d'aquest fill té resposta encara — mateixos criteris que
+   celesPendentsNen/estatCasella, però perquè la targeta mostri el missatge
+   de benvinguda en lloc de l'avís de pendents. */
+function nenGraellaBuida(f, n){
+  return DIES.every(d => FRANGES.every(fr =>
+    !nenTeCasella(n, fr.id, d) || estatCasella(f, fr.id, d) !== "normal" || !responNen(f, n, fr.id, d)));
+}
 function celesPendentsNen(f, n){
   const p = [];
   const teCurs = !!(n.curs || "").trim();
@@ -949,7 +958,18 @@ function pintaBarra(){
   if (ba && !ba.classList.contains("ocult") && ba.dataset.tipus !== "info"){
     const fb = lameva();
     if (fb && doblesDe(fb).length === 0 && celesPendents(fb).length === 0) barraAvisNeteja();
-  } $("#barra").classList.toggle("amaga", !dirty); }
+  }
+  if (dirty){
+    // v4.50: mentre hi ha canvis pendents el botó és sempre actiu — encara que
+    // just abans mostrés «✓ Desat» apagat (canvi nou després de desar)
+    justDesat = false;
+    const bd = $("#btn-desa");
+    if (bd){ bd.disabled = false; bd.textContent = "Desa els canvis"; }
+    const bt = $("#barra-txt");
+    if (bt) bt.textContent = "Canvis sense desar";
+  }
+  $("#barra").classList.toggle("amaga", !dirty && !justDesat);
+}
 
 function doblesDe(f){
   const out = [];
@@ -998,7 +1018,7 @@ async function desa(){
       barraAvis("\u2139\ufe0f " + esc(caiguts.join(" i ")) + " " + (caiguts.length === 1 ? "queda" : "queden") + " sense pla\u00e7a: aquella casella ara est\u00e0 en blanc pel vostre curs. Les seves fam\u00edlies ho veuran als Avisos.", "info");
     else barraAvisNeteja();
   }
-  const b = $("#btn-desa"); b.disabled = true; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
+  const b = $("#btn-desa"); b.disabled = true; b.textContent = "Desant…"; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
   try {
     const f = lameva();
     // v4.46: cognoms de família canviats → reescriu els fills que en seguien el patró
@@ -1117,7 +1137,8 @@ async function desa(){
     }
     esborratsPendents = [];
     await sbGet();
-    dirty = false; pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
+    dirty = false; justDesat = true; b.textContent = "✓ Desat";
+    pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
     // v4.20: la pestanya oberta es repinta amb les dades desades — el mateix
     // repintat de sempre (pintaCotxe amb les seves barres, Resum/Dies…)
     if ($("#tab-cos")) triaTab(tabAct);
@@ -1127,8 +1148,10 @@ async function desa(){
   } catch(e){
     estat("No s'ha desat", true);
     $("#barra-txt").textContent = "No s'ha pogut desar: " + msgNeta(e) + ". Torna-ho a provar.";
+    avis("No s'ha pogut desar. Torna-ho a provar.", "temp");
+    b.disabled = false;
+    b.textContent = "Desa els canvis";
   }
-  b.disabled = false;
 }
 
 /* ── Arrencada ── */
@@ -1720,7 +1743,7 @@ function pintaFamilies(){
 function canviaFam(){
   if (!esAdmin && !esStaff) return;
   if (dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
-  dirty = false; pintaBarra();
+  dirty = false; justDesat = false; pintaBarra();
   famId = "";
   pantallaTria();
 }
@@ -1970,17 +1993,21 @@ function netejaGermana(f, slot, dia){
    Només canvia com es mostra. */
 function blocGraellaNen(f, n){
   const pend = celesPendentsNen(f, n);
+  const buida = nenGraellaBuida(f, n);
   const nomC = n.nom.trim().split(/\s+/)[0];
   let h = "<div class='gr-bloc'><div class='gr-cap'><span class='gr-nom'>\ud83d\udc66 " + esc(n.nom) + "</span>" +
     (n.curs ? "<span class='gr-curs'>" + esc(n.curs) + "</span>"
             : "<span class='gr-curs sensecurs'>\u26a0 sense curs</span>") +
     "<span class='mp " + (pend.length ? "def" : "ok") + "'>" +
     (pend.length ? "\u26a0 " + pend.length + (pend.length === 1 ? " pendent" : " pendents") : "\u2713 completa") + "</span></div>";
-  if (pend.length)
+  if (buida)
+    h += "<p class='hint' style='margin:0 2px 7px'>\ud83d\udc4b Comen\u00e7a aqu\u00ed: toca la primera casella (dilluns entrada) i tria \ud83d\ude97, \ud83d\ude4b o \ud83d\udeab.</p>";
+  else if (pend.length)
     h += "<p class='hint' style='margin:0 2px 7px'>Falta respondre de <b>" + esc(nomC) + "</b>: " + esc(pend[0]) +
          (pend.length > 1 ? " i " + (pend.length - 1) + (pend.length === 2 ? " m\u00e9s" : " m\u00e9s") : "") + ".</p>";
   h += "<div class='graella'>";
   h += "<div></div>" + DIES.map(d => "<div class='g-dia'>" + DIES_LBL[d] + "</div>").join("");
+  let suggeridaFeta = false;
   FRANGES.forEach((fr, i) => {
     if (i === 0 || FRANGES[i-1].tipus !== fr.tipus)
       h += "<div class='g-grup'>" + (fr.tipus === "Entrada" ? "🌅 Entrada" : "🎒 Recollida") + "</div>";
@@ -1996,6 +2023,8 @@ function blocGraellaNen(f, n){
         cls = "nec" + (elPorta(f.id, n.id, fr.id, d) ? " cobert" : "");
         cont = "<span class='c-ico'>🙋</span>";
       }
+      // v4.50: a la targeta buida, ressalta suaument la primera casella pendent
+      if (buida && !noAplica && !suggeridaFeta){ cls += " suggerida"; suggeridaFeta = true; }
       h += "<button class='cel " + cls + (noAplica ? " na" : "") + "' onclick=\"obreCasella('" + fr.id + "','" + d + "','" + n.id + "')\"" +
            " aria-label='" + esc(nomC) + " " + DIES_NOM[d] + " " + fr.hora + "'>" + cont + "</button>";
     });
@@ -2773,7 +2802,7 @@ async function desvinculaCompteDeDebo(){
   const pr = await sb.rpc("el_meu_perfil");
   if (!pr.error && pr.data && pr.data[0]) perfil = pr.data[0];
   else if (perfil){ perfil.family_id = null; perfil.status = "pendent"; }
-  dirty = false; pintaBarra(); famId = ""; esAdmin = esStaff = false;
+  dirty = false; justDesat = false; pintaBarra(); famId = ""; esAdmin = esStaff = false;
   estat("Desvinculat \u2713", "ok");
   avis("Compte desvinculat \u2713 Tria la teva fam\u00edlia (o una altra) per tornar a entrar.", true);
   await pantallaTria();   // torna a «Qui sou?»
@@ -2792,7 +2821,7 @@ async function esborraFamDeDebò(f){
   estat("Esborrant…");
   const r = await sb.rpc("esborra_familia", { p_family: f.id });
   if (r.error){ estat("Error", true); avis("No s'ha pogut esborrar: " + esc(msgNeta(r.error))); return; }
-  dirty = false; pintaBarra();
+  dirty = false; justDesat = false; pintaBarra();
   const pr = await sb.from("profiles").select("*").eq("id", sessio.user.id);
   if (pr.data && pr.data[0]) perfil = pr.data[0];
   estat("Desat ✓", "ok");
@@ -2801,7 +2830,7 @@ async function esborraFamDeDebò(f){
 }
 async function tancaSessio(senseDretes){
   if (!senseDretes && dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
-  dirty = false; pintaBarra();
+  dirty = false; justDesat = false; pintaBarra();
   desconnectaRealtime();
   try { await sb.auth.signOut(); } catch(e){}
   sessio = null; perfil = null; doc = null; famId = ""; grupActiu = null; grupTrobat = null;
