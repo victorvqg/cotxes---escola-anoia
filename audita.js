@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.33", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.33"));
+  T("lema i peu amb versió 4.34", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.34"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -905,12 +905,25 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     const lliures = b2.conds.some(c2 => (c2.places || 0) - w.portaValids(c2, ss, dd).length > 0);
     if (lliures) nAmb29++; else nSense29++;
   }));
-  T("v4.29: «Per assignar» quadra amb balanc()/portaValids()",
+  let nResolts29 = 0;
+  ["dl", "dt", "dc", "dj", "dv"].forEach(dd => ["e8", "e9", "r13", "e15", "r17"].forEach(ss => {
+    const b2 = w.balanc(ss, dd);
+    if (b2.nens.length && !b2.nens.some(n2 => !n2.portadaPerId)) nResolts29++;
+  }));
+  const cal34 = () => d.querySelector("#cal-cos").innerHTML;
+  T("v4.34: el resum de dalt diu els viatges amb nens esperant (o que tot està resolt)",
     (nAmb29 + nSense29 === 0)
-      ? cos().includes("Cap nen esperant en viatges amb seients lliures")
-      : ((cos().match(/esperen:/g) || []).length === nAmb29 + nSense29 &&
-         (nSense29 === 0 || cos().includes("Sense cotxe possible")) &&
-         (nAmb29 === 0 || cos().includes("amb seients lliures"))));
+      ? cal34().includes("Tots els nens tenen cotxe")
+      : cal34().includes((nAmb29 + nSense29) + " viatge") && cal34().includes("amb nens esperant"));
+  T("v4.34: una targeta per viatge amb pastilla, i les resoltes plegades",
+    (cal34().match(/<details/g) || []).length === nAmb29 + nSense29 + nResolts29 &&
+    (cal34().match(/open=""/g) || []).length === nAmb29 + nSense29 &&
+    (nResolts29 === 0 || cal34().includes("✓ resolt")) &&
+    (nAmb29 + nSense29 === 0 || cal34().includes("sense cotxe")));
+  T("v4.34: files amb títol i una línia per persona, i CAP telèfon",
+    !cal34().includes("📞") &&
+    (nAmb29 === 0 || (cal34().includes("Esperen plaça") && cal34().includes("Cotxes amb seients lliures"))) &&
+    (nSense29 === 0 || cal34().includes("Sense cotxe possible")));
   w.triaVistaCal("dia"); await tic(20);
 
   console.log("6c · AVISOS ENTRE COMPTES (v4.15: guardats a Supabase per a tot el grup)");

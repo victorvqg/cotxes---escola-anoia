@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.33</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.34</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -2238,7 +2238,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.33", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.34", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -3099,40 +3099,59 @@ function pintaVistaNen(){
 }
 function selNenCanvia(v){ nenSel = v; pintaVistaNen(); }
 
-/* v4.29: «Per assignar» — els viatges amb nens esperant plaça I algun
-   conductor amb seients lliures (i, a sota, els que no en tenen cap:
-   «Sense cotxe possible»). Tot surt de balanc() i portaValids(). */
+/* v4.34: «Per assignar» per files — resum a dalt, una targeta per viatge
+   amb pastilla (⚠ nens sense cotxe / ✓ resolt), una línia per persona i
+   SENSE telèfons (són a Famílies). Les targetes amb nens esperant van
+   primer (vora vermella, obertes); les resoltes a sota (vora verda,
+   plegades); «Sense cotxe possible» al final. Tot surt de balanc() i
+   portaValids(). */
 function pintaPerAssignar(){
-  const amb = [], sense = [];
+  const esperant = [], resolts = [], sense = [];
   DIES.forEach(d => FRANGES.forEach(fr => {
     const b = balanc(fr.id, d);
+    if (!b.nens.length) return;
     const esperen = b.nens.filter(n => !n.portadaPerId);
-    if (!esperen.length) return;
-    const lliures = b.conds.map(c => ({ c: c, n: Math.max(0, (c.places || 0) - portaValids(c, fr.id, d).length) }))
-      .filter(x => x.n > 0);
-    (lliures.length ? amb : sense).push({ d: d, fr: fr, esperen: esperen, conds: lliures });
+    const lliures = b.conds.map(c => ({ c: c, n: Math.max(0, (c.places || 0) - portaValids(c, fr.id, d).length) })).filter(x => x.n > 0);
+    const it = { d: d, fr: fr, esperen: esperen, coberts: b.nens.filter(n => n.portadaPerId), conds: lliures };
+    if (!esperen.length) resolts.push(it);
+    else if (lliures.length) esperant.push(it);
+    else sense.push(it);
   }));
-  const tel = f2 => (f2 && f2.phone && f2.phoneVisible) ? " \u00b7 \ud83d\udcde " + esc(f2.phone) : "";
   const meva = lameva();
-  const fitxa = it =>
-    "<div class='targeta'>" +
-    "<div class='f-cap'><span class='f-hora'>" + DIES_LBL[it.d] + " " + it.fr.hora + "</span><span class='m-tip " + (it.fr.tipus === "Entrada" ? "e" : "r") + "'>" + it.fr.tipus + "</span></div>" +
-    "<div class='f-linia'>\ud83d\ude4b esperen: " + it.esperen.map(n => {
-      const ff = doc.families.find(x => x.id === n.famId);
-      return "<b>" + esc(n.nom) + "</b> (" + esc(n.fam) + tel(ff) + ")"; }).join(", ") + "</div>" +
-    it.conds.map(x =>
-      "<div class='f-linia'>\ud83d\ude97 amb seients lliures: <b>" + esc(x.c.nom) + "</b>" +
-      (x.c.conductor ? " \u00b7 condueix " + esc(x.c.conductor) : "") +
-      " \u00b7 " + x.n + (x.n === 1 ? " seient" : " seients") + tel(x.c) +
-      (meva && x.c.id === meva.id ? " <button class='enllac' onclick=\"triaTab('cotxe')\">El teu cotxe \u2192</button>" : "") +
-      "</div>").join("") +
-    "</div>";
-  $("#cal-cos").innerHTML =
-    (amb.length ? amb.map(fitxa).join("")
-                : "<p class='lead'>\u2713 Cap nen esperant en viatges amb seients lliures.</p>") +
+  const fitxa = (it, obert) => {
+    const pastilla = it.esperen.length
+      ? "<span class='badge mal'>\u26a0 " + it.esperen.length + (it.esperen.length === 1 ? " nen sense cotxe" : " nens sense cotxe") + "</span>"
+      : "<span class='badge be'>\u2713 resolt</span>";
+    let cos2 = "";
+    if (it.esperen.length)
+      cos2 += "<div class='f-linia'><b>\ud83d\ude4b Esperen pla\u00e7a</b></div>" +
+        it.esperen.map(n => "<div class='f-linia' style='padding-left:14px'>" + esc(n.nom) + " \u00b7 " + esc(n.fam) + "</div>").join("");
+    else if (it.coberts.length)
+      cos2 += "<div class='f-linia'><b>\u2713 Tots amb cotxe</b></div>" +
+        it.coberts.map(n => "<div class='f-linia' style='padding-left:14px'>" + esc(n.nom) + " \u00b7 " + esc(n.fam) + "</div>").join("");
+    if (it.conds.length)
+      cos2 += "<div class='f-linia' style='margin-top:4px'><b>\ud83d\ude97 Cotxes amb seients lliures</b></div>" +
+        it.conds.map(x => "<div class='f-linia' style='padding-left:14px'>" + esc(x.c.nom) +
+          (x.c.conductor ? " \u00b7 condueix " + esc(x.c.conductor) : "") +
+          " \u00b7 " + x.n + (x.n === 1 ? " seient" : " seients") +
+          (meva && x.c.id === meva.id ? " <button class='enllac' onclick=\"triaTab('cotxe')\">El teu cotxe \u2192</button>" : "") +
+          "</div>").join("");
+    return "<details class='targeta conf'" + (obert ? " open" : "") +
+      " style='border-left:4px solid " + (it.esperen.length ? "#d64545" : "#2C7A4B") + ";margin-bottom:10px;margin-top:0'>" +
+      "<summary><span class='f-cap' style='display:inline-flex;width:100%'><span class='f-hora'>" + DIES_LBL[it.d] + " " + it.fr.hora + "</span>" +
+      "<span class='m-tip " + (it.fr.tipus === "Entrada" ? "e" : "r") + "'>" + it.fr.tipus + "</span>" + pastilla + "</span></summary>" +
+      "<div style='padding:4px 2px 6px'>" + cos2 + "</div></details>";
+  };
+  const nProb = esperant.length + sense.length;
+  const resum = nProb
+    ? "<div class='targeta' style='border-left:4px solid #d64545'><b style='color:#8F2B1C'>\u26a0 " + nProb + (nProb === 1 ? " viatge" : " viatges") + " amb nens esperant</b></div>"
+    : "<div class='targeta' style='border-left:4px solid #2C7A4B'><b style='color:#1F5C3B'>\u2713 Tots els nens tenen cotxe.</b></div>";
+  $("#cal-cos").innerHTML = resum +
+    esperant.map(it => fitxa(it, true)).join("") +
+    resolts.map(it => fitxa(it, false)).join("") +
     (sense.length ? "<h2 style='margin:14px 2px 6px'>Sense cotxe possible</h2>" +
       "<p class='hint' style='margin:0 2px 8px'>Viatges amb nens esperant per\u00f2 cap seient lliure: per resoldre parlant.</p>" +
-      sense.map(fitxa).join("") : "");
+      sense.map(it => fitxa(it, true)).join("") : "");
 }
 
 /* \u2500\u2500 Pestanya: resum final del grup \u2500\u2500 */
