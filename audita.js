@@ -28,7 +28,9 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.34", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.34"));
+  T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
+  T("v4.35: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.35"') && !/versió 4\.34|versio_app: "4\.34"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -603,6 +605,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const cos = () => (d.querySelector("#tab-cos") || { innerHTML: "" }).innerHTML;
   await new Promise(r => { if (d.readyState !== "loading") r(); else d.addEventListener("DOMContentLoaded", r); });
   await tic(30);
+
+  console.log("0b · PEU: crèdit i versió (v4.35)");
+  T("el crèdit «creat per Víctor Quintana · versió 4.35» surt sota el peu, ABANS de cap login",
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.35"));
+  T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
+    !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
   const famDoc = nom => w.doc.families.find(f => f.nom === nom);
   const famDB = nom => DB.families.find(f => f.name === nom);
@@ -1757,6 +1766,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   })());
   T("v4.32: sota la barra del grup, la mirada dels nens amb nom propi",
     cos().includes("demandes de plaça") || cos().includes("demanda de plaça"));
+  T("v4.30: línia de demandes CENTRADA (text-align:center) al DOM",
+    !!d.querySelector("#tab-cos .bc-sub[style*='text-align:center']"));
+
   T("v4.18: les barres de família són el càlcul d'El teu cotxe (statsCoberturaFam), reutilitzat", (function(){
     return w.doc.families.every(f2 => { const st2 = w.statsCoberturaFam(f2);
       return !st2.tot || cos().includes(st2.cob + " de " + st2.tot); });

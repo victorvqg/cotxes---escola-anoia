@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.34</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit"><div id="peu-stats" class="peu-stats"></div><div id="peu-credit"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -381,6 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
+const VERSIO = "4.35";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -846,7 +847,7 @@ function statsCobertura(){
   return { tot: tot, cob: cob, dem: dem, ambCotxe: ambCotxe, esperenAmb: esperenAmb, senseCotxe: senseCotxe };
 }
 function liniaNensHtml(st){
-  return "<div class='bc-sub'>\ud83d\ude4b " + st.dem + (st.dem === 1 ? " demanda" : " demandes") + " de pla\u00e7a \u00b7 " +
+  return "<div class='bc-sub' style='text-align:center'>\ud83d\ude4b " + st.dem + (st.dem === 1 ? " demanda" : " demandes") + " de pla\u00e7a \u00b7 " +
     st.ambCotxe + " amb cotxe \u00b7 " + st.esperenAmb + " esperen en viatges amb cotxe \u00b7 " +
     st.senseCotxe + " en viatges on ning\u00fa ofereix cotxe</div>";
 }
@@ -1059,7 +1060,12 @@ async function desa(){
 }
 
 /* ── Arrencada ── */
+function pintaPeuCredit(){
+  const el = $("#peu-credit"); if (!el) return;
+  el.innerHTML = "creat per V\u00edctor Quintana \u00b7 <span class='versio'>versi\u00f3 " + VERSIO + "</span>";
+}
 async function inici(){
+  pintaPeuCredit();
   if (!sbOk()){
     estat("Sense configurar", true);
     $("#pantalla").innerHTML = "<div class='targeta'><h2>Falta la clau pública</h2><p class='lead'>Obre <b>index.html</b> i enganxa la <b>anon public key</b> del projecte Supabase al bloc CONFIG de dalt de tot del JavaScript (comença per <b>eyJ…</b>). La trobes a Supabase → Project Settings → API.</p></div>";
@@ -2238,7 +2244,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.34", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: VERSIO, families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
