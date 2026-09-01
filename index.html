@@ -382,7 +382,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.44";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.45";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1221,7 +1221,8 @@ function pantallaLogin(err){
     "<div class='comfun'><div class='cf-cotxe'>🚗</div><div class='cf-t'>COM FUNCIONA?</div>" +
     "<div class='pas'><span class='pas-n'>1</span>Entra amb el teu correu i contrasenya</div>" +
     "<div class='pas'><span class='pas-n'>2</span>Uneix-te al grup amb el codi que t'ha passat l'administrador</div>" +
-    "<div class='pas'><span class='pas-n'>3</span>Tria la teva família o crea-la, i completa la graella de la setmana</div></div>";
+    "<div class='pas'><span class='pas-n'>3</span>Tria la teva família o crea-la, i completa la graella de la setmana</div>" +
+    "<div class='pas'><span class='pas-n'>4</span>🚗 El teu cotxe · qui hi puja: si algun dia condueixes, marca quins nens puges al teu cotxe i desa. Els altres veuran que tenen plaça.</div></div>";
 }
 async function fesLogin(){
   const email = $("#li-email").value.trim(), pass = $("#li-pass").value;
