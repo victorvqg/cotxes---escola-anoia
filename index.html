@@ -382,7 +382,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.46";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.47";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1206,6 +1206,7 @@ let loginMode = "entra";
 function loginA(m){ loginMode = m; pantallaLogin(); }
 function pantallaLogin(err){
   document.body.classList.remove("dins");
+  pintaPeuStats();   // v4.47: sense sessió, doc és null i peuStatsHtml() no dona res — neteja el peu encara que abans hi hagués estadístiques pintades (p. ex. en tancar sessió)
   const reg = loginMode === "registre";
   estat(reg ? "Crea el compte" : "Entra al grup");
   $("#pantalla").innerHTML =
