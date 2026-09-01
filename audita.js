@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.45: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.45"') && !/versió 4\.44|versio_app: "4\.44"/.test(html));
+  T("v4.46: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.46"') && !/versió 4\.45|versio_app: "4\.45"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.45» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.46» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.45"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.46"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1168,6 +1168,40 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.renomNen(idJan(), "Janot"); await tic();
   await w.desa(); await tic(30);
   T("canviar el nom d'un nen (les marques es conserven)", nenDB(idVila, "Janot") && marquesDB(idVila, "request", "r13", "dv")[0].children_ids.includes(nenDB(idVila, "Janot").id));
+
+  console.log("7a · NOVETATS v4.46 (canviar cognoms de família actualitza els fills)");
+  d.querySelector("#nou-nen").value = "Testu Vila Puig"; w.afegeixNen(); await tic();   // segueix el patró: nom + els 2 cognoms actuals
+  d.querySelector("#nou-nen").value = "Berta Soler"; w.afegeixNen(); await tic();       // cognom propi, diferent del de la família
+  w.renomNen(idJan(), "Janot Vila"); await tic();   // segueix el patró curt: nom + només el 1r cognom
+  await w.desa(); await tic(30);
+  w.renomCognomMare("Serra"); await tic();   // Vila Puig → Vila Serra (només canvia el 2n cognom)
+  await w.desa(); await tic(30);
+  T("v4.46: qui seguia nom + els 2 cognoms de la família ara porta els nous (Testu Vila Puig → Testu Vila Serra)",
+    nenDB(idVila, "Testu Vila Serra") && !nenDB(idVila, "Testu Vila Puig"));
+  T("v4.46: qui seguia nom + només el 1r cognom hi segueix (Janot Vila: el 1r cognom no ha canviat)",
+    nenDB(idVila, "Janot Vila"));
+  T("v4.46: el fill amb un cognom propi, diferent del de la família, NO es toca",
+    nenDB(idVila, "Berta Soler"));
+  T("v4.46: missatge «Cognoms actualitzats a la família i als fills» en desar",
+    d.querySelector("#avis").textContent.includes("Cognoms actualitzats a la família i als fills"));
+  w.renomCognomPare("Roca"); await tic();   // Vila Serra → Roca Serra (ara canvia el 1r cognom)
+  await w.desa(); await tic(30);
+  T("v4.46: en canviar el 1r cognom, també s'actualitza qui el seguia (Janot Vila → Janot Roca)",
+    nenDB(idVila, "Janot Roca") && !nenDB(idVila, "Janot Vila"));
+  T("v4.46: … i qui seguia els 2 cognoms sencers també (Testu Vila Serra → Testu Roca Serra)",
+    nenDB(idVila, "Testu Roca Serra"));
+  T("v4.46: el cognom propi de Berta segueix sense tocar-se",
+    nenDB(idVila, "Berta Soler"));
+  // neteja: la resta de la suite fa servir «Vila Puig» i el nen «Janot» (sol) desenes de cops
+  const famVilaAra = w.doc.families.find(f2 => f2.id === idVila);
+  w.treuNen(famVilaAra.nens.find(n2 => n2.nom === "Testu Roca Serra").id);
+  w.treuNen(famVilaAra.nens.find(n2 => n2.nom === "Berta Soler").id);
+  w.renomNen(idJan(), "Janot"); await tic();
+  w.renomCognomPare("Vila"); await tic();
+  w.renomCognomMare("Puig"); await tic();
+  await w.desa(); await tic(30);
+  T("v4.46: neteja de la prova sense deixar rastre (torna a Vila Puig, Janot sol)",
+    famDB("Vila Puig") && famDB("Vila Puig").id === idVila && nenDB(idVila, "Janot") && famDoc("Vila Puig").nens.length === 1);
 
   console.log("7b · ROLS: admin i staff sense codis PIN");
   w.obreAdmin(); await tic();

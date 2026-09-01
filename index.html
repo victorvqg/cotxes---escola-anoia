@@ -382,7 +382,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.45";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.46";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -526,6 +526,7 @@ async function sbGet(){
   const fams = (rf.data || []).map(row => ({
     id: row.id, nom: row.name, rol: row.role || "usuari",
     cognomPare: row.cognom1 || "", cognomMare: row.cognom2 || "",
+    cognomsBase: { p: row.cognom1 || "", m: row.cognom2 || "" },   // v4.46: instantània — base per detectar canvi de cognoms en desar
     conductor: row.driver || "", places: row.seats == null ? 3 : row.seats,
     phone: row.phone || "", phoneVisible: row.phone_visible !== false,
     curs: row.curs || "", codiFam: "", ownerId: owners[row.id] || "",   // el codi propi es carrega a banda amb codi_familia()
@@ -996,6 +997,10 @@ async function desa(){
   const b = $("#btn-desa"); b.disabled = true; $("#barra-txt").textContent = "Desant…"; estat("Desant…");
   try {
     const f = lameva();
+    // v4.46: cognoms de família canviats → reescriu els fills que en seguien el patró
+    const cbOld = f.cognomsBase || { p: f.cognomPare || "", m: f.cognomMare || "" };
+    const fillsCognomsActualitzats = ((f.cognomPare || "") !== cbOld.p || (f.cognomMare || "") !== cbOld.m)
+      ? actualitzaCognomsFills(f, cbOld.p, cbOld.m) : false;
     /* v4.21: l'«abans» és el que hi havia CARREGAT a pantalla (portaBase),
        no una lectura en viu de la BD: un desat sense canvis reals no genera
        cap avís encara que la BD balli (desats a mitges, dos dispositius). */
@@ -1113,6 +1118,7 @@ async function desa(){
     // repintat de sempre (pintaCotxe amb les seves barres, Resum/Dies…)
     if ($("#tab-cos")) triaTab(tabAct);
     if (resumEsborrats.length) avis("\ud83d\uddd1\ufe0f <b>" + resumEsborrats.join("<br>") + "</b>");
+    else if (fillsCognomsActualitzats) avis("✓ <b>Cognoms actualitzats a la família i als fills</b> — els canvis ja són visibles per a tothom.", true);
     else avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
   } catch(e){
     estat("No s'ha desat", true);
@@ -2424,6 +2430,29 @@ function renomFam(v){
   dirty = true; pintaBarra(); pantallaApp();
 }
 function recomponNom(f){ const a = (f.cognomPare || "").trim(), b = (f.cognomMare || "").trim(); if (a || b) f.nom = (a + " " + b).trim(); }
+/* v4.46: si els cognoms canvien, els fills que en seguien el patró (nom de
+   pila + cognoms VELLS, sencers o només el 1r) passen a portar els nous.
+   Els que tenien un cognom diferent escrit a mà no es toquen. */
+function actualitzaCognomsFills(f, cognomPareAbans, cognomMareAbans){
+  const oldCombinat = ((cognomPareAbans || "").trim() + " " + (cognomMareAbans || "").trim()).trim();
+  const oldNomesPare = (cognomPareAbans || "").trim();
+  const novCombinat = ((f.cognomPare || "").trim() + " " + (f.cognomMare || "").trim()).trim();
+  const novNomesPare = (f.cognomPare || "").trim();
+  let algunActualitzat = false;
+  (f.nens || []).forEach(n => {
+    const nom = (n.nom || "").trim(); if (!nom) return;
+    const patrons = [[oldCombinat, novCombinat], [oldNomesPare, novNomesPare]];
+    for (const [oldS, novS] of patrons){
+      if (!oldS || !nom.endsWith(" " + oldS)) continue;
+      const pila = nom.slice(0, nom.length - oldS.length - 1).trim();
+      if (!pila) continue;
+      n.nom = novS ? (pila + " " + novS) : pila;
+      algunActualitzat = true;
+      break;
+    }
+  });
+  return algunActualitzat;
+}
 function renomCognomPare(v){ const f = lameva(); if (!f) return; if (nomesTitular()) return; const nou = v.trim(); if (nou === (f.cognomPare || "")) return; f.cognomPare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
 function renomCognomMare(v){ const f = lameva(); if (!f) return; if (nomesTitular()) return; const nou = v.trim(); if (nou === (f.cognomMare || "")) return; f.cognomMare = nou; recomponNom(f); dirty = true; pintaBarra(); pantallaApp(); }
 function pintaBloqueig(){
