@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.48: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.48"') && !/versió 4\.47|versio_app: "4\.47"/.test(html));
+  T("v4.49: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.49"') && !/versió 4\.48|versio_app: "4\.48"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.48» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.49» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.48"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.49"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1343,6 +1343,28 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.selDia(diaCond); await tic(30);
   T("la vista dia avisa dels nens pendents de pujar al meu cotxe", cos().includes("demana pla\u00e7a") || cos().includes("demanen pla\u00e7a"));
 
+  console.log("10b2 \u00b7 NOVETATS v4.49 (l'av\u00eds de nens pendents surt ELS 5 DIES, no nom\u00e9s alguns)");
+  {
+    const DDD = ["dl", "dt", "dc", "dj", "dv"];
+    const fVilaP2 = famDoc("Vila Puig");
+    fVilaP2.cotxe = { e9: DDD.slice(), r13: DDD.slice(), e15: DDD.slice() };
+    w.doc.families.push({
+      id: "diag49", nom: "Diag Waiter", rol: "usuari", cognomPare: "Diag", cognomMare: "",
+      conductor: "", places: 0, phone: "", phoneVisible: false, curs: "", codiFam: "", ownerId: "",
+      cotxe: {}, propi: {}, porta: {},
+      nens: [{ id: "diag49-nen", nom: "DiagNen", curs: "1r ESO", marca: { e9: DDD.slice(), r13: DDD.slice(), e15: DDD.slice() } }]
+    });
+    w.triaVistaCal("dia"); await tic();
+    DDD.forEach(dd => {
+      w.selDiaChip(dd);
+      T("v4.49: el dia " + dd + " amb caselles vermelles (alg\u00fa condueix, un nen 1r ESO demana i ning\u00fa l'ha assignat) mostra l'av\u00eds",
+        cos().includes("demana pla\u00e7a") || cos().includes("demanen pla\u00e7a"));
+    });
+    // neteja: treu la fam\u00edlia sint\u00e8tica i deixa Vila Puig com abans
+    w.doc.families = w.doc.families.filter(x2 => x2.id !== "diag49");
+    await w.sincronitza(); await tic(30);
+  }
+
   console.log("10c · NOVETATS v3.2 (tel/curs, codi família, El teu cotxe, límits, staff↛admin, self-heal)");
   const menuHtml2 = d.querySelector("#calaix").innerHTML;
   T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
@@ -1626,6 +1648,27 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.tancaCasella();
   w.obreCasella("e8", "dl"); await tic();
   T("però dilluns no (1r/2n entren a les 9.00)", !d.querySelector("#cel-menu").classList.contains("obert"));
+  console.log("10f2 · NOVETATS v4.49 (🚗/🚫 des d'una targeta on el fill no hi entra)");
+  {
+    const famV = famDoc("Vila Puig");
+    w.obreCasella("e8", "dl", idJan()); await tic();
+    T("v4.49: des de la targeta d'en Janot (que dilluns no entra a les 8.00) el menú SÍ s'obre",
+      d.querySelector("#cel-menu").classList.contains("obert"));
+    T("v4.49: … amb un avís que a ell no li cal marcar-lo, en lloc del botó 🙋",
+      d.querySelector("#cel-menu").innerHTML.includes("no cal marcar-lo") && !d.querySelector("#cel-menu").innerHTML.includes("demana plaça"));
+    T("v4.49: … però 🚗 i 🚫 hi són (són de tota la família, no només d'ell)",
+      d.querySelector("#cel-menu").innerHTML.includes("Conduïm nosaltres") && d.querySelector("#cel-menu").innerHTML.includes("Anem pel nostre compte"));
+    w.celAccio("cotxe"); await tic();
+    T("v4.49: marcar 🚗 des d'aquella targeta SÍ funciona", w.te(famV.cotxe, "e8", "dl"));
+    T("v4.49: … i la casella (apagada) d'en Janot ara mostra el 🚗 de la família",
+      cos().includes("cel cond na"));
+    w.tancaCasella();
+    // neteja: torna a deixar-ho com abans perquè la resta de la suite no es trenqui
+    // (tic(400) perquè l'escut anti-tocs dobles no confongui aquest segon toc amb el primer)
+    await tic(400);
+    w.obreCasella("e8", "dl", idJan()); await tic(); w.celAccio("cotxe"); await tic(); w.tancaCasella();
+    T("v4.49: neteja — e8/dl torna a quedar sense marcar", !w.te(famV.cotxe, "e8", "dl"));
+  }
   w.triaTab("perfil"); await tic();
   // v4.6: el desat amb pendents ara SÍ es desa — cal tornar el curs real d'en
   // Janot abans, que si no quedava 1r ESO a la BD (abans ho tapava el bloqueig)
@@ -1650,8 +1693,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     w.posa(fVPg.cotxe, "e9", "dl");     // NOMÉS d'en Nil: mai no es toca
     w.posa(janG.marca, "r17", "dl");    // 🙋 seu
     w.triaTab("graella"); await tic();
-    T("v4.14: les caselles que no són seves NO mostren marques apagades (e9-dl és d'en Nil)",
-      cos().includes('aria-label="Janot Dilluns 8.35"></button>'));
+    T("v4.49: les caselles que no són seves ARA SÍ mostren (apagat) el 🚗/🚫 de la família — e9-dl és d'en Nil, però la família hi condueix",
+      cos().includes('aria-label="Janot Dilluns 8.35"><span class="c-ico">🚗</span></button>'));
     // camí A · «Només el que és seu»
     w.esborraGraellaNen(janG.id); await tic(10);
     T("v4.14: amb germans i 🚗/🚫 compartit, el diàleg PREGUNTA i esmenta el germà",
