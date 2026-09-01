@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.39";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.40";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -3280,27 +3280,15 @@ function pintaPerAssignar(){
 }
 
 /* \u2500\u2500 Pestanya: resum final del grup \u2500\u2500 */
-var nenResumSel = "";   // «famId|nenId» — la tria es recorda mentre l'app és oberta
-function selNenResum(v){ nenResumSel = v || ""; pintaResum(); }
 async function pintaResum(){
   await refresca();
   if (!doc) return;
-  /* v4.29: filtre per nen — només els viatges on aquell nen hi és
-     (el cotxe de la seva família, el seu 🙋 o el 🚫 de casa) */
-  let famNR = null, nenNR = null;
-  if (nenResumSel.includes("|")){
-    const t29 = nenResumSel.split("|");
-    famNR = doc.families.find(x => x.id === t29[0]) || null;
-    nenNR = famNR ? (famNR.nens || []).find(x => x.id === t29[1]) : null;
-    if (!nenNR) nenResumSel = "";
-  }
+  /* v4.40: Resum torna a mostrar sempre l'estat de tot el grup — el filtre
+     per nen (v4.29) es va traslladar del tot a la pestanya «Per nen», que
+     ja tenia (i conserva) la seva pròpia variable nenSel. */
   const defs = [], justs = [], marges = [];
   let buides = 0, totPlaces = 0, totNens = 0;
   DIES.forEach(d => FRANGES.forEach(fr => {
-    if (nenNR){
-      if (estatCasella(famNR, fr.id, d) !== "normal" || !nenTeCasella(nenNR, fr.id, d)) return;
-      if (!te(famNR.cotxe, fr.id, d) && !te(famNR.propi, fr.id, d) && !te(nenNR.marca, fr.id, d)) return;
-    }
     const b = balanc(fr.id, d);
     if (!b.conds.length && !b.nens.length){ buides++; return; }
     totPlaces += b.places; totNens += b.nens.length;
@@ -3334,15 +3322,7 @@ async function pintaResum(){
            "<div class='r-nens'>" + det + "</div></details>";
   };
   const nNens = doc.families.reduce((s,f) => s + (f.nens || []).length, 0);
-  const opcions = [];
-  famOrd().forEach(f => (f.nens || []).forEach(n =>
-    opcions.push("<option value='" + f.id + "|" + n.id + "'" + (nenResumSel === f.id + "|" + n.id ? " selected" : "") + ">" +
-      esc(n.nom.trim().split(/\s+/)[0]) + " \u00b7 " + esc(f.nom) + "</option>")));
-  let h = "<div class='targeta'><div class='fila' style='align-items:center;gap:8px'><span><b>Nen:</b></span>" +
-    "<select class='input' id='resum-nen' style='flex:1' onchange='selNenResum(this.value)'>" +
-    "<option value=''>Tots</option>" + opcions.join("") + "</select></div>" +
-    (nenNR ? "<p class='hint' style='margin:6px 0 0'>Es mostren nom\u00e9s els viatges de <b>" + esc(nenNR.nom.trim().split(/\s+/)[0]) + "</b>.</p>" : "") + "</div>" +
-    "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
+  let h = "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
     "<div><b>" + doc.families.length + "</b><span>fam\u00edlies</span></div>" +
     "<div><b>" + nNens + "</b><span>nens</span></div>" +
     "<div><b>" + totPlaces + "</b><span>places ofertes/setm.</span></div>" +
