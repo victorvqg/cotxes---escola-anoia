@@ -383,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.54";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.55";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1438,7 +1438,8 @@ async function pantallaTria(){
         (socMembre
           ? "<button class='boto' onclick=\"entraSel()\">Entra</button></div>"
           : "<div id='sel-preview'></div><div id='sel-bloc' style='display:none'><input class='input' id='sel-codi' placeholder='Codi de la família (8 lletres/xifres)' maxlength='8' style='text-transform:uppercase'>" +
-            "<button class='boto' onclick=\"entraSel()\">✓ Correcte: acaba el registre</button></div></div>")
+            "<button class='boto' onclick=\"entraSel()\">✓ Correcte: acaba el registre</button></div></div>" +
+            "<p class='hint' style='margin:6px 2px 0'>💡 Si no hi surt la teva família, pot ser perquè ja té els 2 comptes registrats (parla amb qui ja hi és vinculat, o amb l'administrador del grup).</p>")
       : (!socMembre ? "<p class='lead'>Encara no hi ha cap família reclamable. Crea la teva aquí sota.</p>" : "<p class='lead'>No hi ha cap família al grup.</p>")) +
     (socMembre ? "<div class='fila' style='margin-top:8px'><button class='boto sec' style='margin-left:auto' onclick=\"triaFam(perfil.family_id)\">Torna a la meva</button></div>" : "") +
     "</div>" +
@@ -2655,12 +2656,23 @@ async function descarregaAvisosCsv(){
    res sensible (ni correus ni comptes). RLS: cap consulta nova — les
    marques i assignacions de tot el grup ja són llegibles per qualsevol
    membre (és exactament el que carrega Calendaris). */
-function pintaEstadistiques(){
+/* v4.55: en entrar (o en prémer «↻ Actualitza») rellegeix el grup de Supabase
+   abans de pintar les barres — mateixa refresca() que ja fa servir Calendaris
+   en obrir-se, així ningú veu xifres del moment en què va carregar l'app. */
+async function pintaEstadistiques(){
+  if ($("#tab-cos")) $("#tab-cos").innerHTML = "<div class='targeta'><p class='hint'>Actualitzant…</p></div>";
+  await refresca();
+  if (!doc) return;
+  renderEstadistiques();
+}
+function renderEstadistiques(){
   const st = statsCobertura();
   const files = famOrd().map(f2 => Object.assign({ f: f2 }, statsCoberturaFam(f2)))
     .sort((a, b) => (a.tot ? a.cob / a.tot : 2) - (b.tot ? b.cob / b.tot : 2));
   $("#tab-cos").innerHTML =
-    "<div class='targeta'><div class='peu-stats' style='justify-content:flex-start'>" + peuStatsHtml() + "</div></div>" +
+    "<div class='targeta'><div class='fila' style='justify-content:space-between;align-items:center'>" +
+    "<div class='peu-stats' style='justify-content:flex-start'>" + peuStatsHtml() + "</div>" +
+    "<button class='boto sec' onclick='pintaEstadistiques()'>↻ Actualitza</button></div></div>" +
     "<div class='targeta'>" + barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.tot, liniaNensHtml(st), "") + "</div>" +
     "<p class='hint' style='margin:0 2px 8px'>Una barra per fam\u00edlia \u2014 la mateixa que cadascuna veu a \u00abEl teu cotxe\u00bb \u2014, de menys a m\u00e9s cobertura.</p>" +
     files.map(x => "<div class='targeta'>" +

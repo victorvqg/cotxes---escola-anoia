@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.54: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.54"') && !/versió 4\.53|versio_app: "4\.53"/.test(html));
+  T("v4.55: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.55"') && !/versió 4\.54|versio_app: "4\.54"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.54» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.55» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.54"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.55"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -2025,7 +2025,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("10n · NOVETATS v4.18 (Estadístiques per a l'admin)");
   T("v4.18: el menú de l'admin té l'apartat Estadístiques", d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
-  w.triaTab("estad"); await tic();
+  w.triaTab("estad"); await tic(30);
   T("v4.18: a dalt la barra del grup i una barra per cada família",
     cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
   T("v4.27: Estadístiques duu la mateixa fila del peu a dalt de tot",
@@ -2053,11 +2053,30 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await surtIentra("grau@test.cat", "grau123");
   T("v4.42: un usuari normal TAMBÉ té «Estadístiques» al menú (abans només l'admin)",
     d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
-  w.triaTab("estad"); await tic();
+  w.triaTab("estad"); await tic(30);
   T("v4.42: … i hi entra de debò, amb el mateix contingut (barra del grup + barres per família)",
     cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
   T("v4.42: cap dada de comptes ni correus a Estadístiques (només barres)",
     !cos().includes("@") && !cos().includes("titular") && !cos().includes("Comptes"));
+
+  console.log("NOVETATS v4.55 (Estadistiques es refresca en obrir la pestanya)");
+  {
+    // simula que UN ALTRE compte ha creat una familia (insert directe a la BD,
+    // sense passar per doc.families d'aquesta sessio - com faria un altre dispositiu)
+    const gidE = famDB("Vila Puig").group_id;
+    const insResE = await fakeSupabaseClient().from("families").insert({ group_id: gidE, name: "Estad Provatures", cognom1: "Estad", role: "usuari" }).select("id");
+    T("v4.55: (comprovacio) ja es a la BD pero encara no al doc.families en memoria d'aquesta sessio",
+      !insResE.error && !w.doc.families.some(x2 => x2.nom === "Estad Provatures"));
+    w.triaTab("perfil"); await tic();
+    w.triaTab("estad"); await tic(30);
+    T("v4.55: en (re)obrir Estadistiques, les barres es refresquen soles i ja hi surt la familia nova",
+      cos().includes("Estad Provatures") && w.doc.families.some(x2 => x2.nom === "Estad Provatures"));
+    // neteja
+    DB.families = DB.families.filter(x2 => x2.name !== "Estad Provatures");
+    w.triaTab("perfil"); await tic();
+    w.triaTab("estad"); await tic(30);
+    await w.sbGet(); await tic(10);
+  }
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("10q · NOVETATS v4.26 (progenitor només lectura decidit pel servidor)");
