@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.40";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.42";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1585,9 +1585,8 @@ function pantallaApp(){
   document.body.classList.add("dins");
   setTimeout(pintaPeuStats, 0);
   const f = lameva();
-  if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols"].includes(tabAct)) tabAct = "graella";
+  if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols", "estad", "ajuda"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
-  if (tabAct === "estad" && !esAdmin) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff && !esProgenitor) tabAct = "perfil";
   $("#pantalla").innerHTML =
     "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet" + (esProgenitor ? " prog" : "") + "'>\u00b7 " + (esProgenitor ? "adjunt" : f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
@@ -1621,7 +1620,8 @@ function pintaMenu(){
     it("descarrega", "\ud83d\udda8\ufe0f", "Descarrega") +
     it("families", "👥", "Famílies") +
     ((esAdmin && doc.adminFam && f.id === doc.adminFam) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee1\ufe0f Admin</button>" : (esStaff && perfil && f.id === perfil.family_id) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee0\ufe0f Staff</button>" : "") +
-    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") + it("estad", "\ud83d\udcca", "Estad\u00edstiques") : "") +
+    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
+    it("estad", "\ud83d\udcca", "Estad\u00edstiques") +
     it("ajuda", "❓", "Ajuda") +
     "<button class='c-item' onclick=\"tancaMenu(); tancaSessio();\">🚪 Tanca sessió</button>" +
     "<div class='c-sep'></div>" +
@@ -2434,20 +2434,60 @@ function pintaBloqueig(){
     "<div class='f-linia'>" + (pend.length ? "\u26a0 <b>Graella incompleta</b> \u2014 falten " + pend.length + " caselles (primera: " + esc(pend[0]) + ")" : "\u2713 Graella completa") + "</div>" +
     "<div class='fila' style='margin-top:12px'>" + (perfilComplet(f) ? "" : "<button class='boto sec' onclick=\"triaTab('perfil')\">V\u00e9s al Perfil</button>") + (pend.length ? "<button class='boto' onclick=\"triaTab('graella')\">V\u00e9s a la Graella</button>" : "") + "</div></div>";
 }
-/* v4.38 · tasca 3: guia ràpida dins l'app. Reutilitza els textos ja
-   existents (la instrucció de la Graella i el rètol «Qui puges al teu
-   cotxe?») perquè mai quedin desalineats amb el que hi ha realment a
-   cada pantalla. Visible per a tots els rols. */
-function pintaAjuda(){
+/* v4.41 · Ajuda interactiva: índex + un sol bloc obert alhora, amb el
+   MATEIX patró de pestanyes que Calendaris (.subtabs/.subtab/.actiu — cap
+   estil nou). Reutilitza els textos ja existents (Graella, «Qui puges al
+   teu cotxe?», el banner d'adjunt) perquè mai quedin desalineats amb el
+   que hi ha realment a cada pantalla. Visible per a tots els rols. */
+let ajudaBloc = "comenca";
+function ajudaBlocsDef(){
   const grupTxt = (doc && doc.grupNom) ? "«" + esc(doc.grupNom) + "»" : "del vostre grup";
+  return [
+    { id: "comenca", ico: "🚀", tit: "Comença", cos:
+      "<ol style='margin:0;padding-left:20px'>" +
+      "<li>Crea el compte i entra amb el codi del grup " + grupTxt + " (te'l dona l'administrador).</li>" +
+      "<li>Crea la teva família (o uneix-t'hi amb el codi de família, si ja hi ha algú de casa).</li>" +
+      "<li>Graella: toca cada casella i tria 🚗 conduïu i oferiu places · 🙋 el nen demana plaça · 🚫 aquell dia aneu pel vostre compte. Desa quan estigui completa.</li></ol>" },
+    { id: "icones", ico: "🗓️", tit: "Icones", cos:
+      "<p class='lead' style='margin:0'>A cada casella de la Graella:</p>" +
+      "<p style='margin:6px 0'>🚗 conduïu i oferiu places · 🙋 el nen demana plaça · 🚫 aquell dia aneu pel vostre compte.</p>" +
+      "<p class='hint' style='margin:0'>L'hora d'entrada de cada dia la fixa el curs del nen; les caselles en blanc no cal respondre-les.</p>" },
+    { id: "condueixes", ico: "🚗", tit: "Si condueixes", cos:
+      "<p style='margin:0 0 6px'>Ves a «El teu cotxe» → marca qui puges (secció «Qui puges al teu cotxe?») → prem «Desa els canvis».</p>" +
+      "<p class='hint' style='margin:0'>La barra 🎯 Trajectes coberts per tu et diu quants dels teus viatges ja tenen tothom col·locat.</p>" },
+    { id: "calendaris", ico: "📅", tit: "Calendaris", cos:
+      "<p style='margin:0 0 6px'>A Calendaris tens quatre vistes:</p>" +
+      "<p style='margin:0'>💺 <b>Per assignar</b>: qui espera plaça i quins cotxes tenen seients lliures.<br>" +
+      "<b>Resum</b>: l'estat de tot el grup.<br>" +
+      "<b>Per nen</b>: l'horari d'un nen concret.<br>" +
+      "<b>Dies</b>: el detall de cada franja, dia a dia.</p>" },
+    { id: "avisos", ico: "🔔", tit: "Avisos i Descarrega", cos:
+      "<p style='margin:0 0 6px'>🔔 <b>Avisos</b>: la teva família hi veu els canvis que l'afecten (qui puja o baixa del cotxe).</p>" +
+      "<p style='margin:0'>🖨️ <b>Descarrega</b>: horaris per imprimir, de cada nen i del conductor.</p>" },
+    { id: "dubtes", ico: "❓", tit: "Dubtes", cos:
+      "<p style='margin:0 0 6px'><b>Per què no puc editar?</b> Ets un compte adjunt: ho veus tot, però només el titular pot fer canvis.</p>" +
+      "<p style='margin:0 0 6px'><b>Per què una casella surt en blanc?</b> El vostre curs no hi entra aquell dia — no cal respondre-la.</p>" +
+      "<p style='margin:0'><b>M'he equivocat de família?</b> Perfil → Desvincula aquest compte.</p>" }
+  ];
+}
+function triaAjudaBloc(id){
+  ajudaBloc = id; pintaAjuda();
+  try { $("#ajuda-" + id).scrollIntoView({ block: "start", behavior: "smooth" }); } catch(e){}
+}
+function pintaAjuda(){
+  const blocs = ajudaBlocsDef();
+  const index = "<div class='subtabs'>" + blocs.map(b =>
+    "<button class='subtab " + (ajudaBloc === b.id ? "actiu" : "") + "' onclick=\"triaAjudaBloc('" + b.id + "')\">" + b.ico + " " + b.tit + "</button>").join("") + "</div>";
+  const cossos = blocs.map(b => {
+    const obert = ajudaBloc === b.id;
+    return "<div id='ajuda-" + b.id + "' class='targeta'>" +
+      "<button class='c-item' style='width:100%;text-align:left;font-weight:700;padding:2px 0'" +
+      " onclick=\"triaAjudaBloc('" + b.id + "')\">" + b.ico + " " + b.tit + " <span style='float:right'>" + (obert ? "▾" : "▸") + "</span></button>" +
+      (obert ? "<div style='padding-top:8px'>" + b.cos + "</div>" : "") + "</div>";
+  }).join("");
   $("#tab-cos").innerHTML =
-    "<div class='targeta'><h2>❓ Guia ràpida</h2>" +
-    "<p class='lead' style='margin:0 0 10px'>Els passos per començar:</p>" +
-    "<div class='f-linia'><b>1 ·</b> Crea el compte i entra amb el codi del grup " + grupTxt + " (te'l dona l'administrador).</div>" +
-    "<div class='f-linia'><b>2 ·</b> Crea la teva família (o uneix-t'hi amb el codi de família, si ja hi ha algú de casa).</div>" +
-    "<div class='f-linia'><b>3 ·</b> Graella: toca cada casella i tria 🚗 conduïu i oferiu places · 🙋 el nen demana plaça · 🚫 aquell dia aneu pel vostre compte. Desa quan estigui completa.</div>" +
-    "<div class='f-linia'><b>4 ·</b> Si condueixes: «El teu cotxe» → marca qui puges → «Desa els canvis».</div>" +
-    "<p class='hint' style='margin-top:14px'>Encara tens dubtes? Escriu a l'administrador.</p></div>";
+    "<div class='targeta'><h2>❓ Guia ràpida</h2></div>" + index + cossos +
+    "<p class='hint' style='margin-top:14px;text-align:center'>Encara tens dubtes? Escriu a l'administrador.</p>";
 }
 function pintaRols(){
   if (!esAdmin || !doc.adminFam || !lameva() || lameva().id !== doc.adminFam){ triaTab("graella"); return; }
@@ -2562,10 +2602,12 @@ async function descarregaAvisosCsv(){
 /* v4.18: Estadístiques per a l'admin — la barra de cada família és EXACTAMENT
    la «Trajectes coberts per tu» que aquella família veu a El teu cotxe
    (statsCoberturaFam, la mateixa funció), ordenades de menys a més cobertura
-   per veure primer qui va endarrerit. RLS: cap consulta nova — les marques i
-   assignacions de tot el grup ja són llegibles per qualsevol membre. */
+   per veure primer qui va endarrerit. v4.42: visible per a tots els rols —
+   les barres per família ja eren públiques (surten a Calendaris); no hi ha
+   res sensible (ni correus ni comptes). RLS: cap consulta nova — les
+   marques i assignacions de tot el grup ja són llegibles per qualsevol
+   membre (és exactament el que carrega Calendaris). */
 function pintaEstadistiques(){
-  if (!esAdmin){ triaTab("graella"); return; }
   const st = statsCobertura();
   const files = famOrd().map(f2 => Object.assign({ f: f2 }, statsCoberturaFam(f2)))
     .sort((a, b) => (a.tot ? a.cob / a.tot : 2) - (b.tot ? b.cob / b.tot : 2));

@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.40: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.40"') && !/versió 4\.39|versio_app: "4\.39"/.test(html));
+  T("v4.42: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.42"') && !/versió 4\.41|versio_app: "4\.41"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -692,9 +692,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.40» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.42» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.40"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.42"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1900,9 +1900,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   })());
   T("v4.18: cada família amb la seva línia d'estat de pendents", cos().includes("als seus viatges"));
   await surtIentra("grau@test.cat", "grau123");
-  T("v4.18: fora de l'admin no hi ha Estadístiques al menú", !d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
+  T("v4.42: un usuari normal TAMBÉ té «Estadístiques» al menú (abans només l'admin)",
+    d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
   w.triaTab("estad"); await tic();
-  T("…i la pestanya el retorna a la Graella", cos().includes("Toca una casella"));
+  T("v4.42: … i hi entra de debò, amb el mateix contingut (barra del grup + barres per família)",
+    cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
+  T("v4.42: cap dada de comptes ni correus a Estadístiques (només barres)",
+    !cos().includes("@") && !cos().includes("titular") && !cos().includes("Comptes"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("10q · NOVETATS v4.26 (progenitor només lectura decidit pel servidor)");
@@ -1964,20 +1968,36 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
         (n2.message || "").includes("ja no forma part de la família Grau") && (n2.message || "").includes("seient")));
   }
 
-  console.log("10s · NOVETATS v4.38 (tasca 3: Ajuda)");
+  console.log("10s · NOVETATS v4.41 (Ajuda interactiva amb índex i pestanyes)");
   w.triaTab("perfil"); await tic();
-  T("v4.38: el menú té l'apartat «❓ Ajuda», per a tots els rols", d.querySelector("#calaix").innerHTML.includes("❓ Ajuda"));
+  T("v4.41: el menú té l'apartat «❓ Ajuda», per a tots els rols", d.querySelector("#calaix").innerHTML.includes("❓ Ajuda"));
   w.triaTab("ajuda"); await tic();
-  T("v4.38: la guia té els 4 passos, amb el nom del grup i el botó real de Graella/El teu cotxe",
-    /1 ·/.test(cos()) && /2 ·/.test(cos()) && /3 ·/.test(cos()) && /4 ·/.test(cos()) &&
-    cos().includes(w.doc.grupNom) && cos().includes("El teu cotxe") && cos().includes("Desa els canvis"));
-  T("v4.38: reutilitza el text de la Graella (mateixes icones i etiquetes), no un de nou",
+  T("v4.41: l'índex té els 6 blocs, en ordre, amb el MATEIX patró de pestanyes que Calendaris (.subtabs/.subtab)",
+    !!d.querySelector(".subtabs .subtab") &&
+    ["🚀 Comença", "🗓️ Icones", "🚗 Si condueixes", "📅 Calendaris", "🔔 Avisos i Descarrega", "❓ Dubtes"]
+      .every((t2, i2, arr) => i2 === 0 || cos().indexOf(arr[i2 - 1]) < cos().indexOf(t2)));
+  T("v4.41: en obrir l'Ajuda, «🚀 Comença» surt obert (i el seu botó de l'índex ressaltat) i la resta tancats",
+    d.querySelector(".subtabs .subtab.actiu").textContent.includes("Comença") &&
+    cos().includes(w.doc.grupNom) && cos().includes("Desa quan estigui completa") &&
+    !cos().includes("Qui puges al teu cotxe"));
+  w.triaAjudaBloc("condueixes"); await tic();
+  T("v4.41: en obrir un altre bloc, el de «Comença» es tanca (només un obert alhora)",
+    d.querySelector(".subtabs .subtab.actiu").textContent.includes("Si condueixes") &&
+    cos().includes("Qui puges al teu cotxe") && !cos().includes("Desa quan estigui completa") &&
+    (cos().match(/actiu/g) || []).length === 1);
+  T("v4.41: reutilitza els textos reals (barra «Trajectes coberts per tu», botó «Desa els canvis»)",
+    cos().includes("Trajectes coberts per tu") && cos().includes("Desa els canvis"));
+  w.triaAjudaBloc("icones"); await tic();
+  T("v4.41: bloc d'icones amb el mateix text de la Graella",
     cos().includes("🚗 conduïu i oferiu places") && cos().includes("🙋 el nen demana plaça") && cos().includes("🚫 aquell dia aneu pel vostre compte"));
-  T("v4.38: acaba amb «Encara tens dubtes? Escriu a l'administrador.»",
+  T("v4.41: «Encara tens dubtes?» és fora dels blocs, sempre visible",
     cos().includes("Encara tens dubtes"));
   await surtIentra("pepe@test.cat", "pepe123");   // v4.26: adjunt (només lectura) — la família Grau del cas (c) ja no existeix
   w.triaTab("ajuda"); await tic();
-  T("v4.38: l'Ajuda també és visible per a un usuari sense permisos d'escriptura", cos().includes("Guia ràpida"));
+  T("v4.41: l'Ajuda també és visible per a un usuari sense permisos d'escriptura", cos().includes("Guia ràpida"));
+  w.triaAjudaBloc("dubtes"); await tic();
+  T("v4.41: el bloc de dubtes diu «adjunt», mai «progenitor»",
+    cos().includes("compte adjunt") && !cos().includes("progenitor"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("10t · NOVETATS v4.39 (id d'avís A.B.C)");
