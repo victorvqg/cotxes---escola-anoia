@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.37";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.38";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -995,16 +995,35 @@ async function desa(){
       const t2 = cel.split("-");
       (f.portaBase[cel] || []).forEach(r2 => abansRefs.push({ nen: r2.nen, slot: t2[0], day: t2[1] }));
     });
+    /* v4.38 · CAS (b): un fill que es treu de la família (treuNen) pot deixar
+       un conductor amb un seient orfe — l'esborrat en cascada de children →
+       assignments és silenciós. Es detecta ABANS de desar, que és quan
+       sbDesaFamilia esborrarà els fills que ja no siguin a f.nens. */
+    let assigOrfes = [];
+    {
+      const rFillsAra = await sb.from("children").select("id,name").eq("family_id", f.id);
+      const idsAra = new Set((f.nens || []).map(n => n.id));
+      const fillsEsborrats = (rFillsAra.error ? [] : (rFillsAra.data || [])).filter(x => !idsAra.has(x.id));
+      if (fillsEsborrats.length){
+        const rAssigOrfes = await sb.from("assignments").select("*").in("child_id", fillsEsborrats.map(x => x.id));
+        assigOrfes = (rAssigOrfes.error ? [] : (rAssigOrfes.data || [])).map(a => ({
+          driverFamId: a.driver_family_id, slot: a.slot, day: a.day,
+          childName: (fillsEsborrats.find(x => x.id === a.child_id) || {}).name || ""
+        }));
+      }
+    }
     await sbDesaFamilia(f);
     await logActivitat("canvi graella", "Horari desat", f.id);
     /* v4.15: els canvis d'assignacions generen avisos A LA BD per a la família
        del nen. v4.36: revisat el circuit sencer — amb UN sol desat aquesta
        lògica (abans=portaBase, després=estat actual, dedup dins files2u) ja
-       no insereix mai dues files idèntiques; els repetits que tornaven a
-       sortir venien d'una CURSA entre DOS desats independents gairebé
-       simultanis (dos dispositius de la mateixa família). Això cap client
-       tot sol no ho pot evitar: el tanca la finestra ampliada del trigger
-       antiduplicats a la BD (SQL v49, 60 s en lloc de 2 s del v47). */
+       no insereix mai dues files idèntiques; els repetits venien d'una
+       CURSA entre DOS desats independents gairebé simultanis (dos
+       dispositius de la mateixa família). Això cap client tot sol no ho pot
+       evitar: el tanca la finestra ampliada del trigger antiduplicats a la
+       BD (SQL v49, 60 s en lloc de 2 s del v47; SQL v50 neteja els que ja
+       hi havia). v4.38 · CAS (a): a més del nen, ara també avisa el
+       conductor que se n'ha fet enrere (confirmació, un avís per viatge). */
     {
       const clauA = x => x.nen + "|" + x.slot + "|" + x.day;
       const despres = [];
@@ -1017,17 +1036,44 @@ async function desa(){
       despres.filter(x => !setAbans.has(clauA(x))).forEach(x => filesAv.push({ x: x, puja: true }));
       abansRefs.filter(x => !setDespres.has(clauA(x))).forEach(x => filesAv.push({ x: x, puja: false }));
       const files2 = [];
+      const dropsPerCel = {};   // recompte de nens deixats per viatge, per a la confirmació al conductor
       filesAv.forEach(c => {
         let famN = null, nomNen = "";
         doc.families.forEach(ff => { const n2 = (ff.nens || []).find(z => z.id === c.x.nen); if (n2){ famN = ff; nomNen = n2.nom.trim().split(/\s+/)[0]; } });
         if (!famN || famN.id === f.id) return;   // els fills propis no reben avís del cotxe de casa
         const fr2 = FRANGES.find(z => z.id === c.x.slot);
         const quan = DIES_NOM[c.x.day] + " " + (fr2 ? fr2.hora : c.x.slot);
-        files2.push({ family_id: famN.id, family_name: famN.nom, child_name: nomNen,
-          action: c.puja ? "\ud83d\ude97 puja al cotxe" : "\u23f3 es queda sense cotxe",
-          detail: quan + (c.puja ? " \u2192 el porta " + nomConductorComplet(f) : " \u2192 ja no t\u00e9 cotxe (abans " + nomConductorComplet(f) + ")"),
-          actor_name: f.nom,
-          message: (c.puja ? "\ud83d\ude97 " : "\u23f3 ") + nomNen + " \u00b7 " + quan + (c.puja ? " \u2192 el porta " + nomConductorComplet(f) : " \u2192 ja no t\u00e9 cotxe (abans " + nomConductorComplet(f) + ")") });
+        if (c.puja){
+          files2.push({ family_id: famN.id, family_name: famN.nom, child_name: nomNen,
+            action: "\ud83d\ude97 puja al cotxe", detail: quan + " \u2192 el porta " + nomConductorComplet(f), actor_name: f.nom,
+            message: "\ud83d\ude97 " + nomNen + " \u00b7 " + quan + " \u2192 el porta " + nomConductorComplet(f) });
+        } else {
+          const msg = nomNen + " s'ha quedat sense cotxe al viatge " + quan + ": " + nomConductorComplet(f) + " ja no el porta. Cal buscar-li pla\u00e7a.";
+          files2.push({ family_id: famN.id, family_name: famN.nom, child_name: nomNen,
+            action: "\u23f3 es queda sense cotxe", detail: msg, actor_name: f.nom, message: msg });
+          const kCel = c.x.slot + "|" + c.x.day;
+          dropsPerCel[kCel] = (dropsPerCel[kCel] || 0) + 1;
+        }
+      });
+      Object.keys(dropsPerCel).forEach(kCel => {
+        const t3 = kCel.split("|");
+        const fr3 = FRANGES.find(z => z.id === t3[0]);
+        const quan = DIES_NOM[t3[1]] + " " + (fr3 ? fr3.hora : t3[0]);
+        const n3 = dropsPerCel[kCel];
+        const msg = "Has deixat " + n3 + (n3 === 1 ? " nen" : " nens") + " sense cotxe al viatge " + quan + ". " + (n3 === 1 ? "Est\u00e0" : "Estan") + " buscant pla\u00e7a.";
+        files2.push({ family_id: f.id, family_name: f.nom, child_name: "",
+          action: "\u23f3 has deixat nens sense cotxe", detail: msg, actor_name: f.nom, message: msg });
+      });
+      /* v4.38 \u00b7 CAS (b): els conductors que portaven un fill acabat d'esborrar
+         (assigOrfes, calculat abans de sbDesaFamilia) */
+      assigOrfes.forEach(a => {
+        const cDriver = doc.families.find(x => x.id === a.driverFamId);
+        if (!cDriver || cDriver.id === f.id) return;
+        const fr4 = FRANGES.find(z => z.id === a.slot);
+        const quan = DIES_NOM[a.day] + " " + (fr4 ? fr4.hora : a.slot);
+        const msg = a.childName + " ja no forma part de la fam\u00edlia " + f.nom + " i ha deixat el teu cotxe del viatge " + quan + ". Tens un seient m\u00e9s lliure.";
+        files2.push({ family_id: cDriver.id, family_name: cDriver.nom, child_name: a.childName,
+          action: "\u23f3 es queda sense cotxe", detail: msg, actor_name: f.nom, message: msg });
       });
       const vistK = new Set();
       const files2u = files2.filter(x => { const k = x.family_id + "|" + (x.child_name || "") + "|" + (x.action || "") + "|" + (x.detail || ""); if (vistK.has(k)) return false; vistK.add(k); return true; });
@@ -1568,6 +1614,7 @@ function pintaMenu(){
     it("families", "👥", "Famílies") +
     ((esAdmin && doc.adminFam && f.id === doc.adminFam) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee1\ufe0f Admin</button>" : (esStaff && perfil && f.id === perfil.family_id) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee0\ufe0f Staff</button>" : "") +
     (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") + it("estad", "\ud83d\udcca", "Estad\u00edstiques") : "") +
+    it("ajuda", "❓", "Ajuda") +
     "<button class='c-item' onclick=\"tancaMenu(); tancaSessio();\">🚪 Tanca sessió</button>" +
     "<div class='c-sep'></div>" +
     "<p class='hint' style='padding:0 12px'>Perfil i Graella complets desbloquegen els Calendaris.</p>";
@@ -1577,7 +1624,7 @@ function tancaMenu(){ const v = $("#vel"), c = $("#calaix"); if (v) v.classList.
 
 function triaTab(t){
   tabAct = t; tancaMenu();
-  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cotxe: "🚗 El teu cotxe · qui hi puja", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", families: "👥 Famílies del grup", rols: "\ud83d\udee1\ufe0f Rols del grup", estad: "\ud83d\udcca Estad\u00edstiques del grup" };
+  const tit = { perfil: "\u2699\ufe0f Perfil de la fam\u00edlia", graella: "\ud83d\uddd3\ufe0f Graella de la setmana", cotxe: "🚗 El teu cotxe · qui hi puja", cal: "\ud83d\udcc5 Calendaris del grup", avisos: "\ud83d\udd14 Avisos", descarrega: "\ud83d\udda8\ufe0f Horaris per imprimir", families: "👥 Famílies del grup", rols: "\ud83d\udee1\ufe0f Rols del grup", estad: "\ud83d\udcca Estad\u00edstiques del grup", ajuda: "\u2753 Ajuda" };
   const el = $("#cap-titol");
   if (el) el.innerHTML = esc(tit[t] || "") + ((t === "cal" || t === "graella") && doc && doc.grupNom ? "<br><span style='font-size:13px;font-weight:400;opacity:.75'>Grup " + esc(doc.grupNom) + "</span>" : "");
   pintaMenu();
@@ -1589,6 +1636,7 @@ function triaTab(t){
   else if (t === "families") pintaFamilies();
   else if (t === "rols") pintaRols();
   else if (t === "estad") pintaEstadistiques();
+  else if (t === "ajuda") pintaAjuda();
   else if (!potCal()) pintaBloqueig();
   else pintaCalendari();
 }
@@ -2377,6 +2425,21 @@ function pintaBloqueig(){
     "<div class='f-linia'>" + (perfilComplet(f) ? "\u2713 Perfil complet" : "\u26a0 <b>Perfil incomplet</b> \u2014 falten dades de la fam\u00edlia") + "</div>" +
     "<div class='f-linia'>" + (pend.length ? "\u26a0 <b>Graella incompleta</b> \u2014 falten " + pend.length + " caselles (primera: " + esc(pend[0]) + ")" : "\u2713 Graella completa") + "</div>" +
     "<div class='fila' style='margin-top:12px'>" + (perfilComplet(f) ? "" : "<button class='boto sec' onclick=\"triaTab('perfil')\">V\u00e9s al Perfil</button>") + (pend.length ? "<button class='boto' onclick=\"triaTab('graella')\">V\u00e9s a la Graella</button>" : "") + "</div></div>";
+}
+/* v4.38 · tasca 3: guia ràpida dins l'app. Reutilitza els textos ja
+   existents (la instrucció de la Graella i el rètol «Qui puges al teu
+   cotxe?») perquè mai quedin desalineats amb el que hi ha realment a
+   cada pantalla. Visible per a tots els rols. */
+function pintaAjuda(){
+  const grupTxt = (doc && doc.grupNom) ? "«" + esc(doc.grupNom) + "»" : "del vostre grup";
+  $("#tab-cos").innerHTML =
+    "<div class='targeta'><h2>❓ Guia ràpida</h2>" +
+    "<p class='lead' style='margin:0 0 10px'>Els passos per començar:</p>" +
+    "<div class='f-linia'><b>1 ·</b> Crea el compte i entra amb el codi del grup " + grupTxt + " (te'l dona l'administrador).</div>" +
+    "<div class='f-linia'><b>2 ·</b> Crea la teva família (o uneix-t'hi amb el codi de família, si ja hi ha algú de casa).</div>" +
+    "<div class='f-linia'><b>3 ·</b> Graella: toca cada casella i tria 🚗 conduïu i oferiu places · 🙋 el nen demana plaça · 🚫 aquell dia aneu pel vostre compte. Desa quan estigui completa.</div>" +
+    "<div class='f-linia'><b>4 ·</b> Si condueixes: «El teu cotxe» → marca qui puges → «Desa els canvis».</div>" +
+    "<p class='hint' style='margin-top:14px'>Encara tens dubtes? Escriu a l'administrador.</p></div>";
 }
 function pintaRols(){
   if (!esAdmin || !doc.adminFam || !lameva() || lameva().id !== doc.adminFam){ triaTab("graella"); return; }
