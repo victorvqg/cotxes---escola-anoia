@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.38";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.39";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -508,6 +508,13 @@ async function sbGet(){
     const ro = await sb.from("families").select("id,owner_id").eq("group_id", gid);
     if (!ro.error) (ro.data || []).forEach(r => { if (r.owner_id) owners[r.id] = r.owner_id; });
   } catch(e){}
+  // v4.39: número B de l'id d'avís — a banda igual que owner_id: si el SQL v52
+  // encara no s'ha executat la columna no hi és i l'app segueix com fins ara
+  const numsFam = {};
+  try {
+    const rnf = await sb.from("families").select("id,numero").eq("group_id", gid);
+    if (!rnf.error) (rnf.data || []).forEach(r => { if (r.numero != null) numsFam[r.id] = r.numero; });
+  } catch(e){}
   const ids = (rf.data || []).map(r => r.id);
   const rg = await sb.from("groups").select("*").eq("id", gid);
   const rc = ids.length ? await sb.from("children").select("*").in("family_id", ids) : { data: [] };
@@ -521,6 +528,7 @@ async function sbGet(){
     conductor: row.driver || "", places: row.seats == null ? 3 : row.seats,
     phone: row.phone || "", phoneVisible: row.phone_visible !== false,
     curs: row.curs || "", codiFam: "", ownerId: owners[row.id] || "",   // el codi propi es carrega a banda amb codi_familia()
+    numero: numsFam[row.id] || null,   // v4.39: número B de l'id d'avís A.B.C (estable, mai es recalcula)
     cotxe: {}, propi: {}, nens: [], porta: {}
   }));
   const perId = {}; fams.forEach(x => perId[x.id] = x);
@@ -2459,6 +2467,17 @@ var avisosLlista = [];        // v4.36: nom\u00e9s la P\u00c0GINA actual (carreg
 var avisosPagina = 1;
 var avisosTotalFiltrat = 0;
 var avisosGrupSencer = false; // abast de la consulta: tot el grup (admin a casa seva) o la fam\u00edlia activa
+/* v4.39: id d'avís «A.B.C» — A el grup, B la família (estables, es guarden a
+   Supabase i mai es recalculen), C el número de l'avís dins la família (SQL
+   v52). Si el SQL encara no s'ha executat, algun número no hi és i no es
+   mostra res (l'app es queda com estava, sense id). */
+function idAvis(r){
+  const g = grupActiu && grupActiu.numero;
+  const fam = (doc && doc.families || []).find(x => x.id === r.family_id);
+  const b = fam && fam.numero;
+  const c = r.numero;
+  return (g && b && c) ? (g + "." + b + "." + c) : "";
+}
 function dataHoraAv(iso){ const x = new Date(iso); const p2 = n2 => String(n2).padStart(2, "0"); return p2(x.getDate()) + "/" + p2(x.getMonth() + 1) + "/" + x.getFullYear() + " " + p2(x.getHours()) + ":" + p2(x.getMinutes()) + ":" + p2(x.getSeconds()); }
 function netejaCercaAv(s){ return String(s || "").replace(/[,()%]/g, " ").trim(); }
 /* v4.36: el filtre (data i cerca) es demana AL SERVIDOR \u2014 mai es baixa tot
@@ -2486,7 +2505,7 @@ function pintaAvisosLlista(){
   const el = $("#avisos-llista"); if (!el) return;
   const totalPag = Math.max(1, Math.ceil(avisosTotalFiltrat / AVISOS_PER_PAGINA));
   el.innerHTML = (avisosLlista.length ? avisosLlista.map(r =>
-    "<details class='conf fam-det'><summary>" + dataHoraAv(r.created_at) +
+    "<details class='conf fam-det'><summary>" + (idAvis(r) ? "<b>" + esc(idAvis(r)) + "</b> \u00b7 " : "") + dataHoraAv(r.created_at) +
       (r.family_name ? " \u00b7 " + esc(r.family_name) : "") +
       (r.child_name ? " \u00b7 " + esc(r.child_name) : "") +
       " \u00b7 " + esc(r.action || r.message || "") + "</summary>" +
@@ -2523,9 +2542,11 @@ async function avisosCsv(){
   const camp = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
   const r = await construeixQueryAvisos().limit(5000);
   const files = r.error ? [] : (r.data || []);
-  return "\uFEFF" + ["data i hora", "fam\u00edlia", "nen", "canvi", "detall", "qui ho ha fet"].map(camp).join(",") + "\n" +
-    files.map(row => [dataHoraAv(row.created_at), row.family_name || "", row.child_name || "",
-      row.action || row.message || "", row.detail || row.message || "", row.actor_name || ""].map(camp).join(",")).join("\n");
+  return "\uFEFF" + ["id", "grup", "fam\u00edlia (n\u00famero)", "av\u00eds (n\u00famero)", "data i hora", "fam\u00edlia", "nen", "canvi", "detall", "qui ho ha fet"].map(camp).join(",") + "\n" +
+    files.map(row => { const fam = (doc && doc.families || []).find(x => x.id === row.family_id);
+      return [idAvis(row), (grupActiu && grupActiu.numero) || "", (fam && fam.numero) || "", row.numero || "",
+        dataHoraAv(row.created_at), row.family_name || "", row.child_name || "",
+        row.action || row.message || "", row.detail || row.message || "", row.actor_name || ""].map(camp); }).map(cs => cs.join(",")).join("\n");
 }
 async function descarregaAvisosCsv(){
   try {

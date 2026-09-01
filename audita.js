@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.38: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.38"') && !/versió 4\.37|versio_app: "4\.37"/.test(html));
+  T("v4.39: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.39"') && !/versió 4\.38|versio_app: "4\.38"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -97,6 +97,18 @@ console.log("0 · CABLEJAT ESTÀTIC");
       sql51.includes("create or replace function esborra_familia") &&
       (sql51.match(/insert into notifications/g) || []).length >= 2 &&
       sql51.indexOf("insert into notifications") < sql51.indexOf("delete from families"));
+  }
+  // v4.39 · id d'avís A.B.C: neteja + columnes numero + triggers estables (mai recalculats)
+  {
+    const sql52 = fs.readFileSync(path.join(__dirname, "supabase-v52.sql"), "utf-8");
+    T("SQL v52: neteja de duplicats abans de numerar, i columnes numero a groups/families/notifications",
+      sql52.includes("notifications_dup_backup_v52") && /delete from notifications/i.test(sql52) &&
+      sql52.includes("alter table groups        add column if not exists numero") &&
+      sql52.includes("alter table families      add column if not exists numero") &&
+      sql52.includes("alter table notifications add column if not exists numero"));
+    T("SQL v52: triggers que assignen el número EN CREAR (mai es recalcula), amb pany consultiu",
+      sql52.includes("trg_numero_grup") && sql52.includes("trg_numero_familia") && sql52.includes("trg_numero_avis") &&
+      (sql52.match(/pg_advisory_xact_lock/g) || []).length === 3);
   }
   T("v4.19: el CSS força un avís per línia", html.includes("#avisos-llista details{display:block"));
   // v4.15: els avisos viuen a notifications amb columnes estructurades
@@ -231,6 +243,10 @@ const socAdmin = () => socMembre() && rolMeu() === "admin";
 const socStaffAdmin = () => socMembre() && (rolMeu() === "admin" || rolMeu() === "staff");
 const potTocarFam = fid => fid === mevaFamId() || socAdmin() || (socStaffAdmin() && (famPerId(fid) || {}).role !== "admin");
 const codiDeFam = f => String(f.invite_token || "").replace(/-/g, "").slice(0, 8).toUpperCase();
+// v4.39 · SQL v52: numeració estable A.B.C — el següent número EN CREAR, mai recalculat
+const proxNumeroGrup = () => DB.groups.reduce((m, g) => Math.max(m, g.numero || 0), 0) + 1;
+const proxNumeroFamilia = gid => DB.families.filter(f => f.group_id === gid).reduce((m, f) => Math.max(m, f.numero || 0), 0) + 1;
+const proxNumeroAvis = fid => DB.notifications.filter(n => n.family_id === fid).reduce((m, n) => Math.max(m, n.numero || 0), 0) + 1;
 function logBD(gid, accio, famId, detalls){
   DB.activity_log.push({ id: randomUUID(), group_id: gid, actor_id: currentUserId, family_id: famId || null, affected_family_id: null, action: accio, details: detalls || "", created_at: new Date().toISOString() });
 }
@@ -274,6 +290,7 @@ function execQuery(q){
         if (row.role && row.role !== "usuari" && !socAdmin()) row.role = "usuari"; // trigger protect_family_role
         const r = Object.assign({ id: randomUUID(), cognom2: "", phone: "", phone_visible: true, seats: 3, role: "usuari", invite_token: randomUUID(), created_at: new Date().toISOString() }, row);
         if (r.seats < 0 || r.seats > 6) return err("seats fora de rang");
+        r.numero = proxNumeroFamilia(r.group_id);
         DB.families.push(r); out.push(r); continue;
       }
       if (t === "children"){
@@ -318,7 +335,7 @@ function execQuery(q){
           (x.message || "") === (row.message || "") && (x.action || "") === (row.action || "") &&
           (x.child_name || "") === (row.child_name || "") && (x.detail || "") === (row.detail || "") &&
           (Date.now() - Date.parse(x.created_at)) < 60000);
-        if (!dup) DB.notifications.push(Object.assign({ id: randomUUID(), created_at: new Date().toISOString() }, row));
+        if (!dup) DB.notifications.push(Object.assign({ id: randomUUID(), created_at: new Date().toISOString(), numero: proxNumeroAvis(row.family_id) }, row));
         out.push(row); continue;
       }
       return err("taula no suportada al mock: " + t);
@@ -406,10 +423,10 @@ function rpc(nom, p){
       return err("Codi de creació incorrecte");
     const gid = randomUUID();
     const codi = randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
-    DB.groups.push({ id: gid, name: p.p_name, invite_code: codi, status: "actiu", notice: "", created_by: currentUserId, created_at: new Date().toISOString() });
+    DB.groups.push({ id: gid, name: p.p_name, invite_code: codi, status: "actiu", notice: "", created_by: currentUserId, created_at: new Date().toISOString(), numero: proxNumeroGrup() });
     const fid = randomUUID();
     // Emula trg_protect_family_role: l'override va ABANS de l'insert (si no, el rol cau a 'usuari')
-    DB.families.push({ id: fid, group_id: gid, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "admin", invite_token: randomUUID(), created_at: new Date().toISOString() });
+    DB.families.push({ id: fid, group_id: gid, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "admin", invite_token: randomUUID(), created_at: new Date().toISOString(), numero: proxNumeroFamilia(gid) });
     const pr = meu();
     if (pr){ pr.family_id = fid; pr.requested_group = gid; pr.status = "aprovat"; }
     logBD(gid, "alta família", fid, "Grup " + p.p_name + " creat");
@@ -518,7 +535,7 @@ function rpc(nom, p){
     if (nens.length > 5) return err("Màxim 5 fills per família");
     if ((p.p_nens || []).some(x => x && x.__peta)) return err("error simulat en inserir els nens");
     const fid = randomUUID();
-    DB.families.push({ id: fid, group_id: g.id, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "usuari", invite_token: randomUUID(), created_at: new Date().toISOString() });
+    DB.families.push({ id: fid, group_id: g.id, cognom1: p.p_cognom1, cognom2: p.p_cognom2 || "", name: (p.p_cognom1 + " " + (p.p_cognom2 || "")).trim(), driver: p.p_driver || "", phone: "", phone_visible: true, seats: p.p_seats == null ? 3 : p.p_seats, role: "usuari", invite_token: randomUUID(), created_at: new Date().toISOString(), numero: proxNumeroFamilia(g.id) });
     nens.forEach(x => DB.children.push({ id: randomUUID(), family_id: fid, name: String(x.nom).trim(), curs: x.curs || "" }));
     pr.family_id = fid; pr.requested_group = g.id; pr.status = "aprovat";
     logBD(g.id, "alta família", fid, "Alta amb codi d'invitació");
@@ -599,7 +616,7 @@ function rpc(nom, p){
       const quan = DIA_M[a.day] + " " + HORA_M[a.slot];
       const msg = cNen.name + " s'ha quedat sense cotxe al viatge " + quan + ": " + f.name + " ha marxat del grup i ja no el porta. Cal buscar-li plaça.";
       DB.notifications.push({ id: randomUUID(), family_id: cNen.family_id, message: msg, family_name: famPerId(cNen.family_id).name,
-        child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString() });
+        child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString(), numero: proxNumeroAvis(cNen.family_id) });
     });
     // v51 · (c-2) els fills de la família que marxa pujaven al cotxe d'una altra família
     DB.assignments.filter(a => nensIds.indexOf(a.child_id) >= 0 && a.driver_family_id !== f.id).forEach(a => {
@@ -608,7 +625,7 @@ function rpc(nom, p){
       const quan = DIA_M[a.day] + " " + HORA_M[a.slot];
       const msg = cNen.name + " ja no forma part de la família " + f.name + " (ha marxat del grup) i ha deixat el teu cotxe del viatge " + quan + ". Tens un seient més lliure.";
       DB.notifications.push({ id: randomUUID(), family_id: cDriver.id, message: msg, family_name: cDriver.name,
-        child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString() });
+        child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString(), numero: proxNumeroAvis(cDriver.id) });
     });
     DB.profiles.forEach(x => { if (x.family_id === f.id){ x.family_id = null; x.status = "pendent"; } });
     logBD(f.group_id, "baixa família", mevaFamId(), f.name + " esborrada");
@@ -675,9 +692,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.38» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.39» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.38"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.39"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1966,6 +1983,42 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("ajuda"); await tic();
   T("v4.38: l'Ajuda també és visible per a un usuari sense permisos d'escriptura", cos().includes("Guia ràpida"));
   await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10t · NOVETATS v4.39 (id d'avís A.B.C)");
+  {
+    const fVP = famDB("Vila Puig");
+    const grupNum = DB.groups.find(g2 => g2.id === fVP.group_id).numero;
+    T("v4.39: el grup i la família tenen un número estable, assignat en crear",
+      grupNum === 1 && fVP.numero === 1);   // únic grup del test; Vila Puig és la primera família creada
+    const abansC = DB.notifications.filter(n2 => n2.family_id === fVP.id).reduce((m2, n2) => Math.max(m2, n2.numero || 0), 0);
+    await fakeSupabaseClient().from("notifications").insert({ family_id: fVP.id, message: "PROVA-ID-C", action: "test", child_name: "X", detail: "d", family_name: fVP.name, actor_name: "Test" });
+    const filaC = DB.notifications.find(n2 => n2.message === "PROVA-ID-C");
+    T("v4.39: l'avís nou rep el número C següent dins la família (correlatiu)",
+      !!filaC && filaC.numero === abansC + 1);
+    w.triaTab("avisos"); await tic(30);
+    const idEsperat = grupNum + "." + fVP.numero + "." + filaC.numero;
+    T("v4.39: l'id «A.B.C» surt al davant de l'avís, a la pantalla",
+      cos().includes("<b>" + idEsperat + "</b>"));
+    const csvId = await w.avisosCsv();
+    const capçalera = csvId.split("\n")[0];
+    T("v4.39: el CSV té les columnes noves (id, grup, família núm., avís núm.) amb els valors correctes",
+      /"id"/i.test(capçalera) && /grup/i.test(capçalera) &&
+      csvId.includes('"' + idEsperat + '"') && csvId.includes('"' + grupNum + '"') && csvId.includes('"' + filaC.numero + '"'));
+    // «encara que els id no vagin correlatius, la llista s'ordena per data (nous primer), no per id»
+    const fAltra = DB.families.find(f2 => f2.id !== fVP.id && f2.group_id === fVP.group_id);
+    if (fAltra){
+      const numAltra = proxNumeroAvis(fAltra.id);
+      DB.notifications.push({ id: randomUUID(), family_id: fAltra.id, message: "VELL-ALTRA-FAM", action: "test", child_name: "Y",
+        family_name: fAltra.name, actor_name: "Test", numero: numAltra, created_at: new Date(Date.now() - 999999999).toISOString() });   // molt vell
+      const numC2 = proxNumeroAvis(fVP.id);
+      DB.notifications.push({ id: randomUUID(), family_id: fVP.id, message: "NOU-VILA-PUIG", action: "test", child_name: "Z",
+        family_name: fVP.name, actor_name: "Test", numero: numC2, created_at: new Date().toISOString() });   // acabat de crear
+      const rOrdre = await fakeSupabaseClient().from("notifications").select("*").order("created_at", { ascending: false }).limit(500);
+      const missatges = (rOrdre.data || []).map(x => x.message);
+      T("v4.39: encara que l'id de «" + fAltra.name + "» sigui numèricament diferent, l'ordre és per data (el més nou primer, no per id)",
+        missatges.indexOf("NOU-VILA-PUIG") >= 0 && missatges.indexOf("NOU-VILA-PUIG") < missatges.indexOf("VELL-ALTRA-FAM"));
+    }
+  }
 
   console.log("11 · TANCA LA SESSIÓ");
   await w.tancaSessio(true); await tic(10);
