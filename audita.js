@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.36: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.36"') && !/versió 4\.35|versio_app: "4\.35"/.test(html));
+  T("v4.37: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.37"') && !/versió 4\.36|versio_app: "4\.36"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -634,9 +634,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.36» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.37» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.36"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.37"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -836,9 +836,14 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("5 · CALENDARIS (lectura del grup sencer des de Supabase)");
   await w.pintaCalendari(); await tic(30);
-  T("v4.33: «Dies» s'obre per defecte i Quadre i Setmana ja no hi són",
-    cos().includes("Vista de consulta") && !cos().includes(">Quadre<") && !cos().includes(">Setmana<"));
-  T("els subtabs són a dalt de tot, abans del mapa", cos().indexOf(">Dies<") < cos().indexOf("llegenda"));
+  T("v4.37: «💺 Per assignar» s'obre per defecte (Quadre i Setmana ja no hi són)",
+    !cos().includes("Vista de consulta") && !cos().includes(">Quadre<") && !cos().includes(">Setmana<") &&
+    /amb nens esperant|Tots els nens tenen cotxe/.test(cos()));
+  T("v4.37: l'ordre de pestanyes és Per assignar · Resum · Per nen · Dies",
+    cos().indexOf(">💺 Per assignar<") < cos().indexOf(">Resum<") &&
+    cos().indexOf(">Resum<") < cos().indexOf(">Per nen<") &&
+    cos().indexOf(">Per nen<") < cos().indexOf(">Dies<"));
+  T("els subtabs són a dalt de tot, abans del mapa", cos().indexOf(">💺 Per assignar<") < cos().indexOf("llegenda"));
   T("el dèficit surt al mapa (−3 dl 17.00)", cos().includes("−3"));
   w.triaTab("cal"); await tic(30);
   w.selDia("dl"); await tic(20);

@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.36";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.37";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -2649,7 +2649,7 @@ async function tancaSessio(senseDretes){
 }
 
 /* ── Pestanya: calendari del grup ── */
-let vistaCal = "dia";   // v4.33: «Dies» és la vista per defecte
+let vistaCal = "assignar";   // v4.37: «💺 Per assignar» és la vista per defecte
 let nenSel = "";
 
 async function pintaCalendari(){
@@ -2676,17 +2676,17 @@ function renderCal(){
     });
   });
   $("#tab-cos").innerHTML =
-    "<div class='subtabs'><button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button>" +
-    "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button>" +
+    "<div class='subtabs'><button class='subtab " + (vistaCal === "assignar" ? "actiu" : "") + "' onclick=\"triaVistaCal('assignar')\">\ud83d\udcba Per assignar</button>" +
     "<button class='subtab " + (vistaCal === "resum" ? "actiu" : "") + "' onclick=\"triaVistaCal('resum')\">Resum</button>" +
-    "<button class='subtab " + (vistaCal === "assignar" ? "actiu" : "") + "' onclick=\"triaVistaCal('assignar')\">\ud83d\udcba Per assignar</button></div>" +
+    "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button>" +
+    "<button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button></div>" +
     "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
     "<div class='mapa'>" + mapa + "</div>" +
     "<div id='cal-cos'></div>" +
     "<button class='boto sec cal-actualitza' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
-  // v4.33: Quadre i Setmana fora; qualsevol valor vell cau a «Dies»
-  if (vistaCal !== "nen" && vistaCal !== "resum" && vistaCal !== "assignar") vistaCal = "dia";
-  if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else if (vistaCal === "assignar") pintaPerAssignar(); else pintaVistaNen();
+  // v4.37: qualsevol valor desconegut cau a la vista per defecte, «Per assignar»
+  if (vistaCal !== "dia" && vistaCal !== "nen" && vistaCal !== "resum" && vistaCal !== "assignar") vistaCal = "assignar";
+  if (vistaCal === "assignar") pintaPerAssignar(); else if (vistaCal === "resum") pintaResum(); else if (vistaCal === "dia") pintaVistaDia(); else pintaVistaNen();
 }
 function triaVistaCal(v){ vistaCal = v; renderCal(); }
 function selDia(d){ diaSel = d; vistaCal = "dia"; if (tabAct !== "cal") triaTab("cal"); else renderCal(); }
