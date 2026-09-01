@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.49: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.49"') && !/versió 4\.48|versio_app: "4\.48"/.test(html));
+  T("v4.50: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.50"') && !/versió 4\.49|versio_app: "4\.49"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.49» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.50» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.49"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.50"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -843,12 +843,18 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("3c · LA SETMANA INCOMPLETA AVISA PERÒ ES DESA (v4.6)");
   T("hi ha canvis → surt la barra de desar", !d.querySelector("#barra").classList.contains("amaga"));
-  await w.desa(); await tic(30);
+  const promesaDesa = w.desa();   // sense await: comprovem l'estat MENTRE desa
+  T("v4.50: mentre desa, el botó diu «Desant…» i queda desactivat (no es pot prémer dues vegades)",
+    d.querySelector("#btn-desa").disabled === true && d.querySelector("#btn-desa").textContent === "Desant…");
+  await promesaDesa; await tic(30);
   T("v4.6: amb franges buides ES DESA igualment i l'avís queda a la barra",
-    d.querySelector("#barra").classList.contains("amaga") &&
     !d.querySelector("#barra-avis").classList.contains("ocult") &&
     d.querySelector("#barra-avis").textContent.includes("Es desa igualment") &&
     DB.activity_log.some(l => l.action === "canvi graella"));
+  T("v4.50: en desar bé, la barra es queda visible amb el botó «✓ Desat» apagat (fins al proper canvi)",
+    !d.querySelector("#barra").classList.contains("amaga") &&
+    d.querySelector("#btn-desa").disabled === true &&
+    d.querySelector("#btn-desa").textContent === "✓ Desat");
   const vv = famDoc("Vila Prat");
   const grups = [["e8", "e9"], ["r13"], ["e15"], ["r17"]];
   for (const dd of ["dl", "dt", "dc", "dj", "dv"])
@@ -864,7 +870,8 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.tancaCasella(); await tic();
   await w.desa(); await tic(30);
   const idVila = famDB("Vila Prat").id;
-  T("setmana completa: desa a Supabase (drive + request amb uuid de fill)", d.querySelector("#barra").classList.contains("amaga")
+  T("setmana completa: desa a Supabase (drive + request amb uuid de fill)", !d.querySelector("#barra").classList.contains("amaga")
+      && d.querySelector("#btn-desa").textContent === "✓ Desat"
       && marquesDB(idVila, "drive", "e9", "dl").length === 1
       && marquesDB(idVila, "request", "r17", "dl").length === 1
       && marquesDB(idVila, "request", "r17", "dl")[0].children_ids.includes(nenDB(idVila, "Jan").id)
@@ -1220,6 +1227,17 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(2700);
   T("v4.48: … no un rètol fix: als pocs segons ja no hi és, encara que no hagis canviat de pantalla",
     d.querySelector("#avis").style.display === "none");
+  // v4.50: camí de FALLADA de desa() — un error real de la BD (l'staff sense
+  // permís per tocar la família de l'admin), no només la interfície bloquejada
+  w.triaFam(famDoc("Vila Puig").id); await tic();
+  await w.desa(); await tic(20);
+  T("v4.50: si el desat falla, el botó torna a estar actiu amb el text de sempre",
+    d.querySelector("#btn-desa").disabled === false && d.querySelector("#btn-desa").textContent === "Desa els canvis");
+  T("v4.50: … i surt un avís vermell reutilitzant avis(): «No s'ha pogut desar. Torna-ho a provar»",
+    d.querySelector("#avis").textContent.includes("No s'ha pogut desar. Torna-ho a provar"));
+  T("v4.50: … amb el detall de l'error a la barra",
+    d.querySelector("#barra-txt").textContent.includes("No s'ha pogut desar"));
+  w.triaFam(famDoc("Grau").id); await tic();   // torna l'staff a casa seva
   await w.creaFam(); await tic();
   T("el staff no pot crear famílies", d.querySelector("#avis").textContent.includes("no crear") && DB.families.length === 5);
   T("el staff no veu l'apartat Rols al menú", !pant().includes("Rols del grup") && !pant().includes("Rols<"));
@@ -1668,6 +1686,28 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     await tic(400);
     w.obreCasella("e8", "dl", idJan()); await tic(); w.celAccio("cotxe"); await tic(); w.tancaCasella();
     T("v4.49: neteja — e8/dl torna a quedar sense marcar", !w.te(famV.cotxe, "e8", "dl"));
+  }
+
+  console.log("10f3 · NOVETATS v4.50 (targeta buida amb missatge d'ajuda)");
+  {
+    // blocGraellaNen(f, n) directament, amb una família/fill sintètics i aïllats
+    // (sense l'historial acumulat de Vila Puig): comprova el CRITERI de «buida»
+    const fBuit = { cotxe: {}, propi: {}, porta: {}, nens: [] };
+    const nBuit = { id: "diag50-buit", nom: "Buit Provatures", curs: "1r ESO", marca: {} };
+    const htmlBuit = w.blocGraellaNen(fBuit, nBuit);
+    T("v4.50: la targeta d'un fill sense cap resposta mostra el missatge de benvinguda",
+      htmlBuit.includes("Comença aquí") && htmlBuit.includes("dilluns entrada") && !htmlBuit.includes("Falta respondre de"));
+    T("v4.50: … amb la primera casella aplicable ressaltada (suggerida)",
+      (htmlBuit.match(/suggerida/g) || []).length === 1);
+    w.posa(nBuit.marca, "e9", "dl");   // el fill respon UNA casella (n'hi ha prou)
+    const htmlAmbResposta = w.blocGraellaNen(fBuit, nBuit);
+    T("v4.50: en respondre una casella, el missatge de benvinguda desapareix",
+      !htmlAmbResposta.includes("Comença aquí") && !htmlAmbResposta.includes("suggerida"));
+    w.treu(nBuit.marca, "e9", "dl");   // torna a buit…
+    w.posa(fBuit.cotxe, "r13", "dl");   // … però ara la FAMÍLIA condueix (encara que aquest fill no hi hagi respost res seu)
+    const htmlAmbCotxe = w.blocGraellaNen(fBuit, nBuit);
+    T("v4.50: una marca de tota la família (🚗/🚫) també compta — no és «buida» de debò",
+      !htmlAmbCotxe.includes("Comença aquí"));
   }
   w.triaTab("perfil"); await tic();
   // v4.6: el desat amb pendents ara SÍ es desa — cal tornar el curs real d'en
