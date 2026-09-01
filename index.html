@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.29</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.30</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -852,22 +852,20 @@ function viatgeCobert(f, slot, dia){
     !refs.some(r2 => r2.fam === n.famId && r2.nen === n.nenId)).length;
   return { esperen: esperen, ocupades: refs.length, cobert: !esperen || refs.length >= (f.places || 0) };
 }
+/* v4.30: la barra «per tu» compta NOMÉS els viatges que la família OFEREIX:
+   total = caselles amb el seu 🚗; cobert = viatgeCobert (ningú esperant o
+   cotxe ple). Els 🙋 dels fills NO hi compten (tenen la seva pròpia mirada
+   al Resum i a la línia dels nens del grup). pend = nens esperant als seus
+   viatges. Estadístiques (admin) fa servir aquesta mateixa definició. */
 function statsCoberturaFam(f){
   let tot = 0, cob = 0, pend = 0;
   DIES.forEach(d2 => FRANGES.forEach(fr => {
     if (estatCasella(f, fr.id, d2) !== "normal") return;
-    if (te(f.cotxe, fr.id, d2)){
-      tot++;
-      const vc = viatgeCobert(f, fr.id, d2);
-      pend += vc.esperen;
-      if (vc.cobert) cob++;
-    } else {
-      (f.nens || []).forEach(n => {
-        if (!te(n.marca, fr.id, d2) || !nenTeCasella(n, fr.id, d2)) return;
-        tot++;
-        if (elPorta(f.id, n.id, fr.id, d2)) cob++;
-      });
-    }
+    if (!te(f.cotxe, fr.id, d2)) return;
+    tot++;
+    const vc = viatgeCobert(f, fr.id, d2);
+    pend += vc.esperen;
+    if (vc.cobert) cob++;
   }));
   return { tot: tot, cob: cob, pend: pend };
 }
@@ -2230,7 +2228,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.29", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.30", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2799,7 +2797,7 @@ function pintaCotxe(){
     return;
   }
   const stf = statsCoberturaFam(meva);
-  const barraTu = "<div class='targeta'>" +
+  const barraTu = !stf.tot ? "" : "<div class='targeta'>" +
     barraCobHtml("\ud83c\udfaf Trajectes coberts per tu", stf.cob, stf.tot,
       (pendTotals ? "<div class='bc-sub'>\u26a0 " + pendTotals + (pendTotals === 1 ? " nen demana" : " nens demanen") + " pla\u00e7a als teus viatges. Marca la seva casella i prem \u00abDesa els canvis\u00bb.</div>"
                   : "<div class='bc-sub be'>\u2713 cap nen pendent als teus viatges</div>"), "") +
