@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.31</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.32</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -824,17 +824,31 @@ function avisVell(txt){
 /* Cobertura de trajectes: dem = trajectes de nens a cobrir de tot el grup,
    cob = els que ja tenen cotxe, meus = els que cobreix el MEU cotxe.
    balanc() ja exclou les caselles en blanc per curs. */
+/* v4.32: la barra 🎯 del grup és la SUMA de les barres per família
+   (statsCoberturaFam: viatges oferts coberts / oferts) — la mateixa xifra
+   que «✓ viatges coberts al 100 %» del peu. La mirada dels nens va a part:
+   dem = demandes 🙋 · ambCotxe = amb cotxe · esperenAmb = esperen en
+   viatges on algú ofereix cotxe · senseCotxe = en viatges on ningú no
+   n'ofereix (la xifra que explica el forat). */
 function statsCobertura(){
-  const meva = lameva();
-  let dem = 0, cob = 0, meus = 0; const pendSet = {};
+  let tot = 0, cob = 0;
+  ((doc && doc.families) || []).forEach(f => { const s2 = statsCoberturaFam(f); tot += s2.tot; cob += s2.cob; });
+  let dem = 0, ambCotxe = 0, esperenAmb = 0, senseCotxe = 0;
   DIES.forEach(d2 => FRANGES.forEach(fr => {
-    balanc(fr.id, d2).nens.forEach(n => {
+    const b = balanc(fr.id, d2);
+    b.nens.forEach(n => {
       dem++;
-      if (n.portadaPerId){ cob++; if (meva && n.portadaPerId === meva.id) meus++; }
-      else pendSet[n.famId + "|" + n.nenId] = 1;
+      if (n.portadaPerId) ambCotxe++;
+      else if (b.conds.length) esperenAmb++;
+      else senseCotxe++;
     });
   }));
-  return { dem: dem, cob: cob, meus: meus, nPend: Object.keys(pendSet).length };
+  return { tot: tot, cob: cob, dem: dem, ambCotxe: ambCotxe, esperenAmb: esperenAmb, senseCotxe: senseCotxe };
+}
+function liniaNensHtml(st){
+  return "<div class='bc-sub'>\ud83d\ude4b " + st.dem + (st.dem === 1 ? " demanda" : " demandes") + " de pla\u00e7a \u00b7 " +
+    st.ambCotxe + " amb cotxe \u00b7 " + st.esperenAmb + " esperen en viatges amb cotxe \u00b7 " +
+    st.senseCotxe + " en viatges on ning\u00fa ofereix cotxe</div>";
 }
 /* v4.23: cobertura d'UNA família — els seus trajectes són els cotxes que
    ofereix i les demandes dels seus fills. Un viatge OFERT compta com a
@@ -907,12 +921,7 @@ function pintaPeuStats(){
   if (!fila){ el.innerHTML = ""; return; }
   // Barra de progrés de TOT EL GRUP (la del peu)
   const st = statsCobertura();
-  const barra = barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.dem,
-    (st.dem ? (st.cob === st.dem
-        ? "<div class='bc-sub be'>\ud83c\udf89 100 % \u00b7 tots els nens tenen cotxe</div>"
-        : (st.nPend ? "<div class='bc-sub'>" + st.nPend + (st.nPend === 1 ? " nen encara" : " nens encara") + " sense cotxe en algun trajecte</div>" : ""))
-      : ""),
-    "obreResumDesDePeu()");
+  const barra = barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.tot, liniaNensHtml(st), "obreResumDesDePeu()");
   el.innerHTML = fila + barra;
 }
 function obreResumDesDePeu(){ if (!potCal()) return; triaTab("cal"); triaVistaCal("resum"); }
@@ -2229,7 +2238,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.31", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.32", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2427,7 +2436,7 @@ function pintaEstadistiques(){
     .sort((a, b) => (a.tot ? a.cob / a.tot : 2) - (b.tot ? b.cob / b.tot : 2));
   $("#tab-cos").innerHTML =
     "<div class='targeta'><div class='peu-stats' style='justify-content:flex-start'>" + peuStatsHtml() + "</div></div>" +
-    "<div class='targeta'>" + barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.dem, "", "") + "</div>" +
+    "<div class='targeta'>" + barraCobHtml("\ud83c\udfaf Trajectes coberts del grup", st.cob, st.tot, liniaNensHtml(st), "") + "</div>" +
     "<p class='hint' style='margin:0 2px 8px'>Una barra per fam\u00edlia \u2014 la mateixa que cadascuna veu a \u00abEl teu cotxe\u00bb \u2014, de menys a m\u00e9s cobertura.</p>" +
     files.map(x => "<div class='targeta'>" +
       barraCobHtml("\ud83c\udfaf " + esc(x.f.nom), x.cob, x.tot,
