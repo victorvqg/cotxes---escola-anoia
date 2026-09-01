@@ -110,6 +110,17 @@ console.log("0 · CABLEJAT ESTÀTIC");
       sql52.includes("trg_numero_grup") && sql52.includes("trg_numero_familia") && sql52.includes("trg_numero_avis") &&
       (sql52.match(/pg_advisory_xact_lock/g) || []).length === 3);
   }
+  // v4.42 · v53: reparació autosuficient si el v52 no es va arribar a executar
+  {
+    const sql53 = fs.readFileSync(path.join(__dirname, "supabase-v53.sql"), "utf-8");
+    T("SQL v53: 3 SELECT de comprovació abans de tocar res (a/b/c), neteja abans de numerar i backfill dels tres",
+      /select id, name, numero from groups/.test(sql53) &&
+      sql53.includes("families_sense_numero") && sql53.includes("avisos_sense_numero") &&
+      sql53.indexOf("notifications_dup_backup_v53") < sql53.indexOf("update groups set numero") &&
+      sql53.includes("update groups set numero") && sql53.includes("update families set numero") && sql53.includes("update notifications set numero"));
+    T("SQL v53: torna a deixar els triggers (perquè grup/família/avís nous no tornin a quedar sense numero)",
+      sql53.includes("trg_numero_grup") && sql53.includes("trg_numero_familia") && sql53.includes("trg_numero_avis"));
+  }
   T("v4.19: el CSS força un avís per línia", html.includes("#avisos-llista details{display:block"));
   // v4.15: els avisos viuen a notifications amb columnes estructurades
   {
