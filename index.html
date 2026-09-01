@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.32</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.33</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1047,7 +1047,7 @@ async function desa(){
     await sbGet();
     dirty = false; pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
     // v4.20: la pestanya oberta es repinta amb les dades desades — el mateix
-    // repintat de sempre (pintaCotxe amb les seves barres, Resum/Quadre…)
+    // repintat de sempre (pintaCotxe amb les seves barres, Resum/Dies…)
     if ($("#tab-cos")) triaTab(tabAct);
     if (resumEsborrats.length) avis("\ud83d\uddd1\ufe0f <b>" + resumEsborrats.join("<br>") + "</b>");
     else avis("✓ <b>Desat</b> — els canvis ja són visibles per a tothom.", true);
@@ -2238,7 +2238,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.32", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.33", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2608,7 +2608,7 @@ async function tancaSessio(senseDretes){
 }
 
 /* ── Pestanya: calendari del grup ── */
-let vistaCal = "quadre";
+let vistaCal = "dia";   // v4.33: «Dies» és la vista per defecte
 let nenSel = "";
 
 async function pintaCalendari(){
@@ -2635,9 +2635,7 @@ function renderCal(){
     });
   });
   $("#tab-cos").innerHTML =
-    "<div class='subtabs'><button class='subtab " + (vistaCal === "quadre" ? "actiu" : "") + "' onclick=\"triaVistaCal('quadre')\">Quadre</button>" +
-    "<button class='subtab " + (vistaCal === "set" ? "actiu" : "") + "' onclick=\"triaVistaCal('set')\">Setmana</button>" +
-    "<button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button>" +
+    "<div class='subtabs'><button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button>" +
     "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button>" +
     "<button class='subtab " + (vistaCal === "resum" ? "actiu" : "") + "' onclick=\"triaVistaCal('resum')\">Resum</button>" +
     "<button class='subtab " + (vistaCal === "assignar" ? "actiu" : "") + "' onclick=\"triaVistaCal('assignar')\">\ud83d\udcba Per assignar</button></div>" +
@@ -2645,48 +2643,14 @@ function renderCal(){
     "<div class='mapa'>" + mapa + "</div>" +
     "<div id='cal-cos'></div>" +
     "<button class='boto sec cal-actualitza' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
-  if (vistaCal === "quadre") pintaQuadre(); else if (vistaCal === "set") pintaSetmana(); else if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else if (vistaCal === "assignar") pintaPerAssignar(); else pintaVistaNen();
+  // v4.33: Quadre i Setmana fora; qualsevol valor vell cau a «Dies»
+  if (vistaCal !== "nen" && vistaCal !== "resum" && vistaCal !== "assignar") vistaCal = "dia";
+  if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else if (vistaCal === "assignar") pintaPerAssignar(); else pintaVistaNen();
 }
 function triaVistaCal(v){ vistaCal = v; renderCal(); }
 function selDia(d){ diaSel = d; vistaCal = "dia"; if (tabAct !== "cal") triaTab("cal"); else renderCal(); }
 
 /* Vista de setmana sencera: els 5 dies seguits, amb noms i estat de cada franja */
-function pintaSetmana(){
-  let h = "";
-  DIES.forEach(d => {
-    let files = "", nDef = 0, nJust = 0, nAct = 0;
-    FRANGES.forEach(fr => {
-      const b = balanc(fr.id, d);
-      let cls, pt;
-      if (!b.conds.length && !b.nens.length){ cls = "cap"; pt = "\u00b7"; }
-      else {
-        nAct++;
-        if (b.diff < 0){ cls = "def"; pt = "\u2212" + (-b.diff); nDef++; }
-        else if (b.diff === 0){ cls = "just"; pt = "0"; nJust++; }
-        else { cls = "ok"; pt = "+" + b.diff; }
-      }
-      const conds = b.conds.map(f => esc(f.nom.replace(/^fam[i\u00ed]lia\s+/i, ""))).join(", ");
-      const nens = b.nens.map(n => esc(n.nom)).join(", ");
-      const propis = b.propis.map(f => esc(f.nom.replace(/^fam[i\u00ed]lia\s+/i, ""))).join(", ");
-      const parts = [];
-      if (conds) parts.push("\ud83d\ude97 " + conds);
-      if (nens) parts.push("\ud83d\ude4b " + nens);
-      if (propis) parts.push("\ud83d\udeab " + propis);
-      const txt = parts.length ? parts.join(" \u00b7 ") : "\u2014";
-      files += "<div class='d-fila'><span class='d-hora'>" + fr.hora + "</span><span class='d-txt'>" + txt + "</span><span class='mp " + cls + "'>" + pt + "</span></div>";
-    });
-    const resum = nDef ? "<span class='mp def'>\u26a0 falten places</span>"
-      : nAct ? (nJust ? "<span class='mp just'>va just</span>" : "<span class='mp ok'>tot cobert</span>")
-      : "<span class='mp cap'>buit</span>";
-    h += "<div class='dcard' role='button' tabindex='0' onclick=\"selDia('" + d + "')\">" +
-         "<div class='d-cap'><span class='d-nom'>" + DIES_NOM[d] + "</span>" + resum + "</div>" + files + "</div>";
-  });
-  $("#cal-cos").innerHTML = h;
-}
-
-/* Vista dia a dia */
-/* Capçalera de targeta de viatge — hora en gran + ENTRADA/RECOLLIDA + pastilla.
-   És LA MATEIXA a la vista Dia del Quadre i a «El teu cotxe»: una sola font. */
 function capFranjaHtml(fr, badge){
   return "<div class='f-cap'><span class='f-hora'>" + fr.hora + "</span>" +
     "<span class='m-tip " + (fr.tipus === "Entrada" ? "e" : "r") + "'>" + fr.tipus + "</span>" + badge + "</div>";
@@ -3134,45 +3098,6 @@ function pintaVistaNen(){
   $("#cal-cos").innerHTML = h;
 }
 function selNenCanvia(v){ nenSel = v; pintaVistaNen(); }
-
-function pintaQuadre(){
-  const pila = s => s.trim().split(/\s+/)[0];
-  const llista = arr => arr.map(esc).join(", ").replace(/, ([^,]*)$/, " i $1");
-  let h = "";
-  DIES.forEach(d => {
-    let linies = "";
-    let pendTot = 0;
-    let hiHa = false;
-    FRANGES.forEach(fr => {
-      const b = balanc(fr.id, d);
-      const pend = b.nens.filter(n => !n.portadaPer);
-      b.conds.forEach(c => {
-        hiHa = true;
-        const noms = (c.nens || []).map(n => pila(n.nom));
-        portaValids(c, fr.id, d).forEach(r => {
-          const ff = doc.families.find(x => x.id === r.fam);
-          const nn = ff ? (ff.nens || []).find(x => x.id === r.nen) : null;
-          if (nn) noms.push(pila(nn.nom));
-        });
-        linies += "<div class='qd-linia'><span class='qd-hora'>" + fr.hora + "</span><span class='qd-cotxe'>\ud83d\ude97 <b>" + esc(nomConductor(c)) + "</b>" +
-          (noms.length ? " porta <b>" + llista(noms) + "</b>" : " \u00b7 encara ning\u00fa (" + c.places + " lliures)") + "</span></div>";
-      });
-      if (pend.length){
-        hiHa = true; pendTot += pend.length;
-        linies += "<div class='qd-linia'><span class='qd-hora'>" + fr.hora + "</span><span class='qd-sense'>\u23f3 Sense cotxe: <b>" + llista(pend.map(n => pila(n.nom))) + "</b></span></div>";
-      }
-    });
-    const chip = !hiHa ? "<span class='badge buit'>res marcat</span>"
-      : pendTot ? "<span class='badge mal'>\u26a0 " + pendTot + " sense cotxe</span>"
-      : "<span class='badge be'>\u2713 tot quadrat</span>";
-    h += "<div class='targeta dcard'><div class='d-cap qd-cap' onclick=\"obreDiaDes('" + d + "')\"><h3>" + DIES_NOM[d] + "</h3>" + chip + "</div>" +
-         (linies || "<p class='hint' style='margin:2px 0 4px'>Cap trajecte marcat.</p>") +
-         (hiHa ? "<div style='text-align:right;margin-top:2px'><button class='enllac' onclick=\"obreDiaDes('" + d + "')\">veure el detall \u2192</button></div>" : "") +
-         "</div>";
-  });
-  $("#cal-cos").innerHTML = h;
-}
-function obreDiaDes(d){ vistaCal = "dia"; diaSel = d; renderCal(); }
 
 /* v4.29: «Per assignar» — els viatges amb nens esperant plaça I algun
    conductor amb seients lliures (i, a sota, els que no en tenen cap:

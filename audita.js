@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.32", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.32"));
+  T("lema i peu amb versió 4.33", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.33"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -800,11 +800,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("5 · CALENDARIS (lectura del grup sencer des de Supabase)");
   await w.pintaCalendari(); await tic(30);
-  T("el Quadre (qui porta qui) s'obre per defecte", cos().includes(">Quadre<") && cos().includes("veure el detall"));
-  T("els subtabs són a dalt de tot, abans del mapa", cos().indexOf(">Quadre<") < cos().indexOf("llegenda"));
-  w.triaVistaCal("set"); await tic(20);
-  T("la vista de setmana segueix disponible", cos().includes("dcard"));
-  T("el dèficit surt al mapa i a la setmana (−3 dl 17.00)", cos().includes("−3"));
+  T("v4.33: «Dies» s'obre per defecte i Quadre i Setmana ja no hi són",
+    cos().includes("Vista de consulta") && !cos().includes(">Quadre<") && !cos().includes(">Setmana<"));
+  T("els subtabs són a dalt de tot, abans del mapa", cos().indexOf(">Dies<") < cos().indexOf("llegenda"));
+  T("el dèficit surt al mapa (−3 dl 17.00)", cos().includes("−3"));
   w.triaTab("cal"); await tic(30);
   w.selDia("dl"); await tic(20);
   T("detall del dia: vista de consulta i cada nen amb el seu estat", cos().includes("Vista de consulta") && cos().includes("Arlet") && cos().includes("Bru") && cos().includes("pendent"));
@@ -881,8 +880,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.tancaFull(); await tic();
   T("en tancar, el full desapareix", d.querySelector("#full-horari").classList.contains("ocult"));
   w.triaTab("cal"); await tic(30); w.triaVistaCal("nen"); await tic(20);
-  w.triaVistaCal("quadre"); await tic(20);
-  T("el quadre diu qui porta qui amb noms de pila", cos().includes("Marta VP") && cos().includes("porta") && cos().includes("Arlet"));
+  w.triaVistaCal("dia"); await tic(20);
 
   console.log("6b2 · NOVETATS v4.29 (filtre per nen a Resum + vista Per assignar)");
   w.triaVistaCal("resum"); await tic(30);
@@ -892,7 +890,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.selNenResum(opt29); await tic(30);
   T("v4.29: en triar un nen només surten els seus viatges",
     (cos().match(/r-fila/g) || []).length <= files29 && cos().includes("Es mostren només els viatges de"));
-  w.triaVistaCal("quadre"); await tic(20); w.triaVistaCal("resum"); await tic(30);
+  w.triaVistaCal("dia"); await tic(20); w.triaVistaCal("resum"); await tic(30);
   T("v4.29: la tria es recorda mentre l'app és oberta", d.querySelector("#resum-nen").value === opt29);
   w.selNenResum(""); await tic(30);
   T("v4.29: «Tots» torna la vista sencera", (cos().match(/r-fila/g) || []).length === files29);
@@ -913,7 +911,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
       : ((cos().match(/esperen:/g) || []).length === nAmb29 + nSense29 &&
          (nSense29 === 0 || cos().includes("Sense cotxe possible")) &&
          (nAmb29 === 0 || cos().includes("amb seients lliures"))));
-  w.triaVistaCal("quadre"); await tic(20);
+  w.triaVistaCal("dia"); await tic(20);
 
   console.log("6c · AVISOS ENTRE COMPTES (v4.15: guardats a Supabase per a tot el grup)");
   await surtIentra("grau@test.cat", "grau123");
