@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.30</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.31</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -1514,8 +1514,8 @@ function pantallaApp(){
   if (tabAct === "estad" && !esAdmin) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff && !esProgenitor) tabAct = "perfil";
   $("#pantalla").innerHTML =
-    "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet" + (esProgenitor ? " prog" : "") + "'>\u00b7 " + (esProgenitor ? "progenitor" : f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
-    (esProgenitor ? "<div class='prog-banner'>\ud83d\udc40 Has entrat com a <b>progenitor</b> de la fam\u00edlia <b>" + esc(f.nom) + "</b> \u00b7 <b>nom\u00e9s lectura</b>.<br><span class='hint'>Pots mirar-ho tot, per\u00f2 els canvis els fa el titular de la fam\u00edlia.</span></div>" : "") +
+    "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet" + (esProgenitor ? " prog" : "") + "'>\u00b7 " + (esProgenitor ? "adjunt" : f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
+    (esProgenitor ? "<div class='prog-banner'>\ud83d\udc40 Has entrat com a <b>adjunt</b> de la fam\u00edlia <b>" + esc(f.nom) + "</b> \u00b7 <b>nom\u00e9s lectura</b>.<br><span class='hint'>Ho veus tot, per\u00f2 nom\u00e9s el titular pot fer canvis.</span></div>" : "") +
     ((esAdmin || esStaff) && perfil && f.id !== perfil.family_id ? (function(){
       const pr = doc.families.find(x => x.id === perfil.family_id);
       return "<div class='adm-banner'>\ud83d\udee1\ufe0f Est\u00e0s dins d'una altra fam\u00edlia: tot el que editis \u00e9s seu." + (pr ? " <button class='enllac' onclick=\"triaFam('" + pr.id + "')\">torna a la meva</button>" : "") + "</div>";
@@ -1667,7 +1667,7 @@ function pintaPerfil(){
     "<p class='hint' style='margin-top:8px'>" + (okP ? "\u2713 Perfil complet." : "\u26a0 Falta omplir: " + [!f.nom ? "nom" : "", !(f.cognomPare || "").trim() ? "1r cognom" : "", !(f.conductor || "").trim() ? "conductor" : "", !f.nens.length ? "un nen" : "", f.nens.some(n => !(n.curs || "").trim()) ? "el curs de cada nen" : ""].filter(Boolean).join(", ") + ".") + (dirty ? " <b>Recorda \u00abDesa els canvis\u00bb.</b>" : "") + "</p>" +
     (f.codiFam ? "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de la vostra fam\u00edlia</span></div>" +
     "<div class='fila' style='align-items:center;gap:8px;justify-content:center;flex-wrap:wrap'><span class='nomgran' style='letter-spacing:.14em'>" + esc(f.codiFam) + "</span><button class='boto sec' onclick='copiaTextCodiFam(this)'>Copia el codi</button></div>" +
-    "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a l'altre progenitor o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia.</p>" : "") +
+    "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a l'altre adult o al vostre fill/a: amb aquest codi sol ja poden crear el seu compte i entrar a la fam\u00edlia com a adjunts.</p>" : "") +
     "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>El vostre grup: " + esc(doc && doc.grupNom ? doc.grupNom : "\u2014") + "</span></div>" +
     "<div class='fila' style='align-items:center;gap:8px;justify-content:center;flex-wrap:wrap'><span>Codi d'invitaci\u00f3:</span><span class='nomgran' style='letter-spacing:.14em'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</span><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
     "<p class='hint' style='text-align:center;margin-top:4px'>Passa aquest codi a les fam\u00edlies que s'hi vulguin unir. Nom\u00e9s cal el codi, no el nom del grup.</p>" +
@@ -1996,7 +1996,7 @@ function pantallaAdmin(){
       "<textarea class='input' id='imp-json' rows='5' placeholder='{\"families\":[…]}' style='font-family:monospace;font-size:13px'></textarea>" +
       "<div class='fila' style='margin-top:8px'><button class='boto' onclick='importaDades()'>Importa les dades</button></div>" +
       "<div id='imp-estat' class='hint' style='margin-top:6px'></div>" +
-      "<div class='p-fila' style='margin-top:16px'><span class='p-lab'>Comptes registrats<span class='p-sub'>correu de cada compte, fam\u00edlia on \u00e9s vinculat i rol del compte (titular o progenitor); tamb\u00e9 els comptes sense fam\u00edlia. Els nens no tenen compte. Nom\u00e9s ho veus tu</span></span></div>" +
+      "<div class='p-fila' style='margin-top:16px'><span class='p-lab'>Comptes registrats<span class='p-sub'>correu de cada compte, fam\u00edlia on \u00e9s vinculat i rol del compte (titular o adjunt); tamb\u00e9 els comptes sense fam\u00edlia. Els nens no tenen compte. Nom\u00e9s ho veus tu</span></span></div>" +
       "<div class='fila'><button class='boto sec' onclick='mostraComptes()'>Mostra els comptes</button></div>" +
       "<div id='comptes-box' style='margin-top:8px'></div>" +
       "<div class='p-fila' style='margin-top:16px'><span class='p-lab'>Activitat del grup<span class='p-sub'>registre de qui ha fet qu\u00e8; nom\u00e9s el veus tu</span></span></div>" +
@@ -2084,7 +2084,7 @@ function regeneraCodi(id){
   const f = doc.families.find(x => x.id === id); if (!f) return;
   mostraConfirm({
     titol: "\ud83d\udd04 Regenerar el codi de " + esc(f.nom) + "?",
-    text: "El codi actual deixar\u00e0 de funcionar: si algun progenitor encara no s'hi ha vinculat, li haur\u00e0s de passar el nou. Quedar\u00e0 registrat a l'activitat del grup.",
+    text: "El codi actual deixar\u00e0 de funcionar: si algun adjunt encara no s'hi ha vinculat, li haur\u00e0s de passar el nou. Quedar\u00e0 registrat a l'activitat del grup.",
     ok: "S\u00ed, regenera'l", cancel: "Cancel\u00b7la",
     alOk: async () => {
       const r = await sb.rpc("regenera_codi", { p_family: id });
@@ -2110,6 +2110,7 @@ async function mostraLogs(){
   box.innerHTML = files || "<p class='hint'>Encara no hi ha activitat registrada.</p>";
 }
 var comptesCache = [];
+function rolCompteVist(r){ return r === "progenitor" ? "adjunt" : (r || ""); }   // v4.31: només el text visible
 function elMeuCompte(c){ return sessio && sessio.user && String(c.correu || "").toLowerCase() === String(sessio.user.email || "").toLowerCase(); }
 async function mostraComptes(){
   if (!esAdmin) return;
@@ -2129,8 +2130,8 @@ async function mostraComptes(){
     if (!divisor && !c.familia){ divisor = true; h += "<p class='hint' style='margin:8px 2px 2px'>\u2014 comptes sense fam\u00edlia \u2014</p>"; }
     const meu = elMeuCompte(c);
     const linia = "<b>" + esc(c.correu || "") + "</b>" +
-      (c.familia ? " \u00b7 " + esc(c.familia) + " \u00b7 " + esc(c.rol_compte || "") + (c.rol_familia ? " \u00b7 " + esc(c.rol_familia) : "")
-                 : " \u00b7 <i>" + esc(c.rol_compte || "sense fam\u00edlia") + "</i>") +
+      (c.familia ? " \u00b7 " + esc(c.familia) + " \u00b7 " + esc(rolCompteVist(c.rol_compte)) + (c.rol_familia ? " \u00b7 " + esc(c.rol_familia) : "")
+                 : " \u00b7 <i>" + esc(rolCompteVist(c.rol_compte) || "sense fam\u00edlia") + "</i>") +
       (c.estat && c.estat !== "aprovat" ? " \u00b7 " + esc(c.estat) : "");
     h += "<details class='conf fam-det'><summary><input type='checkbox' class='cmp-sel' data-i='" + i + "'" + (meu ? " disabled" : "") +
       " onclick='event.stopPropagation()' onchange='actualitzaSelComptes()' style='width:18px;height:18px;margin-right:6px;vertical-align:middle'> " + linia + "</summary>" +
@@ -2228,7 +2229,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.30", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.31", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });

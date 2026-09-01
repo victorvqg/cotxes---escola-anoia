@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.30", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.30"));
+  T("lema i peu amb versió 4.31", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.31"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -1762,8 +1762,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const rClaim26 = await fakeSupabaseClient().rpc("claim_family", { p_family: famLliure.id, p_token: codiDeFam(famLliure) });
   T("v4.26: el segon compte es vincula a la família", !rTitu26.error && !rClaim26.error);
   await surtIentra("pepe@test.cat", "pepe123");
-  T("v4.26: el servidor diu que NO és titular i entra en només lectura (banner de progenitor)",
-    pant().includes("progenitor"));
+  T("v4.26: el servidor diu que NO és titular i entra en només lectura (banner d'adjunt)",
+    pant().includes("adjunt") && !pant().includes(">progenitor<"));
+  T("v4.31: cap «progenitor» visible per a l'usuari (només als noms interns)",
+    !pant().includes("progenitor"));
   w.triaTab("graella"); await tic();
   T("v4.26: cap botó d'esborrar a la graella del progenitor", !cos().includes("Esborra la graella de"));
   await w.desa(); await tic(10);
