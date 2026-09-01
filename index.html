@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.42";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.43";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -2439,7 +2439,6 @@ function pintaBloqueig(){
    estil nou). Reutilitza els textos ja existents (Graella, «Qui puges al
    teu cotxe?», el banner d'adjunt) perquè mai quedin desalineats amb el
    que hi ha realment a cada pantalla. Visible per a tots els rols. */
-let ajudaBloc = "comenca";
 function ajudaBlocsDef(){
   const grupTxt = (doc && doc.grupNom) ? "«" + esc(doc.grupNom) + "»" : "del vostre grup";
   return [
@@ -2452,6 +2451,12 @@ function ajudaBlocsDef(){
       "<p class='lead' style='margin:0'>A cada casella de la Graella:</p>" +
       "<p style='margin:6px 0'>🚗 conduïu i oferiu places · 🙋 el nen demana plaça · 🚫 aquell dia aneu pel vostre compte.</p>" +
       "<p class='hint' style='margin:0'>L'hora d'entrada de cada dia la fixa el curs del nen; les caselles en blanc no cal respondre-les.</p>" },
+    { id: "graella-fill", ico: "🗓️", tit: "La Graella, fill per fill", cos:
+      "<p style='margin:0 0 6px'>Cada fill té la seva targeta: respons la setmana de cada nen per separat.</p>" +
+      "<p style='margin:0 0 6px'>Cada casella és un viatge (dia + hora). Toca-la i tria 🚗 conduïu i oferiu places · 🙋 el nen demana plaça · 🚫 aquell dia aneu pel vostre compte.</p>" +
+      "<p class='hint' style='margin:0 0 6px'>L'hora d'entrada la fixa el curs del nen; les caselles que el seu curs no té surten apagades i no cal respondre-les.</p>" +
+      "<p style='margin:0 0 6px'>Quan una targeta té totes les caselles respostes hi surt «✓ completa». Es pot desar encara que en falti alguna; els Calendaris no s'obren fins que tots els fills tenen la targeta completa.</p>" +
+      "<p class='hint' style='margin:0'>Amb «🗑️ Esborra la graella de [nom]» pots buidar la d'un fill i tornar-la a fer.</p>" },
     { id: "condueixes", ico: "🚗", tit: "Si condueixes", cos:
       "<p style='margin:0 0 6px'>Ves a «El teu cotxe» → marca qui puges (secció «Qui puges al teu cotxe?») → prem «Desa els canvis».</p>" +
       "<p class='hint' style='margin:0'>La barra 🎯 Trajectes coberts per tu et diu quants dels teus viatges ja tenen tothom col·locat.</p>" },
@@ -2470,23 +2475,15 @@ function ajudaBlocsDef(){
       "<p style='margin:0'><b>M'he equivocat de família?</b> Perfil → Desvincula aquest compte.</p>" }
   ];
 }
-function triaAjudaBloc(id){
-  ajudaBloc = id; pintaAjuda();
-  try { $("#ajuda-" + id).scrollIntoView({ block: "start", behavior: "smooth" }); } catch(e){}
-}
 function pintaAjuda(){
   const blocs = ajudaBlocsDef();
-  const index = "<div class='subtabs'>" + blocs.map(b =>
-    "<button class='subtab " + (ajudaBloc === b.id ? "actiu" : "") + "' onclick=\"triaAjudaBloc('" + b.id + "')\">" + b.ico + " " + b.tit + "</button>").join("") + "</div>";
-  const cossos = blocs.map(b => {
-    const obert = ajudaBloc === b.id;
-    return "<div id='ajuda-" + b.id + "' class='targeta'>" +
-      "<button class='c-item' style='width:100%;text-align:left;font-weight:700;padding:2px 0'" +
-      " onclick=\"triaAjudaBloc('" + b.id + "')\">" + b.ico + " " + b.tit + " <span style='float:right'>" + (obert ? "▾" : "▸") + "</span></button>" +
-      (obert ? "<div style='padding-top:8px'>" + b.cos + "</div>" : "") + "</div>";
-  }).join("");
+  const cossos = blocs.map((b, i) =>
+    "<details id='ajuda-" + b.id + "' class='targeta'" + (i === 0 ? " open" : "") + ">" +
+    "<summary style='font-weight:700;padding:2px 0'>" + b.ico + " " + b.tit + "</summary>" +
+    "<div style='padding-top:8px'>" + b.cos + "</div></details>"
+  ).join("");
   $("#tab-cos").innerHTML =
-    "<div class='targeta'><h2>❓ Guia ràpida</h2></div>" + index + cossos +
+    "<div class='targeta'><h2>❓ Guia ràpida</h2></div>" + cossos +
     "<p class='hint' style='margin-top:14px;text-align:center'>Encara tens dubtes? Escriu a l'administrador.</p>";
 }
 function pintaRols(){
