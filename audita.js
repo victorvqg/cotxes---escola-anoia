@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.27", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.27"));
+  T("lema i peu amb versió 4.32", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.32"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -854,7 +854,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.canviaPlaces(-1); w.canviaPlaces(-1); await tic();
   w.triaTab("cal"); await tic(30);
   T("si les places baixen, el comptador avisa del sobreeiximent (2/1)", cos().includes("2/1"));
-  T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges oferts") && s.includes("3 places ocupades") && s.includes("lliure"); })());
+  T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges oferts") && s.includes("3 seients ocupats") && s.includes("seient") && s.includes("lliure"); })());
   T("amb canvis pendents, l'Actualitza dels calendaris s'amaga (mana el Desa)", d.body.classList.contains("amb-barra") && cos().includes("cal-actualitza"));
   w.triaTab("perfil"); await tic();
   w.canviaPlaces(1); w.canviaPlaces(1); await tic();
@@ -883,6 +883,37 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("cal"); await tic(30); w.triaVistaCal("nen"); await tic(20);
   w.triaVistaCal("quadre"); await tic(20);
   T("el quadre diu qui porta qui amb noms de pila", cos().includes("Marta VP") && cos().includes("porta") && cos().includes("Arlet"));
+
+  console.log("6b2 · NOVETATS v4.29 (filtre per nen a Resum + vista Per assignar)");
+  w.triaVistaCal("resum"); await tic(30);
+  T("v4.29: Resum duu el desplegable «Nen: Tots / …»", !!d.querySelector("#resum-nen") && cos().includes("Tots"));
+  const files29 = (cos().match(/r-fila/g) || []).length;
+  const opt29 = d.querySelector("#resum-nen option[value*='|']").value;
+  w.selNenResum(opt29); await tic(30);
+  T("v4.29: en triar un nen només surten els seus viatges",
+    (cos().match(/r-fila/g) || []).length <= files29 && cos().includes("Es mostren només els viatges de"));
+  w.triaVistaCal("quadre"); await tic(20); w.triaVistaCal("resum"); await tic(30);
+  T("v4.29: la tria es recorda mentre l'app és oberta", d.querySelector("#resum-nen").value === opt29);
+  w.selNenResum(""); await tic(30);
+  T("v4.29: «Tots» torna la vista sencera", (cos().match(/r-fila/g) || []).length === files29);
+  // vista «Per assignar»: es recompta amb balanc/portaValids (la mateixa font que la pantalla)
+  T("v4.29: la pestanya nova hi és", cos().includes("Per assignar"));
+  w.triaVistaCal("assignar"); await tic(20);
+  let nAmb29 = 0, nSense29 = 0;
+  ["dl", "dt", "dc", "dj", "dv"].forEach(dd => ["e8", "e9", "r13", "e15", "r17"].forEach(ss => {
+    const b2 = w.balanc(ss, dd);
+    const esp = b2.nens.filter(n2 => !n2.portadaPerId).length;
+    if (!esp) return;
+    const lliures = b2.conds.some(c2 => (c2.places || 0) - w.portaValids(c2, ss, dd).length > 0);
+    if (lliures) nAmb29++; else nSense29++;
+  }));
+  T("v4.29: «Per assignar» quadra amb balanc()/portaValids()",
+    (nAmb29 + nSense29 === 0)
+      ? cos().includes("Cap nen esperant en viatges amb seients lliures")
+      : ((cos().match(/esperen:/g) || []).length === nAmb29 + nSense29 &&
+         (nSense29 === 0 || cos().includes("Sense cotxe possible")) &&
+         (nAmb29 === 0 || cos().includes("amb seients lliures"))));
+  w.triaVistaCal("quadre"); await tic(20);
 
   console.log("6c · AVISOS ENTRE COMPTES (v4.15: guardats a Supabase per a tot el grup)");
   await surtIentra("grau@test.cat", "grau123");
@@ -1136,14 +1167,18 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("a Famílies es veu el rol de cadascuna (+curs i telèfon)", cos().includes("· admin") && cos().includes("· staff") && cos().includes("2n ESO") && cos().includes("600111222"));
   w.triaTab("cotxe"); await tic();
   T("«El teu cotxe» llista els nens que hi puc carregar, amb caselles", cos().includes("Qui puges al teu cotxe?") && (cos().includes("demana pla") || cos().includes("demanen pla")));
-  T("v4.17: la barra de dalt és NOMÉS de la família (cotxes oferts + demandes dels fills)", (function(){
+  T("v4.30: la barra de dalt compta NOMÉS els viatges oferts (els 🙋 dels fills no hi són)", (function(){
     const stf = w.statsCoberturaFam(w.lameva());
-    return cos().includes("Trajectes coberts per tu") && stf.tot > 0 && cos().includes(stf.cob + " de " + stf.tot);
+    let oferts30 = 0;
+    ["dl", "dt", "dc", "dj", "dv"].forEach(dd => ["e8", "e9", "r13", "e15", "r17"].forEach(ss => {
+      if (w.te(w.lameva().cotxe, ss, dd) && w.estatCasella(w.lameva(), ss, dd) === "normal") oferts30++;
+    }));
+    return cos().includes("Trajectes coberts per tu") && stf.tot === oferts30 && stf.tot > 0 && cos().includes(stf.cob + " de " + stf.tot);
   })());
   T("v4.17: la barra del peu és la del grup (el mateix número que el Resum)", (function(){
     const st = w.statsCobertura();
     const peu = (d.querySelector("#peu-stats") || { innerHTML: "" }).innerHTML;
-    return peu.includes("Trajectes coberts del grup") && st.dem > 0 && peu.includes(st.cob + " de " + st.dem);
+    return peu.includes("Trajectes coberts del grup") && st.tot > 0 && peu.includes(st.cob + " de " + st.tot) && peu.includes("on ningú ofereix cotxe");
   })());
   d.querySelector("#tab-cos").insertAdjacentHTML("beforeend", "<i id='sentinella-repintat'></i>");
   await w.desa(); await tic(30);
@@ -1172,10 +1207,16 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
       t27.includes("(" + completes + " amb la setmana completa)") &&
       t27.includes("🚗 " + oferts + " viatge") && t27.includes("/setmana") &&
       t27.includes("✓ " + cob + " viatge") && t27.includes("al 100 %") &&
-      t27.includes("🤝 " + ocu + " ") && t27.includes("🪑 " + Math.max(0, ofertes - ocu) + " ") &&
+      t27.includes("🤝 " + ocu + " seient") && t27.includes("💺 " + Math.max(0, ofertes - ocu) + " seient") &&
       t27.includes("lliure"));
     T("v4.27: la regla del cobert és una sola funció compartida (barra per tu + peu)",
       (html.match(/viatgeCobert\(/g) || []).length === 3);
+    const stG32 = w.statsCobertura();
+    T("v4.32: la barra del grup coincideix amb «✓ viatges coberts al 100 %» del peu",
+      stG32.cob === cob && stG32.tot === oferts);
+    T("v4.32: la línia dels nens quadra (demandes = amb cotxe + esperen + sense cotxe)",
+      stG32.dem === stG32.ambCotxe + stG32.esperenAmb + stG32.senseCotxe &&
+      t27.length > 0);
   }
   // v4.22: un canvi a Qui puja ha de repintar les barres A L'INSTANT (fallaria si no repinta)
   {
@@ -1188,14 +1229,14 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     }));
     T("v4.22: hi ha un candidat pendent per provar el repintat", !!cel22);
     const pend0 = parseInt((cos().match(/(\d+) nens? deman/) || [0, "0"])[1], 10);
-    const cob0 = w.statsCobertura().cob;
+    const cob0 = w.statsCobertura().ambCotxe;
     w.assigna(cel22.s, cel22.d, cel22.n.famId, cel22.n.nenId, true); await tic();
     const esperat = pend0 - 1;
     T("v4.22: marcar un nen a Qui puja repinta la línia de pendents a l'instant",
       esperat === 0 ? cos().includes("cap nen pendent") : cos().includes("\u26a0 " + esperat + " nen"));
-    T("v4.22: …i la barra del grup del peu també puja a l'instant",
-      w.statsCobertura().cob === cob0 + 1 &&
-      d.querySelector("#peu-stats").innerHTML.includes((cob0 + 1) + " de " + w.statsCobertura().dem));
+    T("v4.22: …i la línia dels nens del peu puja «amb cotxe» a l'instant",
+      w.statsCobertura().ambCotxe === cob0 + 1 &&
+      d.querySelector("#peu-stats").textContent.includes((cob0 + 1) + " amb cotxe"));
     T("v4.22: una SOLA línia de pendents (fora la frase duplicada)",
       !cos().includes("esperen pla") && (cos().match(/deman(a|en) pla\u00e7a als teus viatges/g) || []).length <= 1);
     // v4.23: el viatge ofert compta com a cobert quan ningú hi espera (o el cotxe és ple)
@@ -1697,6 +1738,14 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
   T("v4.27: Estadístiques duu la mateixa fila del peu a dalt de tot",
     /viatges? oferts?\/setmana/.test(cos()) && cos().includes("al 100 %") && cos().includes("amb la setmana completa"));
+  T("v4.32: la barra del grup és EXACTAMENT la suma de les barres per família", (function(){
+    let sTot = 0, sCob = 0;
+    w.doc.families.forEach(f2 => { const s2 = w.statsCoberturaFam(f2); sTot += s2.tot; sCob += s2.cob; });
+    const stG = w.statsCobertura();
+    return stG.tot === sTot && stG.cob === sCob && cos().includes(sCob + " de " + sTot);
+  })());
+  T("v4.32: sota la barra del grup, la mirada dels nens amb nom propi",
+    cos().includes("demandes de plaça") || cos().includes("demanda de plaça"));
   T("v4.18: les barres de família són el càlcul d'El teu cotxe (statsCoberturaFam), reutilitzat", (function(){
     return w.doc.families.every(f2 => { const st2 = w.statsCoberturaFam(f2);
       return !st2.tot || cos().includes(st2.cob + " de " + st2.tot); });
@@ -1727,8 +1776,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const rClaim26 = await fakeSupabaseClient().rpc("claim_family", { p_family: famLliure.id, p_token: codiDeFam(famLliure) });
   T("v4.26: el segon compte es vincula a la família", !rTitu26.error && !rClaim26.error);
   await surtIentra("pepe@test.cat", "pepe123");
-  T("v4.26: el servidor diu que NO és titular i entra en només lectura (banner de progenitor)",
-    pant().includes("progenitor"));
+  T("v4.26: el servidor diu que NO és titular i entra en només lectura (banner d'adjunt)",
+    pant().includes("adjunt") && !pant().includes(">progenitor<"));
+  T("v4.31: cap «progenitor» visible per a l'usuari (només als noms interns)",
+    !pant().includes("progenitor"));
   w.triaTab("graella"); await tic();
   T("v4.26: cap botó d'esborrar a la graella del progenitor", !cos().includes("Esborra la graella de"));
   await w.desa(); await tic(10);
