@@ -382,7 +382,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.48";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.49";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1851,14 +1851,9 @@ function obreCasella(slot, dia, nenId){
   const f = lameva();
   if (nomesTitular()) return;
   const nSel = (f && nenId) ? (f.nens || []).find(x => x.id === nenId) : null;
-  if (nSel && !nenTeCasella(nSel, slot, dia)){
-    const nomC = esc(nSel.nom.trim().split(/\s+/)[0]);
-    const q = nSel.curs ? " (" + esc(nSel.curs) + ")" : "";
-    avis((slot === "e8" || slot === "e9")
-      ? nomC + " no entra a les " + horaDe(slot) + " " + DIES_NOM[dia].toLowerCase() + ": l'hora d'entrada la fixa el seu curs" + q + "."
-      : nomC + " no t\u00e9 escola " + DIES_NOM[dia].toLowerCase() + " a la tarda" + q + ".");
-    return;
-  }
+  /* v4.49: un fill sense aquesta casella (pel seu curs) ja NO bloqueja obrir el
+     men\u00fa \u2014 \ud83d\ude97/\ud83d\udeab s\u00f3n de tota la fam\u00edlia i qualsevol fill hi ha de poder donar
+     acc\u00e9s; pintaCasella() ja amaga el \ud83d\ude4b (nom\u00e9s seu) quan no li toca a ell. */
   if (f && !nSel){
     const ec = estatCasella(f, slot, dia);
     if (ec === "blanc-entrada"){
@@ -1888,13 +1883,20 @@ function pintaCasella(){
   const fr = FRANGES.find(x => x.id === s) || {};
   const btn = (on, txt, ac) => "<button class='cbtn" + (on ? " on" : "") + "' onclick=\"celAccio('" + ac + "')\">" + txt + (on ? " <span class='cb-ok'>\u2713</span>" : "") + "</button>";
   let h = "<div class='cm-cap'><b>" + DIES_NOM[d] + " \u00b7 " + (fr.hora || "") + "</b><span class='cm-tip'>" + (fr.tipus || "") + "</span><button class='cm-x' onclick='tancaCasella()'>\u2715</button></div>";
-  const nensCel = nensDelMenu(f, s, d);   // el fill del bloc tocat (o tots, en mode família)
-  const totsMarcats = nensCel.length > 0 && nensCel.every(n => te(n.marca, s, d));
-  const etDemana = nensCel.length === 1 ? "\ud83d\ude4b " + esc(nensCel[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a"
-    : nensCel.length < f.nens.length ? "\ud83d\ude4b " + esc(nensCel.map(n => n.nom.trim().split(/\s+/)[0]).join(" i ")) + " demanen pla\u00e7a"
-    : "\ud83d\ude4b Els nens demanen pla\u00e7a";
+  const nSel = celObert.nenId ? (f.nens || []).find(x => x.id === celObert.nenId) : null;
+  const noAplicaFill = nSel && !nenTeCasella(nSel, s, d);
   h += btn(te(f.cotxe, s, d), "\ud83d\ude97 Condu\u00efm nosaltres \u2014 els nens v\u00e9nen amb nosaltres \u00b7 " + f.places + " " + (f.places === 1 ? "pla\u00e7a" : "places"), "cotxe");
-  h += btn(totsMarcats, etDemana, "demana");
+  if (noAplicaFill){
+    const nomC = esc(nSel.nom.trim().split(/\s+/)[0]);
+    h += "<p class='hint' style='margin:6px 2px'>\ud83d\udc66 " + nomC + " " + ((s === "e8" || s === "e9") ? "no entra a les " + horaDe(s) + " " + DIES_NOM[d].toLowerCase() : "no t\u00e9 escola " + DIES_NOM[d].toLowerCase() + " a la tarda") + ": no cal marcar-lo.</p>";
+  } else {
+    const nensCel = nensDelMenu(f, s, d);   // el fill del bloc tocat (o tots, en mode fam\u00edlia)
+    const totsMarcats = nensCel.length > 0 && nensCel.every(n => te(n.marca, s, d));
+    const etDemana = nensCel.length === 1 ? "\ud83d\ude4b " + esc(nensCel[0].nom.trim().split(/\s+/)[0]) + " demana pla\u00e7a"
+      : nensCel.length < f.nens.length ? "\ud83d\ude4b " + esc(nensCel.map(n => n.nom.trim().split(/\s+/)[0]).join(" i ")) + " demanen pla\u00e7a"
+      : "\ud83d\ude4b Els nens demanen pla\u00e7a";
+    h += btn(totsMarcats, etDemana, "demana");
+  }
   h += btn(te(f.propi, s, d), "\ud83d\udeab Anem pel nostre compte", "propi");
   h += "<button class='boto' style='width:100%;margin-top:10px' onclick='tancaCasella()'>Fet</button>";
   const m = $("#cel-menu"), v = $("#cel-vel");
@@ -1986,10 +1988,11 @@ function blocGraellaNen(f, n){
     DIES.forEach(d => {
       const noAplica = !nenTeCasella(n, fr.id, d) || estatCasella(f, fr.id, d) !== "normal";
       let cls = "", cont = "";
-      if (noAplica){ /* la casella no és seva: cap marca de família (ni apagada) a la seva targeta */ }
-      else if (te(f.cotxe, fr.id, d)){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
+      // v4.49: el 🚗/🚫 és de tota la família — es veu (apagat) fins i tot si aquest fill no hi entra;
+      // només el 🙋 és exclusiu del fill i, per tant, només compta si la casella SÍ és seva.
+      if (te(f.cotxe, fr.id, d)){ cls = "cond"; cont = "<span class='c-ico'>🚗</span>"; }
       else if (te(f.propi, fr.id, d)){ cls = "propi"; cont = "<span class='c-ico'>🚫</span>"; }
-      else if (te(n.marca, fr.id, d)){
+      else if (!noAplica && te(n.marca, fr.id, d)){
         cls = "nec" + (elPorta(f.id, n.id, fr.id, d) ? " cobert" : "");
         cont = "<span class='c-ico'>🙋</span>";
       }
