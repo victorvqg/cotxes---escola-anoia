@@ -30,6 +30,7 @@ h1{font-family:'Baloo 2';font-weight:800;font-size:24.5px;line-height:1.05}
 .zebra{height:10px;background:repeating-linear-gradient(90deg,#fff 0 18px,#17456B 18px 36px);border-top:3px solid #17456B}
 .cos{flex:1;padding:14px 14px 96px}
 .targeta{background:#fff;border:1.5px solid #D6E0E7;border-radius:16px;padding:14px;margin-bottom:12px}
+.targeta.reg{background:#DCF1E3;border-color:#9CCDAD}
 h2{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#17456B;margin-bottom:8px}
 .lead{font-size:14.5px;color:#5B6E7C;margin-bottom:10px;line-height:1.5}
 .avis{background:#FDF1EF;border:1.5px solid #E6C7C0;border-left:5px solid #BE3D2A;border-radius:12px;padding:10px 12px;font-size:14.5px;color:#5B4640;margin-bottom:12px;display:none}
@@ -381,7 +382,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.43";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.44";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1203,7 +1204,7 @@ function pantallaLogin(err){
   estat(reg ? "Crea el compte" : "Entra al grup");
   $("#pantalla").innerHTML =
     "<img class='hero-ico' src='android-chrome-192x192.png' alt='' onerror=\"this.style.display='none'\">" +
-    "<div class='targeta'><h2>" + (reg ? "Crea el teu compte" : "Entra a l'app dels cotxes") + "</h2>" +
+    "<div class='targeta" + (reg ? " reg" : "") + "'><h2>" + (reg ? "Crea el teu compte" : "Entra a l'app dels cotxes") + "</h2>" +
     "<p class='lead'>" + (reg
       ? "Només cal el correu i una contrasenya (mínim 6 caràcters). Després et demanarà el codi del grup."
       : "Cada pare o mare entra amb el <b>seu compte</b> (ja no hi ha clau compartida).") + "</p>" +

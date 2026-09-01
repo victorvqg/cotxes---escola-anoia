@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.43: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.43"') && !/versió 4\.42|versio_app: "4\.42"/.test(html));
+  T("v4.44: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.44"') && !/versió 4\.43|versio_app: "4\.43"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.43» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.44» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.43"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.44"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -752,12 +752,20 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("1 · LOGIN I CONSENTIMENT RGPD");
   T("arrenca a la pantalla de login (correu + 3 passos)", pant().includes("Entra a l'app") && pant().includes("COM FUNCIONA"));
+  T("v4.44: sense sessió, el peu d'estadístiques del grup és buit (peuStatsHtml() exigeix doc, i doc és null fins entrar)",
+    (d.querySelector("#peu-stats") || { innerHTML: "" }).innerHTML === "");
   T("el login no ofereix cap alternativa de Google", !pant().includes("Continua amb Google") && !pant().includes("Google") && typeof w.fesGoogle === "undefined");
   T("mode per defecte: només «Entra» (el registre no es veu)", pant().includes('onclick="fesLogin()"') && !pant().includes('onclick="fesRegistre()"'));
+  T("v4.44: en mode «Entra» la targeta és blanca (sense la classe verda «reg»)",
+    !d.querySelector("#pantalla .targeta").classList.contains("reg"));
   w.loginA("registre"); await tic();
   T("mode registre: només «Crea el compte»", pant().includes("Crea el teu compte") && pant().includes('onclick="fesRegistre()"') && !pant().includes('onclick="fesLogin()"'));
+  T("v4.44: en mode «Crea el teu compte» la targeta porta la classe verda «reg»",
+    d.querySelector("#pantalla .targeta").classList.contains("reg"));
   w.loginA("entra"); await tic();
   T("es pot tornar al mode Entra", pant().includes('onclick="fesLogin()"'));
+  T("v4.44: … i la targeta torna a ser blanca en tornar a «Entra»",
+    !d.querySelector("#pantalla .targeta").classList.contains("reg"));
   await ompleLogin("admin@test.cat", "malament");
   await w.fesLogin(); await tic(10);
   T("compte inexistent o contrasenya dolenta → refusat amb missatge", pant().includes("incorrectes"));
