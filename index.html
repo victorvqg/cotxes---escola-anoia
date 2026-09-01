@@ -382,7 +382,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.47";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.48";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -818,13 +818,17 @@ let avisTimer = null;
 function avis(txt, ok){
   const e = $("#avis");
   if (avisTimer){ clearTimeout(avisTimer); avisTimer = null; }
-  if (ok){
+  if (ok === true){
     e.className = "avis ok"; e.innerHTML = txt;
     avisTimer = setTimeout(() => { e.className = "avis"; e.innerHTML = ""; avisTimer = null; }, 2600);
     return;
   }
   e.className = "avis";
-  return avisVell(txt);
+  avisVell(txt);
+  /* v4.48: ok === "temp" — resposta a UN intent bloquejat (p. ex. l'staff
+     entrant a la família de l'admin): es mostra un moment i es tanca sola,
+     no es queda de rètol fix en canviar de pantalla. */
+  if (ok === "temp" && txt) avisTimer = setTimeout(() => avisVell(""), 2600);
 }
 function avisVell(txt){
   const a = $("#avis");
@@ -1530,7 +1534,7 @@ async function entraSel(){
   const v = $("#sel-fam").value; if (!v || v === "__nova__") return;
   const socMembre = !!(perfil && perfil.family_id);
   if (socMembre){
-    if (esStaff && !esAdmin && doc.adminFam && v === doc.adminFam){ avis("La família de l'administrador només la gestiona l'administrador."); return; }
+    if (esStaff && !esAdmin && doc.adminFam && v === doc.adminFam){ avis("La família de l'administrador només la gestiona l'administrador.", "temp"); return; }
     triaFam(v); return;
   }
   // Compte nou que reclama una família existent: cal el codi de la família
@@ -1585,7 +1589,7 @@ async function rolFam(id){
 function adminEdita(id){
   if (nomesTitular()) return;
   if (!esAdmin && !esStaff) return;
-  if (!esAdmin && esStaff && doc.adminFam && id === doc.adminFam){ avis("La fam\u00edlia de l'administrador nom\u00e9s la gestiona l'administrador."); return; }
+  if (!esAdmin && esStaff && doc.adminFam && id === doc.adminFam){ avis("La fam\u00edlia de l'administrador nom\u00e9s la gestiona l'administrador.", "temp"); return; }
   tabAct = "perfil"; triaFam(id);
 }
 

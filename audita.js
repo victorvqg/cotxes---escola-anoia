@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.47: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.47"') && !/versió 4\.46|versio_app: "4\.46"/.test(html));
+  T("v4.48: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.48"') && !/versió 4\.47|versio_app: "4\.47"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.47» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.48» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.47"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.48"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1216,6 +1216,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("el staff té «canvia» i «edita» (a totes menys a la de l'admin)", pant().includes(">canvia<") && (pant().match(/>edita</g) || []).length === 4);
   w.adminEdita(famDoc("Vila Puig").id); await tic();
   T("el staff NO pot entrar a la família de l'admin", d.querySelector("#avis").textContent.includes("només la gestiona l'administrador"));
+  T("v4.48: … és un avís de resposta a l'intent (es veu just després de bloquejar-lo)", d.querySelector("#avis").style.display !== "none");
+  await tic(2700);
+  T("v4.48: … no un rètol fix: als pocs segons ja no hi és, encara que no hagis canviat de pantalla",
+    d.querySelector("#avis").style.display === "none");
   await w.creaFam(); await tic();
   T("el staff no pot crear famílies", d.querySelector("#avis").textContent.includes("no crear") && DB.families.length === 5);
   T("el staff no veu l'apartat Rols al menú", !pant().includes("Rols del grup") && !pant().includes("Rols<"));
