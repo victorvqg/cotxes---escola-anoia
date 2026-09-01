@@ -383,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.53";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.54";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -3266,7 +3266,7 @@ function pintaDescarrega(){
     const p = nenPendents(f, n2);
     const nomC = esc(n2.nom.trim().split(/\s+/)[0]);
     h += "<button class='boto sec' style='width:100%;margin-top:8px' onclick=\"descarregaHorariNen('" + f.id + "','" + n2.id + "')\">\ud83d\udda8\ufe0f Horari de " + nomC + " " + esc(f.nom) + "</button>";
-    if (p) h += "<p class='hint' style='margin:4px 0 0'>\u26a0 " + nomC + " t\u00e9 " + (p === 1 ? "1 trajecte" : p + " trajectes") + " sense conductor: al full " + (p === 1 ? "surt" : "surten") + " en vermell com a \u00abpendent\u00bb.</p>";
+    if (p) h += "<p class='hint a-pend' style='margin:4px 0 0'>\u26a0 " + nomC + " t\u00e9 " + (p === 1 ? "1 trajecte" : p + " trajectes") + " sense conductor: al full " + (p === 1 ? "surt" : "surten") + " en vermell com a \u00abpendent\u00bb.</p>";
   });
   const condueix = FRANGES.some(fr => DIES.some(d => te(f.cotxe, fr.id, d)));
   h += condueix
