@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.35";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.36";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -997,7 +997,14 @@ async function desa(){
     });
     await sbDesaFamilia(f);
     await logActivitat("canvi graella", "Horari desat", f.id);
-    // v4.15: els canvis d'assignacions generen avisos A LA BD per a la família del nen
+    /* v4.15: els canvis d'assignacions generen avisos A LA BD per a la família
+       del nen. v4.36: revisat el circuit sencer — amb UN sol desat aquesta
+       lògica (abans=portaBase, després=estat actual, dedup dins files2u) ja
+       no insereix mai dues files idèntiques; els repetits que tornaven a
+       sortir venien d'una CURSA entre DOS desats independents gairebé
+       simultanis (dos dispositius de la mateixa família). Això cap client
+       tot sol no ho pot evitar: el tanca la finestra ampliada del trigger
+       antiduplicats a la BD (SQL v49, 60 s en lloc de 2 s del v47). */
     {
       const clauA = x => x.nen + "|" + x.slot + "|" + x.day;
       const despres = [];
@@ -2384,25 +2391,38 @@ function pintaRols(){
     "<p class='lead'>Toca el rol d'una fam\u00edlia per alternar <b>usuari \u2194 staff</b> (es desa a l'instant). El teu rol d'administrador \u00e9s fix. Recorda: el codi de staff nom\u00e9s funciona a les fam\u00edlies que aqu\u00ed tinguin el rol de staff.</p>" +
     files + "</div>";
 }
-var avisosLlista = [];   // files carregades de notifications (per filtrar i pel CSV)
+const AVISOS_PER_PAGINA = 15;
+var avisosLlista = [];        // v4.36: nom\u00e9s la P\u00c0GINA actual (carregada per range al servidor)
+var avisosPagina = 1;
+var avisosTotalFiltrat = 0;
+var avisosGrupSencer = false; // abast de la consulta: tot el grup (admin a casa seva) o la fam\u00edlia activa
 function dataHoraAv(iso){ const x = new Date(iso); const p2 = n2 => String(n2).padStart(2, "0"); return p2(x.getDate()) + "/" + p2(x.getMonth() + 1) + "/" + x.getFullYear() + " " + p2(x.getHours()) + ":" + p2(x.getMinutes()) + ":" + p2(x.getSeconds()); }
-function avisosFiltrats(){
-  const de = ($("#av-de") || {}).value || "", fins = ($("#av-a") || {}).value || "", q = (($("#av-q") || {}).value || "").trim().toLowerCase();
-  return avisosLlista.filter(r => {
-    const t = new Date(r.created_at).getTime();
-    if (de && t < new Date(de + "T00:00:00").getTime()) return false;
-    if (fins && t > new Date(fins + "T23:59:59").getTime()) return false;
-    if (q){
-      const blob = ((r.family_name || "") + " " + (r.child_name || "") + " " + (r.action || "") + " " + (r.detail || "") + " " + (r.message || "")).toLowerCase();
-      if (!blob.includes(q)) return false;
-    }
-    return true;
-  });
+function netejaCercaAv(s){ return String(s || "").replace(/[,()%]/g, " ").trim(); }
+/* v4.36: el filtre (data i cerca) es demana AL SERVIDOR \u2014 mai es baixa tot
+   per tallar-ho al client. La mateixa consulta serveix per paginar (amb
+   range) i per descarregar el CSV sencer (sense range). */
+function construeixQueryAvisos(){
+  const f = lameva();
+  let q = sb.from("notifications").select("*", { count: "exact" });
+  if (!avisosGrupSencer && f) q = q.eq("family_id", f.id);
+  const de = ($("#av-de") || {}).value || "", fins = ($("#av-a") || {}).value || "";
+  if (de) q = q.gte("created_at", de + "T00:00:00");
+  if (fins) q = q.lte("created_at", fins + "T23:59:59");
+  const cerca = netejaCercaAv(($("#av-q") || {}).value || "");
+  if (cerca) q = q.or(["family_name", "child_name", "action", "detail", "message"].map(c => c + ".ilike.%" + cerca + "%").join(","));
+  return q.order("created_at", { ascending: false });
+}
+function paginacioAvisosHtml(pagina, totalPag){
+  if (totalPag <= 1) return "";
+  return "<div class='fila' style='justify-content:center;align-items:center;gap:10px;margin-top:10px'>" +
+    "<button class='boto sec' id='av-ant' " + (pagina <= 1 ? "disabled" : "") + " onclick='avAnterior()'>\u2039 Anteriors</button>" +
+    "<span class='hint'>P\u00e0gina " + pagina + " de " + totalPag + "</span>" +
+    "<button class='boto sec' id='av-seg' " + (pagina >= totalPag ? "disabled" : "") + " onclick='avSeguent()'>Seg\u00fcents \u203a</button></div>";
 }
 function pintaAvisosLlista(){
   const el = $("#avisos-llista"); if (!el) return;
-  const files = avisosFiltrats();
-  el.innerHTML = files.length ? files.map(r =>
+  const totalPag = Math.max(1, Math.ceil(avisosTotalFiltrat / AVISOS_PER_PAGINA));
+  el.innerHTML = (avisosLlista.length ? avisosLlista.map(r =>
     "<details class='conf fam-det'><summary>" + dataHoraAv(r.created_at) +
       (r.family_name ? " \u00b7 " + esc(r.family_name) : "") +
       (r.child_name ? " \u00b7 " + esc(r.child_name) : "") +
@@ -2410,19 +2430,44 @@ function pintaAvisosLlista(){
     "<div style='padding:4px 2px 8px'><div class='f-linia'>" + esc(r.detail || r.message || "") + "</div>" +
     (r.actor_name ? "<div class='hint'>Qui ho ha fet: " + esc(r.actor_name) + "</div>" : "") +
     "</div></details>").join("")
-    : "<p class='hint'>Cap av\u00eds amb aquest filtre.</p>";
+    : "<p class='hint'>Cap av\u00eds amb aquest filtre.</p>") +
+    paginacioAvisosHtml(avisosPagina, totalPag);
 }
-function avFiltra(){ pintaAvisosLlista(); }
-function avNeteja(){ ["av-de", "av-a", "av-q"].forEach(id => { const e = $("#" + id); if (e) e.value = ""; }); pintaAvisosLlista(); }
-function avisosCsv(){
+async function carregaAvisosPagina(pagina){
+  avisosPagina = Math.max(1, pagina);
+  const de2 = (avisosPagina - 1) * AVISOS_PER_PAGINA;
+  const r = await construeixQueryAvisos().range(de2, de2 + AVISOS_PER_PAGINA - 1);
+  avisosLlista = r.error ? [] : (r.data || []);
+  avisosTotalFiltrat = r.error ? 0 : (r.count || 0);
+  pintaAvisosLlista();
+}
+function avFiltra(){ return carregaAvisosPagina(1); }
+function avNeteja(){ ["av-de", "av-a", "av-q"].forEach(id => { const e = $("#" + id); if (e) e.value = ""; }); return carregaAvisosPagina(1); }
+async function avAnterior(){
+  if (avisosPagina <= 1) return;
+  await carregaAvisosPagina(avisosPagina - 1);
+  try { $("#avisos-llista").scrollIntoView({ block: "start" }); } catch(e){}
+}
+async function avSeguent(){
+  const totalPag = Math.max(1, Math.ceil(avisosTotalFiltrat / AVISOS_PER_PAGINA));
+  if (avisosPagina >= totalPag) return;
+  await carregaAvisosPagina(avisosPagina + 1);
+  try { $("#avisos-llista").scrollIntoView({ block: "start" }); } catch(e){}
+}
+/* v4.36: la desc\u00e0rrega baixa TOT el resultat filtrat (no nom\u00e9s la p\u00e0gina
+   visible) \u2014 la mateixa consulta filtrada, sense range. */
+async function avisosCsv(){
   const camp = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+  const r = await construeixQueryAvisos().limit(5000);
+  const files = r.error ? [] : (r.data || []);
   return "\uFEFF" + ["data i hora", "fam\u00edlia", "nen", "canvi", "detall", "qui ho ha fet"].map(camp).join(",") + "\n" +
-    avisosFiltrats().map(r => [dataHoraAv(r.created_at), r.family_name || "", r.child_name || "",
-      r.action || r.message || "", r.detail || r.message || "", r.actor_name || ""].map(camp).join(",")).join("\n");
+    files.map(row => [dataHoraAv(row.created_at), row.family_name || "", row.child_name || "",
+      row.action || row.message || "", row.detail || row.message || "", row.actor_name || ""].map(camp).join(",")).join("\n");
 }
-function descarregaAvisosCsv(){
+async function descarregaAvisosCsv(){
   try {
-    const blob = new Blob([avisosCsv()], { type: "text/csv;charset=utf-8" });
+    const txt = await avisosCsv();
+    const blob = new Blob([txt], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "avisos-" + slug((doc && doc.grupNom) || "grup") + ".csv";
@@ -2452,16 +2497,9 @@ function pintaEstadistiques(){
 }
 /* v4.15: els avisos viuen a la taula notifications de Supabase — cada família
    llegeix els seus (RLS) i l'admin els de tot el grup. Filtres, hora amb
-   segons, fila desplegable i descàrrega en CSV del que passa el filtre. */
-/* mateix segon + mateix contingut = un sol avís a pantalla (les còpies per
-   família dels avisos de grup, i qualsevol duplicat vell, es col·lapsen) */
-function dedupAvisos(files){
-  const vist = new Set();
-  return files.filter(x => {
-    const k = String(x.created_at || "").slice(0, 19) + "|" + (x.message || "") + "|" + (x.action || "") + "|" + (x.child_name || "") + "|" + (x.detail || "");
-    if (vist.has(k)) return false; vist.add(k); return true;
-  });
-}
+   segons, fila desplegable, paginació de 15 en 15 i descàrrega en CSV del
+   que passa el filtre (v4.36: tot demanat al servidor amb range/count —
+   res de baixar-ho tot per tallar-ho al client). */
 /* v4.19: el bloc de tot el grup (filtres, cerca i descàrrega) és NOMÉS de
    l'admin. La resta de rols veuen només els avisos de la seva família, en
    llista simple desplegable. */
@@ -2472,14 +2510,13 @@ async function pintaAvisos(){
   /* v4.21: el bloc de tot el grup NOMÉS quan la família activa és la de
      l'admin. L'admin dins d'una altra família veu exactament el que veu
      aquella família. */
-  const grupSencer = esAdmin && doc && doc.adminFam && f.id === doc.adminFam;
-  if (!grupSencer){
+  avisosGrupSencer = !!(esAdmin && doc && doc.adminFam && f.id === doc.adminFam);
+  avisosPagina = 1;
+  if (!avisosGrupSencer){
     $("#tab-cos").innerHTML =
       "<div class='targeta'><h2>\ud83d\udd14 Avisos de la teva fam\u00edlia</h2>" +
       "<div id='avisos-llista'><p class='hint'>Carregant\u2026</p></div></div>";
-    const r0 = await sb.from("notifications").select("*").eq("family_id", f.id).order("created_at", { ascending: false }).limit(200);
-    avisosLlista = dedupAvisos(r0.error ? [] : (r0.data || []));
-    pintaAvisosLlista();
+    await carregaAvisosPagina(1);
     return;
   }
   $("#tab-cos").innerHTML =
@@ -2492,9 +2529,7 @@ async function pintaAvisos(){
     "<button class='boto sec' onclick='avNeteja()'>Neteja el filtre</button>" +
     "<button class='boto sec' onclick='descarregaAvisosCsv()'>\u2b07\ufe0f Descarrega</button></div>" +
     "<div id='avisos-llista'><p class='hint'>Carregant\u2026</p></div></div>";
-  const r = await sb.from("notifications").select("*").order("created_at", { ascending: false }).limit(500);
-  avisosLlista = dedupAvisos(r.error ? [] : (r.data || []));
-  pintaAvisosLlista();
+  await carregaAvisosPagina(1);
 }
 function renomTel(v){
   const f = lameva(); if (!f) return;

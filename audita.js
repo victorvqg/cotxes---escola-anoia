@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.35: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.35"') && !/versió 4\.34|versio_app: "4\.34"/.test(html));
+  T("v4.36: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.36"') && !/versió 4\.35|versio_app: "4\.35"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -76,6 +76,12 @@ console.log("0 · CABLEJAT ESTÀTIC");
     T("SQL v47: lectura només família/admin (staff fora) i trigger antiduplicats de 2 segons",
       sql47.includes("family_id = my_family() or is_admin()") &&
       sql47.includes("notifications_dedupe") && sql47.includes("before insert on notifications"));
+  }
+  // v4.36: finestra del trigger antiduplicats ampliada (races entre desats concurrents)
+  {
+    const sql49 = fs.readFileSync(path.join(__dirname, "supabase-v49.sql"), "utf-8");
+    T("SQL v49: la funció notifications_dedupe es recrea amb una finestra de 60 segons",
+      sql49.includes("create or replace function notifications_dedupe") && sql49.includes("interval '60 seconds'"));
   }
   T("v4.19: el CSS força un avís per línia", html.includes("#avisos-llista details{display:block"));
   // v4.15: els avisos viuen a notifications amb columnes estructurades
@@ -230,8 +236,12 @@ function execQuery(q){
     else if (t === "notifications") rows = DB.notifications.filter(r => r.family_id === mevaFamId() || socAdmin());   // v47: staff fora
     let res = filtra(rows);
     if (q.ordre) res = res.slice().sort((a, b2) => (String(a[q.ordre.c] || "") < String(b2[q.ordre.c] || "") ? -1 : 1) * (q.ordre.asc ? 1 : -1));
-    if (q.limitN != null) res = res.slice(0, q.limitN);
-    return dades(res);
+    const count = q.ambCount ? res.length : undefined;   // v4.36: count EXACT abans de tallar per range/limit
+    if (q.rangeDe != null) res = res.slice(q.rangeDe, q.rangeA + 1);
+    else if (q.limitN != null) res = res.slice(0, q.limitN);
+    const out = dades(res);
+    if (count !== undefined) out.count = count;
+    return out;
   }
   if (q.op === "insert"){
     const out = [];
@@ -286,11 +296,13 @@ function execQuery(q){
         out.push(row); continue;
       }
       if (t === "notifications"){
-        // v47: trigger antiduplicats — mateixa acció dins de 2 segons, una sola fila
+        // v49: trigger antiduplicats — mateixa acció dins de 60 segons, una sola fila
+        // (abans 2 segons: massa curt per absorbir dues desades gairebé simultànies
+        // de dos dispositius de la mateixa família — la causa real dels repetits)
         const dup = DB.notifications.some(x => x.family_id === row.family_id &&
           (x.message || "") === (row.message || "") && (x.action || "") === (row.action || "") &&
           (x.child_name || "") === (row.child_name || "") && (x.detail || "") === (row.detail || "") &&
-          (Date.now() - Date.parse(x.created_at)) < 2000);
+          (Date.now() - Date.parse(x.created_at)) < 60000);
         if (!dup) DB.notifications.push(Object.assign({ id: randomUUID(), created_at: new Date().toISOString() }, row));
         out.push(row); continue;
       }
@@ -334,13 +346,28 @@ function execQuery(q){
 }
 
 function qb(t){
-  const q = { t: t, op: "select", filters: [], rows: null, obj: null, volFiles: false, ordre: null, limitN: null };
+  const q = { t: t, op: "select", filters: [], rows: null, obj: null, volFiles: false, ordre: null, limitN: null,
+    ambCount: false, rangeDe: null, rangeA: null };
   const api = {
-    select(){ if (q.op !== "select") q.volFiles = true; return api; },
+    select(cols, opts){ if (q.op !== "select") q.volFiles = true; if (opts && opts.count === "exact") q.ambCount = true; return api; },
     eq(c, v){ q.filters.push(r => r[c] === v); return api; },
     in(c, arr){ q.filters.push(r => (arr || []).indexOf(r[c]) >= 0); return api; },
+    gte(c, v){ q.filters.push(r => String(r[c] || "") >= String(v)); return api; },
+    lte(c, v){ q.filters.push(r => String(r[c] || "") <= String(v)); return api; },
+    // v4.36: emula PostgREST .or("col.ilike.%text%,col2.ilike.%text%,…")
+    or(expr){
+      const clausules = String(expr || "").split(",").map(cl => {
+        const m = cl.match(/^([\w]+)\.ilike\.%(.*)%$/);
+        if (!m) return () => false;
+        const c = m[1], v = m[2].toLowerCase();
+        return r => String(r[c] || "").toLowerCase().includes(v);
+      });
+      q.filters.push(r => clausules.some(f => f(r)));
+      return api;
+    },
     order(c, o){ q.ordre = { c: c, asc: !(o && o.ascending === false) }; return api; },
     limit(n){ q.limitN = n; return api; },
+    range(de, a){ q.rangeDe = de; q.rangeA = a; return api; },
     insert(rows){ q.op = "insert"; q.rows = Array.isArray(rows) ? rows : [rows]; return api; },
     update(obj){ q.op = "update"; q.obj = obj; return api; },
     delete(){ q.op = "delete"; return api; },
@@ -607,9 +634,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.35» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.36» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.35"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.36"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -947,31 +974,60 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.19: un usuari normal NO té filtres, ni cerca, ni descàrrega, i el títol és el de la seva família",
     !cos().includes('id="av-q"') && !cos().includes("Descarrega</button>") && cos().includes("Avisos de la teva família"));
   T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
+
+  console.log("6c-bis · NOVETATS v4.36 (paginació de 15 en 15, servidor amb range/count)");
+  {
+    // 22 avisos sintètics MOLT VELLS per a la família Grau (un any enrere):
+    // mai desplacen els avisos reals de la pàgina 1, però obliguen a paginar
+    const famGrauId = famDB("Grau").id;
+    const base = Date.now() - 1000 * 60 * 60 * 24 * 365;
+    for (let i = 0; i < 22; i++){
+      DB.notifications.push({ id: randomUUID(), family_id: famGrauId, message: "SINT-" + i,
+        action: "🚗 puja al cotxe", child_name: "Sintètic" + i, detail: "avís de prova " + i,
+        actor_name: "Test", created_at: new Date(base - i * 1000).toISOString() });
+    }
+    w.triaTab("avisos"); await tic(10);   // encara com a grau@test.cat: bloc «de la teva família»
+    T("v4.36: sense filtre, la pàgina en mostra 15 i surten els controls de pàgina",
+      (cos().match(/<details/g) || []).length === 15 && cos().includes("Pàgina 1 de"));
+    T("…amb «Anteriors» desactivat i «Següents» actiu a la primera pàgina",
+      !!d.querySelector("#av-ant") && d.querySelector("#av-ant").disabled && !d.querySelector("#av-seg").disabled);
+    await w.avSeguent(); await tic(10);
+    T("v4.36: «Següents» avança de pàgina i «Anteriors» s'activa",
+      cos().includes("Pàgina 2 de") && !d.querySelector("#av-ant").disabled);
+    await w.avAnterior(); await tic(10);
+    T("v4.36: «Anteriors» torna a la pàgina 1", cos().includes("Pàgina 1 de") && d.querySelector("#av-ant").disabled);
+    DB.notifications = DB.notifications.filter(n2 => !String(n2.message || "").startsWith("SINT-"));
+    w.triaTab("avisos"); await tic(10);
+    T("un cop netejats els sintètics, torna a haver-hi una sola pàgina (sense controls)", !cos().includes("Anteriors"));
+  }
+
   await surtIentra("admin@test.cat", "admin123");
   w.triaTab("avisos"); await tic(10);
   T("v4.19: l'admin SÍ que veu el bloc de tot el grup amb filtres i descàrrega",
     cos().includes("Avisos de tot el grup") && cos().includes('id="av-q"') && cos().includes("Descarrega"));
-  d.querySelector("#av-q").value = "Bru"; w.avFiltra();
-  T("v4.15: la cerca per nen filtra mentre s'escriu",
+  d.querySelector("#av-q").value = "Bru"; await w.avFiltra(); await tic(10);
+  T("v4.15: la cerca per nen filtra mentre s'escriu (demanada al servidor: .or ilike)",
     d.querySelector("#avisos-llista").innerHTML.includes("Bru") && (d.querySelector("#avisos-llista").innerHTML.match(/<details/g) || []).length >= 1);
-  d.querySelector("#av-q").value = "zzzzz"; w.avFiltra();
+  d.querySelector("#av-q").value = "zzzzz"; await w.avFiltra(); await tic(10);
   T("…i sense coincidències ho diu", d.querySelector("#avisos-llista").innerHTML.includes("Cap avís"));
-  w.avNeteja();
+  await w.avNeteja(); await tic(10);
   T("«Neteja el filtre» ho torna a mostrar tot", (d.querySelector("#avisos-llista").innerHTML.match(/<details/g) || []).length >= 1);
-  d.querySelector("#av-de").value = "2099-01-01"; w.avFiltra();
+  d.querySelector("#av-de").value = "2099-01-01"; await w.avFiltra(); await tic(10);
   T("el filtre de dates també talla", d.querySelector("#avisos-llista").innerHTML.includes("Cap avís"));
-  w.avNeteja(); d.querySelector("#av-q").value = "Bru"; w.avFiltra();
-  const csvAv = w.avisosCsv();
+  await w.avNeteja(); await tic(10);
+  d.querySelector("#av-q").value = "Bru"; await w.avFiltra(); await tic(10);
+  const csvAv = await w.avisosCsv();
   T("v4.15: el CSV duu capçalera i NOMÉS el que passa el filtre",
     csvAv.includes("data i hora") && csvAv.includes("Bru") &&
     !csvAv.split("\n").slice(1).some(l => l && !l.toLowerCase().includes("bru")));
-  w.avNeteja();
-  // v4.19: el trigger antiduplicats — la mateixa acció al mateix segon, una sola fila
+  await w.avNeteja(); await tic(10);
+  // v4.36: el trigger antiduplicats — la mateixa acció dins la finestra ampliada, una sola fila
   const rowDup = { family_id: famDB("Grau").id, message: "DUPTEST", action: "x", child_name: "Jan", detail: "d" };
   await fakeSupabaseClient().from("notifications").insert(rowDup);
   await fakeSupabaseClient().from("notifications").insert(Object.assign({}, rowDup));
-  T("v4.19: una mateixa acció al mateix segon es guarda UNA sola vegada",
+  T("v4.36: una mateixa acció dins la finestra antiduplicats (60 s) es guarda UNA sola vegada",
     DB.notifications.filter(x => x.message === "DUPTEST").length === 1);
+  DB.notifications = DB.notifications.filter(x => x.message !== "DUPTEST");
   // v4.21: l'admin DINS d'una altra família veu el que veu aquella família
   w.adminEdita(famDB("Grau").id); await tic(20);
   w.triaTab("avisos"); await tic(10);
