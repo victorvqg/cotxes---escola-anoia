@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.52: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.52"') && !/versió 4\.51|versio_app: "4\.51"/.test(html));
+  T("v4.53: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.53"') && !/versió 4\.52|versio_app: "4\.52"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.52» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.53» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.52"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.53"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -943,6 +943,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   console.log("6 · IMPORTACIÓ DE LES DADES ANTIGUES (dades.json)");
   w.obreAdmin(); await tic();
   T("el panell d'admin mostra el codi d'invitació", pant().includes(CODI) && pant().includes("Importa les dades antigues"));
+  T("v4.53: el panell d'admin ja NO té el bloc de codi de creació de grup (interfície, camp i botó)",
+    !pant().includes("Codi de creació de grup") && !d.querySelector("#codicreacio-box") && !d.querySelector("#cc-codi") &&
+    typeof w.carregaCodiCreacio === "undefined" && typeof w.desaCodiCreacio === "undefined");
+  T("v4.53: … però crear un grup NOU segueix demanant-lo (funció intacta, només es treu la pantalla de veure'l/canviar-lo)",
+    html.includes("id='gg-codicreacio'") && html.includes("create_group"));
   const jsonVell = JSON.stringify({ versio: 1, families: [
     { id: "nova", nom: "Família Nova", cognomPare: "Família", cognomMare: "Nova", conductor: "", places: 0, cotxe: {}, nens: [{ id: "pol", nom: "Pol", marca: {} }] },
     { id: "soltera", nom: "Família Soltera", cognomPare: "Soltera", conductor: "Anna", places: 1, cotxe: {}, propi: { e9: ["dl"] }, nens: [{ id: "kim", nom: "Kim", marca: { r17: ["dl"] } }] },
