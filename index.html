@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.28</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.29</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -2230,7 +2230,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.28", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.29", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });
@@ -2631,12 +2631,13 @@ function renderCal(){
     "<button class='subtab " + (vistaCal === "set" ? "actiu" : "") + "' onclick=\"triaVistaCal('set')\">Setmana</button>" +
     "<button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button>" +
     "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button>" +
-    "<button class='subtab " + (vistaCal === "resum" ? "actiu" : "") + "' onclick=\"triaVistaCal('resum')\">Resum</button></div>" +
+    "<button class='subtab " + (vistaCal === "resum" ? "actiu" : "") + "' onclick=\"triaVistaCal('resum')\">Resum</button>" +
+    "<button class='subtab " + (vistaCal === "assignar" ? "actiu" : "") + "' onclick=\"triaVistaCal('assignar')\">\ud83d\udcba Per assignar</button></div>" +
     "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
     "<div class='mapa'>" + mapa + "</div>" +
     "<div id='cal-cos'></div>" +
     "<button class='boto sec cal-actualitza' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
-  if (vistaCal === "quadre") pintaQuadre(); else if (vistaCal === "set") pintaSetmana(); else if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else pintaVistaNen();
+  if (vistaCal === "quadre") pintaQuadre(); else if (vistaCal === "set") pintaSetmana(); else if (vistaCal === "dia") pintaVistaDia(); else if (vistaCal === "resum") pintaResum(); else if (vistaCal === "assignar") pintaPerAssignar(); else pintaVistaNen();
 }
 function triaVistaCal(v){ vistaCal = v; renderCal(); }
 function selDia(d){ diaSel = d; vistaCal = "dia"; if (tabAct !== "cal") triaTab("cal"); else renderCal(); }
@@ -3165,13 +3166,64 @@ function pintaQuadre(){
 }
 function obreDiaDes(d){ vistaCal = "dia"; diaSel = d; renderCal(); }
 
+/* v4.29: «Per assignar» — els viatges amb nens esperant plaça I algun
+   conductor amb seients lliures (i, a sota, els que no en tenen cap:
+   «Sense cotxe possible»). Tot surt de balanc() i portaValids(). */
+function pintaPerAssignar(){
+  const amb = [], sense = [];
+  DIES.forEach(d => FRANGES.forEach(fr => {
+    const b = balanc(fr.id, d);
+    const esperen = b.nens.filter(n => !n.portadaPerId);
+    if (!esperen.length) return;
+    const lliures = b.conds.map(c => ({ c: c, n: Math.max(0, (c.places || 0) - portaValids(c, fr.id, d).length) }))
+      .filter(x => x.n > 0);
+    (lliures.length ? amb : sense).push({ d: d, fr: fr, esperen: esperen, conds: lliures });
+  }));
+  const tel = f2 => (f2 && f2.phone && f2.phoneVisible) ? " \u00b7 \ud83d\udcde " + esc(f2.phone) : "";
+  const meva = lameva();
+  const fitxa = it =>
+    "<div class='targeta'>" +
+    "<div class='f-cap'><span class='f-hora'>" + DIES_LBL[it.d] + " " + it.fr.hora + "</span><span class='m-tip " + (it.fr.tipus === "Entrada" ? "e" : "r") + "'>" + it.fr.tipus + "</span></div>" +
+    "<div class='f-linia'>\ud83d\ude4b esperen: " + it.esperen.map(n => {
+      const ff = doc.families.find(x => x.id === n.famId);
+      return "<b>" + esc(n.nom) + "</b> (" + esc(n.fam) + tel(ff) + ")"; }).join(", ") + "</div>" +
+    it.conds.map(x =>
+      "<div class='f-linia'>\ud83d\ude97 amb seients lliures: <b>" + esc(x.c.nom) + "</b>" +
+      (x.c.conductor ? " \u00b7 condueix " + esc(x.c.conductor) : "") +
+      " \u00b7 " + x.n + (x.n === 1 ? " seient" : " seients") + tel(x.c) +
+      (meva && x.c.id === meva.id ? " <button class='enllac' onclick=\"triaTab('cotxe')\">El teu cotxe \u2192</button>" : "") +
+      "</div>").join("") +
+    "</div>";
+  $("#cal-cos").innerHTML =
+    (amb.length ? amb.map(fitxa).join("")
+                : "<p class='lead'>\u2713 Cap nen esperant en viatges amb seients lliures.</p>") +
+    (sense.length ? "<h2 style='margin:14px 2px 6px'>Sense cotxe possible</h2>" +
+      "<p class='hint' style='margin:0 2px 8px'>Viatges amb nens esperant per\u00f2 cap seient lliure: per resoldre parlant.</p>" +
+      sense.map(fitxa).join("") : "");
+}
+
 /* \u2500\u2500 Pestanya: resum final del grup \u2500\u2500 */
+var nenResumSel = "";   // «famId|nenId» — la tria es recorda mentre l'app és oberta
+function selNenResum(v){ nenResumSel = v || ""; pintaResum(); }
 async function pintaResum(){
   await refresca();
   if (!doc) return;
+  /* v4.29: filtre per nen — només els viatges on aquell nen hi és
+     (el cotxe de la seva família, el seu 🙋 o el 🚫 de casa) */
+  let famNR = null, nenNR = null;
+  if (nenResumSel.includes("|")){
+    const t29 = nenResumSel.split("|");
+    famNR = doc.families.find(x => x.id === t29[0]) || null;
+    nenNR = famNR ? (famNR.nens || []).find(x => x.id === t29[1]) : null;
+    if (!nenNR) nenResumSel = "";
+  }
   const defs = [], justs = [], marges = [];
   let buides = 0, totPlaces = 0, totNens = 0;
   DIES.forEach(d => FRANGES.forEach(fr => {
+    if (nenNR){
+      if (estatCasella(famNR, fr.id, d) !== "normal" || !nenTeCasella(nenNR, fr.id, d)) return;
+      if (!te(famNR.cotxe, fr.id, d) && !te(famNR.propi, fr.id, d) && !te(nenNR.marca, fr.id, d)) return;
+    }
     const b = balanc(fr.id, d);
     if (!b.conds.length && !b.nens.length){ buides++; return; }
     totPlaces += b.places; totNens += b.nens.length;
@@ -3205,7 +3257,15 @@ async function pintaResum(){
            "<div class='r-nens'>" + det + "</div></details>";
   };
   const nNens = doc.families.reduce((s,f) => s + (f.nens || []).length, 0);
-  let h = "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
+  const opcions = [];
+  famOrd().forEach(f => (f.nens || []).forEach(n =>
+    opcions.push("<option value='" + f.id + "|" + n.id + "'" + (nenResumSel === f.id + "|" + n.id ? " selected" : "") + ">" +
+      esc(n.nom.trim().split(/\s+/)[0]) + " \u00b7 " + esc(f.nom) + "</option>")));
+  let h = "<div class='targeta'><div class='fila' style='align-items:center;gap:8px'><span><b>Nen:</b></span>" +
+    "<select class='input' id='resum-nen' style='flex:1' onchange='selNenResum(this.value)'>" +
+    "<option value=''>Tots</option>" + opcions.join("") + "</select></div>" +
+    (nenNR ? "<p class='hint' style='margin:6px 0 0'>Es mostren nom\u00e9s els viatges de <b>" + esc(nenNR.nom.trim().split(/\s+/)[0]) + "</b>.</p>" : "") + "</div>" +
+    "<div class='targeta'><h2>L'estat del grup</h2><div class='r-stats'>" +
     "<div><b>" + doc.families.length + "</b><span>fam\u00edlies</span></div>" +
     "<div><b>" + nNens + "</b><span>nens</span></div>" +
     "<div><b>" + totPlaces + "</b><span>places ofertes/setm.</span></div>" +

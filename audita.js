@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.28", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.28"));
+  T("lema i peu amb versió 4.29", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.29"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -883,6 +883,37 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("cal"); await tic(30); w.triaVistaCal("nen"); await tic(20);
   w.triaVistaCal("quadre"); await tic(20);
   T("el quadre diu qui porta qui amb noms de pila", cos().includes("Marta VP") && cos().includes("porta") && cos().includes("Arlet"));
+
+  console.log("6b2 · NOVETATS v4.29 (filtre per nen a Resum + vista Per assignar)");
+  w.triaVistaCal("resum"); await tic(30);
+  T("v4.29: Resum duu el desplegable «Nen: Tots / …»", !!d.querySelector("#resum-nen") && cos().includes("Tots"));
+  const files29 = (cos().match(/r-fila/g) || []).length;
+  const opt29 = d.querySelector("#resum-nen option[value*='|']").value;
+  w.selNenResum(opt29); await tic(30);
+  T("v4.29: en triar un nen només surten els seus viatges",
+    (cos().match(/r-fila/g) || []).length <= files29 && cos().includes("Es mostren només els viatges de"));
+  w.triaVistaCal("quadre"); await tic(20); w.triaVistaCal("resum"); await tic(30);
+  T("v4.29: la tria es recorda mentre l'app és oberta", d.querySelector("#resum-nen").value === opt29);
+  w.selNenResum(""); await tic(30);
+  T("v4.29: «Tots» torna la vista sencera", (cos().match(/r-fila/g) || []).length === files29);
+  // vista «Per assignar»: es recompta amb balanc/portaValids (la mateixa font que la pantalla)
+  T("v4.29: la pestanya nova hi és", cos().includes("Per assignar"));
+  w.triaVistaCal("assignar"); await tic(20);
+  let nAmb29 = 0, nSense29 = 0;
+  ["dl", "dt", "dc", "dj", "dv"].forEach(dd => ["e8", "e9", "r13", "e15", "r17"].forEach(ss => {
+    const b2 = w.balanc(ss, dd);
+    const esp = b2.nens.filter(n2 => !n2.portadaPerId).length;
+    if (!esp) return;
+    const lliures = b2.conds.some(c2 => (c2.places || 0) - w.portaValids(c2, ss, dd).length > 0);
+    if (lliures) nAmb29++; else nSense29++;
+  }));
+  T("v4.29: «Per assignar» quadra amb balanc()/portaValids()",
+    (nAmb29 + nSense29 === 0)
+      ? cos().includes("Cap nen esperant en viatges amb seients lliures")
+      : ((cos().match(/esperen:/g) || []).length === nAmb29 + nSense29 &&
+         (nSense29 === 0 || cos().includes("Sense cotxe possible")) &&
+         (nAmb29 === 0 || cos().includes("amb seients lliures"))));
+  w.triaVistaCal("quadre"); await tic(20);
 
   console.log("6c · AVISOS ENTRE COMPTES (v4.15: guardats a Supabase per a tot el grup)");
   await surtIentra("grau@test.cat", "grau123");
