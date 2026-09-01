@@ -362,7 +362,7 @@ h1{font-size:24px}
   </header>
   <div class="zebra"></div>
   <main class="cos"><div class="avis" id="avis"></div><div id="pantalla"></div>
-  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.27</span><div id="peu-stats" class="peu-stats"></div></footer></main>
+  <footer class="credit">creat per Víctor Quintana<br><span class="versio">versió 4.28</span><div id="peu-stats" class="peu-stats"></div></footer></main>
   <div class="barra amaga" id="barra"><div id="barra-avis" class="barra-avis ocult"></div><div class="barra-int">
     <span class="barra-txt" id="barra-txt">Canvis sense desar</span>
     <button class="boto" id="btn-desa" onclick="desa()">Desa els canvis</button>
@@ -900,8 +900,8 @@ function peuStatsHtml(){
     "<span>\ud83e\uddd2 " + pl(nens, "nen", "nens") + "</span>" +
     "<span>\ud83d\ude97 " + pl(oferts, "viatge ofert", "viatges oferts") + "/setmana</span>" +
     "<span>\u2713 " + coberts + (coberts === 1 ? " viatge cobert" : " viatges coberts") + " al 100 %</span>" +
-    "<span>\ud83e\udd1d " + pl(ocupades, "pla\u00e7a ocupada", "places ocupades") + "</span>" +
-    "<span>\ud83e\ude91 " + pl(Math.max(0, ofertes - ocupades), "pla\u00e7a lliure", "places lliures") + "</span>";
+    "<span>\ud83e\udd1d " + pl(ocupades, "seient ocupat", "seients ocupats") + "</span>" +
+    "<span>\ud83d\udcba " + pl(Math.max(0, ofertes - ocupades), "seient lliure", "seients lliures") + "</span>";
 }
 function pintaPeuStats(){
   const el = $("#peu-stats"); if (!el) return;
@@ -2230,7 +2230,7 @@ async function copiaSeguretat(){
     const r = await sb.from("activity_log").select("*").eq("group_id", grupActiu.id).order("created_at", { ascending: false }).limit(500);
     if (!r.error) logs = r.data || [];
   } catch(e){}
-  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.27", families: doc.families, logs: logs };
+  const data = { grup: doc.grupNom || "", exportat: new Date().toISOString(), versio_app: "4.28", families: doc.families, logs: logs };
   const txt = JSON.stringify(data, null, 2);
   try {
     const blob = new Blob([txt], { type: "application/json" });

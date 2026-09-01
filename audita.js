@@ -28,7 +28,7 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsDef = new Set([...html.matchAll(/id=(?:'|\\?")([\w-]+)(?:'|\\?")/g)].map(m => m[1]));
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
-  T("lema i peu amb versió 4.27", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.27"));
+  T("lema i peu amb versió 4.28", html.includes("Montbui → Escola Anoia") && html.includes("creat per Víctor Quintana") && html.includes("versió 4.28"));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -854,7 +854,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.canviaPlaces(-1); w.canviaPlaces(-1); await tic();
   w.triaTab("cal"); await tic(30);
   T("si les places baixen, el comptador avisa del sobreeiximent (2/1)", cos().includes("2/1"));
-  T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges oferts") && s.includes("3 places ocupades") && s.includes("lliure"); })());
+  T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges oferts") && s.includes("3 seients ocupats") && s.includes("seient") && s.includes("lliure"); })());
   T("amb canvis pendents, l'Actualitza dels calendaris s'amaga (mana el Desa)", d.body.classList.contains("amb-barra") && cos().includes("cal-actualitza"));
   w.triaTab("perfil"); await tic();
   w.canviaPlaces(1); w.canviaPlaces(1); await tic();
@@ -1172,7 +1172,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
       t27.includes("(" + completes + " amb la setmana completa)") &&
       t27.includes("🚗 " + oferts + " viatge") && t27.includes("/setmana") &&
       t27.includes("✓ " + cob + " viatge") && t27.includes("al 100 %") &&
-      t27.includes("🤝 " + ocu + " ") && t27.includes("🪑 " + Math.max(0, ofertes - ocu) + " ") &&
+      t27.includes("🤝 " + ocu + " seient") && t27.includes("💺 " + Math.max(0, ofertes - ocu) + " seient") &&
       t27.includes("lliure"));
     T("v4.27: la regla del cobert és una sola funció compartida (barra per tu + peu)",
       (html.match(/viatgeCobert\(/g) || []).length === 3);
