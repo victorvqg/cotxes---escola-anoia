@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.37: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.37"') && !/versió 4\.36|versio_app: "4\.36"/.test(html));
+  T("v4.38: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.38"') && !/versió 4\.37|versio_app: "4\.37"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -82,6 +82,21 @@ console.log("0 · CABLEJAT ESTÀTIC");
     const sql49 = fs.readFileSync(path.join(__dirname, "supabase-v49.sql"), "utf-8");
     T("SQL v49: la funció notifications_dedupe es recrea amb una finestra de 60 segons",
       sql49.includes("create or replace function notifications_dedupe") && sql49.includes("interval '60 seconds'"));
+  }
+  // v4.38 · tasca 1: neteja reversible dels duplicats ja guardats
+  {
+    const sql50 = fs.readFileSync(path.join(__dirname, "supabase-v50.sql"), "utf-8");
+    T("SQL v50: neteja de duplicats amb SELECT de comprovació, còpia de seguretat i rollback",
+      sql50.includes("SELECT DE COMPROVACIÓ") && sql50.includes("notifications_dup_backup_v50") &&
+      /delete from notifications/i.test(sql50) && sql50.includes("ROLLBACK"));
+  }
+  // v4.38 · tasca 2, cas (c): esborra_familia avisa passatgers i conductors abans de marxar del grup
+  {
+    const sql51 = fs.readFileSync(path.join(__dirname, "supabase-v51.sql"), "utf-8");
+    T("SQL v51: esborra_familia insereix avisos ABANS de l'esborrat en cascada (passatgers i fills)",
+      sql51.includes("create or replace function esborra_familia") &&
+      (sql51.match(/insert into notifications/g) || []).length >= 2 &&
+      sql51.indexOf("insert into notifications") < sql51.indexOf("delete from families"));
   }
   T("v4.19: el CSS força un avís per línia", html.includes("#avisos-llista details{display:block"));
   // v4.15: els avisos viuen a notifications amb columnes estructurades
@@ -331,15 +346,22 @@ function execQuery(q){
     return dades(q.volFiles ? tocats : null);
   }
   if (q.op === "delete"){
-    const abans = DB[t].length;
+    const esborrats = [];
     DB[t] = DB[t].filter(row => {
       if (!q.filters.every(f => f(row))) return true;
       if (t === "children" && !potTocarFam(row.family_id)) return true;
       if (t === "weekly_marks" && !potTocarFam(row.family_id)) return true;
       if (t === "assignments" && !potTocarFam(row.driver_family_id) &&
           !potTocarFam((DB.children.find(c => c.id === row.child_id) || {}).family_id)) return true;   // SQL v43
+      esborrats.push(row);
       return false;
     });
+    // v4.38: cascada com children.id references … on delete cascade (esquema real) —
+    // si es borren fills, les seves assignacions (com a passatgers) també cauen
+    if (t === "children" && esborrats.length){
+      const idsEsb = new Set(esborrats.map(x => x.id));
+      DB.assignments = DB.assignments.filter(a => !idsEsb.has(a.child_id));
+    }
     return dades(null);
   }
   return err("operació desconeguda");
@@ -568,15 +590,34 @@ function rpc(nom, p){
     if (!(mevaFamId() === f.id || socAdmin())) return err("No tens permís per esborrar aquesta família");
     if (f.role === "admin" && mevaFamId() === f.id && DB.families.some(x => x.group_id === f.group_id && x.id !== f.id))
       return err("Ets l'administrador: transfereix el rol o esborra primer la resta de famílies");
+    const HORA_M = { e8: "7.35", e9: "8.35", r13: "13.00", e15: "14.35", r17: "17.00" };
+    const DIA_M = { dl: "Dilluns", dt: "Dimarts", dc: "Dimecres", dj: "Dijous", dv: "Divendres" };
+    const nensIds = DB.children.filter(c => c.family_id === f.id).map(c => c.id);
+    // v51 · (c-1) la família marxa i conduïa: avisa els passatgers
+    DB.assignments.filter(a => a.driver_family_id === f.id).forEach(a => {
+      const cNen = DB.children.find(x => x.id === a.child_id); if (!cNen) return;
+      const quan = DIA_M[a.day] + " " + HORA_M[a.slot];
+      const msg = cNen.name + " s'ha quedat sense cotxe al viatge " + quan + ": " + f.name + " ha marxat del grup i ja no el porta. Cal buscar-li plaça.";
+      DB.notifications.push({ id: randomUUID(), family_id: cNen.family_id, message: msg, family_name: famPerId(cNen.family_id).name,
+        child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString() });
+    });
+    // v51 · (c-2) els fills de la família que marxa pujaven al cotxe d'una altra família
+    DB.assignments.filter(a => nensIds.indexOf(a.child_id) >= 0 && a.driver_family_id !== f.id).forEach(a => {
+      const cNen = DB.children.find(x => x.id === a.child_id); const cDriver = famPerId(a.driver_family_id);
+      if (!cNen || !cDriver) return;
+      const quan = DIA_M[a.day] + " " + HORA_M[a.slot];
+      const msg = cNen.name + " ja no forma part de la família " + f.name + " (ha marxat del grup) i ha deixat el teu cotxe del viatge " + quan + ". Tens un seient més lliure.";
+      DB.notifications.push({ id: randomUUID(), family_id: cDriver.id, message: msg, family_name: cDriver.name,
+        child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString() });
+    });
     DB.profiles.forEach(x => { if (x.family_id === f.id){ x.family_id = null; x.status = "pendent"; } });
     logBD(f.group_id, "baixa família", mevaFamId(), f.name + " esborrada");
     DB.activity_log.forEach(x => { if (x.family_id === f.id && x.action !== "baixa família"){ x.actor_id = null; x.details = ""; } });
-    const nensIds = DB.children.filter(c => c.family_id === f.id).map(c => c.id);
     DB.assignments = DB.assignments.filter(a => a.driver_family_id !== f.id && nensIds.indexOf(a.child_id) < 0);
     DB.weekly_marks = DB.weekly_marks.filter(m => m.family_id !== f.id);
     DB.children = DB.children.filter(c => c.family_id !== f.id);
-    DB.notifications = DB.notifications.filter(n => n.family_id !== f.id);
     DB.families = DB.families.filter(x => x.id !== f.id);
+    DB.notifications = DB.notifications.filter(n => n.family_id !== f.id);   // cascada com families(id) on delete cascade
     return dades(null);
   }
   return err("rpc desconeguda al mock: " + nom);
@@ -634,9 +675,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.37» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.38» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.37"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.38"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1043,12 +1084,18 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.assigna("r17", "dl", famDoc("Grau").id, idBru, false); await tic();
   await w.desa(); await tic(30);
   T("la desassignació queda a Supabase", !DB.assignments.some(a => a.child_id === nenDB(famDB("Grau").id, "Bru").id));
+  T("v4.38 · cas (a): el missatge nou al nen ('s'ha quedat sense cotxe... Cal buscar-li plaça')",
+    DB.notifications.some(n2 => n2.family_id === famDB("Grau").id && (n2.message || "").includes("Bru s'ha quedat sense cotxe al viatge Dilluns 17.00") &&
+      (n2.message || "").includes("ja no el porta") && (n2.message || "").includes("Cal buscar-li plaça")));
+  T("v4.38 · cas (a): el conductor rep confirmació de qui ha deixat sense cotxe",
+    DB.notifications.some(n2 => n2.family_id === famDB("Vila Prat").id && (n2.message || "").includes("Has deixat 1 nen sense cotxe al viatge Dilluns 17.00") &&
+      (n2.message || "").includes("buscant plaça")));
   await surtIentra("grau@test.cat", "grau123");
   T("v4.15: la baixa del cotxe també és un avís a la BD (escrit en desar, no detectat al mòbil)",
-    w.avisosNous() >= 1 && DB.notifications.some(n2 => n2.family_id === famDB("Grau").id && (n2.message || "").includes("ja no té cotxe")));
+    w.avisosNous() >= 1 && DB.notifications.some(n2 => n2.family_id === famDB("Grau").id && (n2.message || "").includes("s'ha quedat sense cotxe")));
   w.triaTab("avisos"); await tic(10);
-  T("la pàgina mostra la baixa amb nom, dia, franja i el conductor d'abans",
-    cos().includes("Bru") && cos().includes("ja no té cotxe") && cos().includes("abans Marta Vila Prat") && cos().includes("Dilluns 17.00"), cos().slice(0, 400));
+  T("la pàgina mostra la baixa amb nom, dia, franja i el conductor",
+    cos().includes("Bru") && cos().includes("s'ha quedat sense cotxe") && cos().includes("Marta Vila Prat") && cos().includes("Dilluns 17.00"), cos().slice(0, 400));
   T("un cop llegits, el comptador es posa a zero", w.avisosNous() === 0);
   const cliUsuari = fakeSupabaseClient(); // RLS: en Grau (rol usuari), directe contra la BD
   await cliUsuari.from("weekly_marks").delete().eq("family_id", idVila);
@@ -1871,6 +1918,53 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     d.querySelector("#avis").textContent.includes("Només el titular"));
   T("v4.26: l'error de RLS es tradueix per a progenitors",
     w.msgNeta({ message: "new row violates row-level security policy" }).includes("Només el titular"));
+  await surtIentra("admin@test.cat", "admin123");
+
+  console.log("10r · NOVETATS v4.38 (tasca 2: nen sense cotxe casos b i c; tasca 3: Ajuda)");
+  {
+    // ── CAS (b): un fill esborrat (treuNen) deixa un conductor amb un seient orfe ──
+    const idPassB = randomUUID();
+    DB.children.push({ id: idPassB, family_id: famDB("Grau").id, name: "Orfe", curs: "1r ESO" });
+    DB.assignments.push({ id: randomUUID(), group_id: famDB("Vila Puig").group_id, driver_family_id: famDB("Vila Puig").id, child_id: idPassB, slot: "r13", day: "dt", updated_by: null });
+    await surtIentra("grau@test.cat", "grau123");
+    w.triaTab("perfil"); await tic();
+    w.treuNen(idPassB); await w.desa(); await tic(30);
+    T("v4.38 · cas (b): el fill esborrat desapareix i l'assignació cau amb ell",
+      !DB.children.some(c => c.id === idPassB) && !DB.assignments.some(a => a.child_id === idPassB));
+    T("v4.38 · cas (b): el conductor rep l'avís del passatger perdut",
+      DB.notifications.some(n2 => n2.family_id === famDB("Vila Puig").id && (n2.message || "").includes("Orfe") &&
+        (n2.message || "").includes("ja no forma part de la família Grau") && (n2.message || "").includes("seient")));
+    await surtIentra("admin@test.cat", "admin123");
+  }
+  {
+    // ── CAS (c): una família CONDUCTORA marxa del grup — avisa passatgers I els conductors dels seus fills ──
+    const cGrau = famDB("Grau"), cVilaP = famDB("Vila Puig");
+    DB.assignments.push({ id: randomUUID(), group_id: cGrau.group_id, driver_family_id: cGrau.id, child_id: idJan(), slot: "e8", day: "dv", updated_by: null });      // Grau porta en Janot
+    DB.assignments.push({ id: randomUUID(), group_id: cVilaP.group_id, driver_family_id: cVilaP.id, child_id: idArlet, slot: "e9", day: "dv", updated_by: null });     // Vila Puig porta l'Arlet (fill de Grau)
+    const rSurtC = await fakeSupabaseClient().rpc("esborra_familia", { p_family: cGrau.id });
+    T("v4.38 · cas (c): l'esborrat de la família funciona igual que abans", !rSurtC.error && !famDB("Grau"));
+    T("v4.38 · cas (c-1): el passatger (Janot) rep l'avís que el conductor ha marxat del grup",
+      DB.notifications.some(n2 => n2.family_id === cVilaP.id && (n2.message || "").includes("Janot") &&
+        (n2.message || "").includes("ha marxat del grup") && (n2.message || "").includes("Cal buscar-li plaça") && (n2.message || "").includes("Divendres 7.35")));
+    T("v4.38 · cas (c-2): el conductor (Vila Puig) sap que l'Arlet ja no forma part de Grau",
+      DB.notifications.some(n2 => n2.family_id === cVilaP.id && (n2.message || "").includes("Arlet") &&
+        (n2.message || "").includes("ja no forma part de la família Grau") && (n2.message || "").includes("seient")));
+  }
+
+  console.log("10s · NOVETATS v4.38 (tasca 3: Ajuda)");
+  w.triaTab("perfil"); await tic();
+  T("v4.38: el menú té l'apartat «❓ Ajuda», per a tots els rols", d.querySelector("#calaix").innerHTML.includes("❓ Ajuda"));
+  w.triaTab("ajuda"); await tic();
+  T("v4.38: la guia té els 4 passos, amb el nom del grup i el botó real de Graella/El teu cotxe",
+    /1 ·/.test(cos()) && /2 ·/.test(cos()) && /3 ·/.test(cos()) && /4 ·/.test(cos()) &&
+    cos().includes(w.doc.grupNom) && cos().includes("El teu cotxe") && cos().includes("Desa els canvis"));
+  T("v4.38: reutilitza el text de la Graella (mateixes icones i etiquetes), no un de nou",
+    cos().includes("🚗 conduïu i oferiu places") && cos().includes("🙋 el nen demana plaça") && cos().includes("🚫 aquell dia aneu pel vostre compte"));
+  T("v4.38: acaba amb «Encara tens dubtes? Escriu a l'administrador.»",
+    cos().includes("Encara tens dubtes"));
+  await surtIentra("pepe@test.cat", "pepe123");   // v4.26: adjunt (només lectura) — la família Grau del cas (c) ja no existeix
+  w.triaTab("ajuda"); await tic();
+  T("v4.38: l'Ajuda també és visible per a un usuari sense permisos d'escriptura", cos().includes("Guia ràpida"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("11 · TANCA LA SESSIÓ");
