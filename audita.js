@@ -924,21 +924,17 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
 
   console.log("5 · CALENDARIS (lectura del grup sencer des de Supabase)");
   await w.pintaCalendari(); await tic(30);
-  T("v4.37: «💺 Per assignar» s'obre per defecte (Quadre i Setmana ja no hi són)",
-    !cos().includes("Vista de consulta") && !cos().includes(">Quadre<") && !cos().includes(">Setmana<") &&
+  T("v4.37: «💺 Per assignar» s'obre per defecte i la vista Dies desapareix",
+    !cos().includes(">Dies<") && !cos().includes("Vista de consulta") &&
     /amb nens esperant|Tots els nens tenen cotxe/.test(cos()));
-  T("v4.37: l'ordre de pestanyes és Per assignar · Resum · Per nen · Dies",
+  T("v4.54: l'ordre de pestanyes és Per assignar · Resum · Per nen",
     cos().indexOf(">💺 Per assignar<") < cos().indexOf(">Resum<") &&
-    cos().indexOf(">Resum<") < cos().indexOf(">Per nen<") &&
-    cos().indexOf(">Per nen<") < cos().indexOf(">Dies<"));
+    cos().indexOf(">Resum<") < cos().indexOf(">Per nen<"));
   T("els subtabs són a dalt de tot, abans del mapa", cos().indexOf(">💺 Per assignar<") < cos().indexOf("llegenda"));
   T("el dèficit surt al mapa (−3 dl 17.00)", cos().includes("−3"));
   w.triaTab("cal"); await tic(30);
-  w.selDia("dl"); await tic(20);
-  T("detall del dia: vista de consulta i cada nen amb el seu estat", cos().includes("Vista de consulta") && cos().includes("Arlet") && cos().includes("Bru") && cos().includes("pendent"));
-  T("si no condueixes, la targeta t'explica qui assigna i on", cos().includes("els assigna qui condueix") && cos().includes("El teu cotxe"));
-  T("detall del dia: badge de falten 3", cos().includes("falten 3"));
-  T("línia de conductor completa: qui condueix, amb qui i places lliures", cos().includes("condueix Marta") && cos().includes("amb Jan i Mia") && cos().includes("places lliures"));
+  w.triaVistaCal("resum"); await tic(20);
+  T("el resum del calendari mostra l'estat del grup", cos().includes("L'estat del grup") && cos().includes("famílies"));
 
   console.log("6 · IMPORTACIÓ DE LES DADES ANTIGUES (dades.json)");
   w.obreAdmin(); await tic();
@@ -974,21 +970,21 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("graella"); await tic();
   w.triaPinzell("cotxe"); await tic(400); w.pinta("r17", "dl"); await tic();
   await w.desa(); await tic(30);
-  w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
+  w.triaTab("cal"); await tic(30); w.triaVistaCal("resum"); await tic(20);
   w.assigna("r17", "dl", famDoc("Grau").id, idArlet, true); await tic();
   await w.desa(); await tic(30);
   T("el conductor assigna un nen i queda desat a Supabase", DB.assignments.some(a => a.driver_family_id === idVila && a.child_id === nenDB(famDB("Grau").id, "Arlet").id && a.slot === "r17" && a.day === "dl"));
-  T("el dia mostra qui porta cada nen (persona: nom + inicials)", cos().includes("el porta Marta VP") && cos().includes("pendent"));
+  w.triaTab("cotxe"); await tic(30);
+  T("la vista del cotxe mostra qui està assignat (nom + família)", cos().includes("Qui puges al teu cotxe") && cos().includes("Arlet") && cos().includes("/3"));
   w.assigna("r17", "dl", famDoc("Grau").id, idBru, true); await tic();
   T("comptador de places del cotxe (2/3)", cos().includes("2/3"));
   await w.desa(); await tic(30);
   T("el segon nen assignat també queda a Supabase", DB.assignments.some(a => a.child_id === nenDB(famDB("Grau").id, "Bru").id));
   w.triaTab("perfil"); await tic();
   w.canviaPlaces(-1); w.canviaPlaces(-1); await tic();
-  w.triaTab("cal"); await tic(30);
+  w.triaTab("cotxe"); await tic(30);
   T("si les places baixen, el comptador avisa del sobreeiximent (2/1)", cos().includes("2/1"));
   T("el peu llueix les dades del grup, en viu", (function(){ const s = d.querySelector("#peu-stats").textContent; return s.includes("5 famílies") && s.includes("7 nens") && s.includes("4 viatges oferts") && s.includes("3 seients ocupats") && s.includes("seient") && s.includes("lliure"); })());
-  T("amb canvis pendents, l'Actualitza dels calendaris s'amaga (mana el Desa)", d.body.classList.contains("amb-barra") && cos().includes("cal-actualitza"));
   w.triaTab("perfil"); await tic();
   w.canviaPlaces(1); w.canviaPlaces(1); await tic();
   w.triaTab("cal"); await tic(30); w.triaVistaCal("nen"); await tic(20);
@@ -1016,7 +1012,6 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.tancaFull(); await tic();
   T("en tancar, el full desapareix", d.querySelector("#full-horari").classList.contains("ocult"));
   w.triaTab("cal"); await tic(30); w.triaVistaCal("nen"); await tic(20);
-  w.triaVistaCal("dia"); await tic(20);
 
   console.log("6b2 · NOVETATS v4.40 (fora el filtre per nen de Resum) + v4.29 (vista Per assignar)");
   w.triaVistaCal("resum"); await tic(30);
@@ -1056,7 +1051,6 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     !cal34().includes("📞") &&
     (nAmb29 === 0 || (cal34().includes("Esperen plaça") && cal34().includes("Cotxes amb seients lliures"))) &&
     (nSense29 === 0 || cal34().includes("Sense cotxe possible")));
-  w.triaVistaCal("dia"); await tic(20);
 
   console.log("6c · AVISOS ENTRE COMPTES (v4.15: guardats a Supabase per a tot el grup)");
   await surtIentra("grau@test.cat", "grau123");
@@ -1130,7 +1124,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.21: dins d'una altra família no hi ha bloc de grup ni filtres, només els avisos d'aquella família",
     cos().includes("Avisos de la teva família") && !cos().includes('id="av-q"') && !cos().includes("Avisos de tot el grup"));
   await surtIentra("admin@test.cat", "admin123");
-  w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
+  w.triaTab("cal"); await tic(30); w.triaVistaCal("resum"); await tic(20);
   w.assigna("r17", "dl", famDoc("Grau").id, idBru, false); await tic();
   await w.desa(); await tic(30);
   T("la desassignació queda a Supabase", !DB.assignments.some(a => a.child_id === nenDB(famDB("Grau").id, "Bru").id));
@@ -1153,7 +1147,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.commuta(famDoc("Grau").nens.find(n => n.id === idArlet).marca, "r17", "dl");
   await w.desa(); await tic(30);
   await surtIentra("admin@test.cat", "admin123");
-  w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
+  w.triaTab("cotxe"); await tic(30);
   T("si un nen es desmarca, la seva plaça no compta al cotxe de l'altre (0/3)", cos().includes("0/3") && !cos().includes("Arlet"));
 
   console.log("6d · CANVIS AMB PASSATGERS A BORD");
@@ -1393,34 +1387,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   else DB.weekly_marks.push({ id: randomUUID(), family_id: grauF.id, slot: slotCond, day: diaCond, type: "request", children_ids: [nenG.id], seats_override: null, updated_by: currentUserId, updated_at: new Date().toISOString() });
   await w.sincronitza(); await tic(30);
   T("la sincronització recarrega els canvis fets per un altre compte", w.doc.families.find(x => x.id === grauF.id).nens.some(n => w.te(n.marca, slotCond, diaCond)));
-  w.selDia(diaCond); await tic(30);
-  T("la vista dia avisa dels nens pendents de pujar al meu cotxe", cos().includes("demana pla\u00e7a") || cos().includes("demanen pla\u00e7a"));
-
-  console.log("10b2 \u00b7 NOVETATS v4.49 (l'av\u00eds de nens pendents surt ELS 5 DIES, no nom\u00e9s alguns)");
-  {
-    const DDD = ["dl", "dt", "dc", "dj", "dv"];
-    const fVilaP2 = famDoc("Vila Puig");
-    fVilaP2.cotxe = { e9: DDD.slice(), r13: DDD.slice(), e15: DDD.slice() };
-    w.doc.families.push({
-      id: "diag49", nom: "Diag Waiter", rol: "usuari", cognomPare: "Diag", cognomMare: "",
-      conductor: "", places: 0, phone: "", phoneVisible: false, curs: "", codiFam: "", ownerId: "",
-      cotxe: {}, propi: {}, porta: {},
-      nens: [{ id: "diag49-nen", nom: "DiagNen", curs: "1r ESO", marca: { e9: DDD.slice(), r13: DDD.slice(), e15: DDD.slice() } }]
-    });
-    w.triaVistaCal("dia"); await tic();
-    DDD.forEach(dd => {
-      w.selDiaChip(dd);
-      T("v4.49: el dia " + dd + " amb caselles vermelles (alg\u00fa condueix, un nen 1r ESO demana i ning\u00fa l'ha assignat) mostra l'av\u00eds",
-        cos().includes("demana pla\u00e7a") || cos().includes("demanen pla\u00e7a"));
-    });
-    // neteja: treu la fam\u00edlia sint\u00e8tica i deixa Vila Puig com abans
-    w.doc.families = w.doc.families.filter(x2 => x2.id !== "diag49");
-    await w.sincronitza(); await tic(30);
-  }
+  w.triaVistaCal("resum"); await tic(30);
 
   console.log("10c · NOVETATS v3.2 (tel/curs, codi família, El teu cotxe, límits, staff↛admin, self-heal)");
   const menuHtml2 = d.querySelector("#calaix").innerHTML;
   T("el menú té l'apartat «El teu cotxe»", menuHtml2.includes("El teu cotxe"));
+  w.triaTab("cotxe"); await tic(30);
+  T("el propi cotxe mostra el comptador i llista de nens", cos().includes("Qui puges al teu cotxe") && cos().includes("/3"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el codi de la família (per convidar la parella)", cos().includes("Codi de la vostra fam") && cos().includes(codiDeFam(famDB("Vila Puig"))));
   T("v4.12: el codi de família en tres línies, amb el botó «Copia el codi» COMPARTIT amb el del grup",
@@ -1555,11 +1528,10 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await w.creaFam(); await tic(30);
   T("«Aquest compte ja té família» es repara sol: entra a la família vinculada", pant().includes("Hola") && pant().includes("Grau"), d.querySelector("#avis").textContent + " || " + pant().slice(0, 200));
 
-  console.log("10d · NOVETATS v3.3 (Dia només lectura, curs per nen, famílies desplegables, codi de grup al perfil)");
+  console.log("10d · NOVETATS v3.3 (curs per nen, famílies desplegables, codi de grup al perfil)");
   await surtIentra("admin@test.cat", "admin123");
-  w.triaTab("cal"); await tic(30); w.triaVistaCal("dia"); await tic(20); w.selDia("dl"); await tic(20);
-  T("la vista Dia ja NO té caselles: és només de consulta", !cos().includes('type="checkbox"') && cos().includes("Vista de consulta"));
-  T("el propi cotxe es veu amb comptador i s'assigna a «El teu cotxe»", cos().includes("Al teu cotxe") && cos().includes("/3"));
+  w.triaTab("cotxe"); await tic(30);
+  T("el propi cotxe mostra el comptador i llista de nens", cos().includes("Qui puges al teu cotxe") && cos().includes("/3"));
   w.triaTab("perfil"); await tic();
   T("el perfil mostra el grup i el seu codi d'invitació", cos().includes("El vostre grup") && cos().includes(CODI));
   T("v4.8: nom del grup i codi separats, amb botó de copiar i l'aclariment",

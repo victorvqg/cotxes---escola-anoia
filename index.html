@@ -465,7 +465,6 @@ let esAdmin = false, esStaff = false;   // deriven del rol de la MEVA família a
 let esProgenitor = false;
 let esborratsPendents = [];   // fills amb la graella esborrada pendent de desar: en desar s'alliberen els cotxes i s'avisa el grup      // 2n compte de la família: NOMÉS LECTURA (el titular és families.owner_id)
 let confObert = false;
-let diaSel = (d => d>=1 && d<=5 ? DIES[d-1] : "dl")(new Date().getDay());
 let tabAct = "graella";
 let ultimToc = {k:"", t:0};
 
@@ -1140,7 +1139,7 @@ async function desa(){
     dirty = false; justDesat = true; b.textContent = "✓ Desat";
     pintaBarra(); pintaPeuStats(); estat("Desat ✓", "ok");
     // v4.20: la pestanya oberta es repinta amb les dades desades — el mateix
-    // repintat de sempre (pintaCotxe amb les seves barres, Resum/Dies…)
+    // repintat de sempre (pintaCotxe amb les seves barres, Resum…)
     if ($("#tab-cos")) triaTab(tabAct);
     if (resumEsborrats.length) avis("\ud83d\uddd1\ufe0f <b>" + resumEsborrats.join("<br>") + "</b>");
     else if (fillsCognomsActualitzats) avis("✓ <b>Cognoms actualitzats a la família i als fills</b> — els canvis ja són visibles per a tothom.", true);
@@ -2514,11 +2513,10 @@ function ajudaBlocsDef(){
       "<p style='margin:0 0 6px'>Ves a «El teu cotxe» → marca qui puges (secció «Qui puges al teu cotxe?») → prem «Desa els canvis».</p>" +
       "<p class='hint' style='margin:0'>La barra 🎯 Trajectes coberts per tu et diu quants dels teus viatges ja tenen tothom col·locat.</p>" },
     { id: "calendaris", ico: "📅", tit: "Calendaris", cos:
-      "<p style='margin:0 0 6px'>A Calendaris tens quatre vistes:</p>" +
+      "<p style='margin:0 0 6px'>A Calendaris tens tres vistes:</p>" +
       "<p style='margin:0'>💺 <b>Per assignar</b>: qui espera plaça i quins cotxes tenen seients lliures.<br>" +
       "<b>Resum</b>: l'estat de tot el grup.<br>" +
-      "<b>Per nen</b>: l'horari d'un nen concret.<br>" +
-      "<b>Dies</b>: el detall de cada franja, dia a dia.</p>" },
+      "<b>Per nen</b>: l'horari d'un nen concret.</p>" },
     { id: "avisos", ico: "🔔", tit: "Avisos i Descarrega", cos:
       "<p style='margin:0 0 6px'>🔔 <b>Avisos</b>: la teva família hi veu els canvis que l'afecten (qui puja o baixa del cotxe).</p>" +
       "<p style='margin:0'>🖨️ <b>Descarrega</b>: horaris per imprimir, de cada nen i del conductor.</p>" },
@@ -2837,7 +2835,7 @@ async function pintaCalendari(){
 
 function renderCal(){
   let mapa = "<div></div>" + DIES.map(d =>
-    "<button class='m-cel' style='background:none;min-height:auto' onclick=\"selDia('" + d + "')\"><span class='m-cap'>" + DIES_LBL[d] + "</span></button>").join("");
+    "<button class='m-cel' style='background:none;min-height:auto' onclick=\"triaVistaCal('resum')\"><span class='m-cap'>" + DIES_LBL[d] + "</span></button>").join("");
   FRANGES.forEach(fr => {
     const t = fr.tipus === "Entrada" ? "e" : "r";
     mapa += "<div class='m-fr'><span class='m-hora'>" + fr.hora + "</span><span class='m-tip " + t + "'>" + fr.tipus + "</span></div>";
@@ -2848,101 +2846,29 @@ function renderCal(){
       else if (b.diff < 0){ cls = "def"; n1 = "\u2212" + (-b.diff); n2 = b.diff < -1 ? "falten" : "falta"; }
       else if (b.diff === 0){ cls = "just"; n1 = "0"; n2 = "just"; }
       else { cls = "ok"; n1 = "+" + b.diff; n2 = b.diff > 1 ? "sobren" : "sobra"; }
-      mapa += "<button class='m-cel " + cls + "' onclick=\"selDia('" + d + "')\"><span class='n1'>" + n1 + "</span><span class='n2'>" + n2 + "</span></button>";
+      mapa += "<button class='m-cel " + cls + "' onclick=\"triaVistaCal('resum')\"><span class='n1'>" + n1 + "</span><span class='n2'>" + n2 + "</span></button>";
     });
   });
   $("#tab-cos").innerHTML =
     "<div class='subtabs'><button class='subtab " + (vistaCal === "assignar" ? "actiu" : "") + "' onclick=\"triaVistaCal('assignar')\">\ud83d\udcba Per assignar</button>" +
     "<button class='subtab " + (vistaCal === "resum" ? "actiu" : "") + "' onclick=\"triaVistaCal('resum')\">Resum</button>" +
-    "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button>" +
-    "<button class='subtab " + (vistaCal === "dia" ? "actiu" : "") + "' onclick=\"triaVistaCal('dia')\">Dies</button></div>" +
+    "<button class='subtab " + (vistaCal === "nen" ? "actiu" : "") + "' onclick=\"triaVistaCal('nen')\">Per nen</button></div>" +
     "<div class='llegenda'><span class='lg ok'>verd \u00b7 sobren places</span><span class='lg just'>groc \u00b7 just</span><span class='lg def'>vermell \u00b7 falten</span></div>" +
     "<div class='mapa'>" + mapa + "</div>" +
     "<div id='cal-cos'></div>" +
     "<button class='boto sec cal-actualitza' style='width:100%' onclick='pintaCalendari()'>\u21bb Actualitza</button>";
   // v4.37: qualsevol valor desconegut cau a la vista per defecte, «Per assignar»
-  if (vistaCal !== "dia" && vistaCal !== "nen" && vistaCal !== "resum" && vistaCal !== "assignar") vistaCal = "assignar";
-  if (vistaCal === "assignar") pintaPerAssignar(); else if (vistaCal === "resum") pintaResum(); else if (vistaCal === "dia") pintaVistaDia(); else pintaVistaNen();
+  if (vistaCal !== "nen" && vistaCal !== "resum" && vistaCal !== "assignar") vistaCal = "assignar";
+  if (vistaCal === "assignar") pintaPerAssignar(); else if (vistaCal === "resum") pintaResum(); else pintaVistaNen();
 }
 function triaVistaCal(v){ vistaCal = v; renderCal(); }
-function selDia(d){ diaSel = d; vistaCal = "dia"; if (tabAct !== "cal") triaTab("cal"); else renderCal(); }
 
-/* Vista de setmana sencera: els 5 dies seguits, amb noms i estat de cada franja */
 function capFranjaHtml(fr, badge){
-  return "<div class='f-cap'><span class='f-hora'>" + fr.hora + "</span>" +
-    "<span class='m-tip " + (fr.tipus === "Entrada" ? "e" : "r") + "'>" + fr.tipus + "</span>" + badge + "</div>";
-}
-function pintaVistaDia(){
-  const mevaV = lameva();
-  let pendMeu = 0;
-  if (mevaV) FRANGES.forEach(fr => {
-    if (!te(mevaV.cotxe, fr.id, diaSel)) return;
-    const b = balanc(fr.id, diaSel);
-    pendMeu += b.nens.filter(n => !n.portadaPerId || n.portadaPerId === mevaV.id).length;
-  });
-  const targetaPend = pendMeu
-    ? "<div class='targeta' style='border-left:4px solid #d64545;margin-bottom:10px'><b>\u26a0 " + (pendMeu === 1 ? "1 nen demana pla\u00e7a" : pendMeu + " nens demanen pla\u00e7a") + " i encara no puja al teu cotxe</b><br><span class='hint'>Ves a la pestanya \u00ab\ud83d\ude97 El teu cotxe\u00bb del men\u00fa i marca qui recollir\u00e0s.</span></div>"
-    : "";
-  $("#cal-cos").innerHTML =
-    targetaPend +
-    "<div class='dies-sel'>" + DIES.map(d => "<button class='dia-b " + (diaSel === d ? "actiu" : "") + "' onclick=\"selDiaChip('" + d + "')\">" + DIES_LBL[d] + "</button>").join("") + "</div>" +
-    "<h2 style='margin:2px 2px 10px'>" + DIES_NOM[diaSel] + "</h2>" +
-    "<p class='hint' style='margin:0 2px 10px'>\ud83d\udc40 Vista de consulta: aqu\u00ed nom\u00e9s ho mires. Qui condueix tria els nens que recull des de la pestanya \u00ab\ud83d\ude97 El teu cotxe\u00bb del men\u00fa.</p>" +
-    "<div id='dia-detall'></div>";
-  pintaDia();
-}
-function selDiaChip(d){ diaSel = d; pintaVistaDia(); }
-
-function pintaDia(){
-  const meva = lameva();
-  let h = "";
-  FRANGES.forEach((fr, fi) => {
-    if (fi === 0 || FRANGES[fi - 1].tipus !== fr.tipus)
-      h += "<div class='f-grup'>" + (fr.tipus === "Entrada" ? "🌅 Entrada" : "🎒 Recollida") + "</div>";
-    const b = balanc(fr.id, diaSel);
-    let badge;
-    if (!b.conds.length && !b.nens.length) badge = "<span class='badge buit'>" + (b.propis.length ? "res a coordinar" : "ning\u00fa apuntat") + "</span>";
-    else if (b.diff < 0) badge = "<span class='badge mal'>" + (b.diff < -1 ? "falten " : "falta ") + (-b.diff) + "</span>";
-    else if (b.nens.length) badge = "<span class='badge be'>cobert" + (b.diff > 0 ? " \u00b7 " + b.diff + (b.diff === 1 ? " lliure" : " lliures") : "") + "</span>";
-    else badge = "<span class='badge be'>" + b.places + " " + (b.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</span>";
-    const condsHtml = b.conds.map(f => {
-      const seus = (f.nens || []).map(n => n.nom).join(" i ");
-      let linia = "<div class='f-linia'>\ud83d\ude97 <b>" + esc(f.nom) + "</b>" +
-        (f.conductor ? " \u00b7 condueix " + esc(f.conductor) : "") +
-        (seus ? " \u00b7 amb " + esc(seus) : "") +
-        " \u00b7 <b>" + f.places + " " + (f.places === 1 ? "pla\u00e7a lliure" : "places lliures") + "</b></div>";
-      if (meva && f.id === meva.id){
-        // Vista de consulta: s'hi veu qui puja al teu cotxe, per\u00f2 s'assigna a \u00abEl teu cotxe\u00bb
-        const refs = portaValids(f, fr.id, diaSel);
-        const nomsR = refs.map(r => {
-          const ff = doc.families.find(x => x.id === r.fam);
-          const nn = ff ? (ff.nens || []).find(x => x.id === r.nen) : null;
-          return nn ? nn.nom : "";
-        }).filter(Boolean);
-        linia += "<div class='f-linia'>\ud83e\uddd2 Al teu cotxe: <b>" + (nomsR.length ? esc(nomsR.join(", ")) : "cap nen assignat") + "</b> (" + refs.length + "/" + f.places + ") \u00b7 <span class='hint'>es canvia a \u00ab\ud83d\ude97 El teu cotxe\u00bb</span></div>";
-      }
-      return linia;
-    }).join("");
-    const nensHtml = b.nens.length
-      ? "<div class='f-linia'>\ud83d\ude4b " + b.nens.map(n =>
-          esc(n.nom) +
-          (n.portadaPer ? " <span class='a-ok'>\u2192 el porta " + esc(n.portadaPer) + "</span>" : " <span class='a-pend'>\u00b7 \u23f3 pendent</span>")
-        ).join(" \u00b7 ") + "</div>"
-      : "";
-    const propisHtml = b.propis.length ? "<div class='f-linia'>\ud83d\udeab Pel seu compte: " + b.propis.map(f => esc(f.nom)).join(", ") + "</div>" : "";
-    const senseClasse = doc.families.filter(f => estatCasella(f, fr.id, diaSel) === "blanc-tarda");
-    const classeHtml = senseClasse.length
-      ? "<div class='f-linia' style='opacity:.65'>\ud83c\udfeb No hi ha classe: " + senseClasse.map(f => esc(f.nom)).join(", ") + " (3r/4t)</div>"
-      : "";
-    const socCond = meva && b.conds.some(x => x.id === meva.id);
-    const pista = (!socCond && b.nens.some(n => !n.portadaPer))
-      ? "<p class='hint' style='margin:4px 2px 0'>\ud83d\udca1 Els nens pendents els assigna qui condueix, des de la pestanya \u00ab\ud83d\ude97 El teu cotxe\u00bb del seu men\u00fa.</p>"
-      : "";
-    h += "<div class='targeta franja'>" + capFranjaHtml(fr, badge) +
-         condsHtml + nensHtml + propisHtml + classeHtml + pista + "</div>";
-  });
-  const dEl = $("#dia-detall"); if (!dEl) return;
-  dEl.innerHTML = h;
+  if (!fr) return "";
+  const tip = (fr.tipus === "Entrada" ? "e" : "r");
+  return "<div class='f-cap'><span class='f-hora'>" + (fr.hora || "") + "</span>" +
+    "<span class='m-tip " + tip + "'>" + (fr.tipus || "") + "</span>" +
+    (badge || "") + "</div>";
 }
 
 /* ── Pestanya: El teu cotxe (assignar nens a tots els teus viatges d'un cop d'ull) ── */
@@ -2996,7 +2922,7 @@ function pintaCotxe(){
   $("#tab-cos").innerHTML = barraTu + h;
   bloquejaEdicio();
 }
-function repintaCotxe(){ if (tabAct === "cotxe") pintaCotxe(); else pintaDia(); }
+function repintaCotxe(){ if (tabAct === "cotxe") pintaCotxe(); else if (tabAct === "cal") renderCal(); }
 
 function assigna(slot, dia, famRef, nenRef, posar){
   const f = lameva();
@@ -3375,6 +3301,7 @@ function pintaPerAssignar(){
 async function pintaResum(){
   await refresca();
   if (!doc) return;
+  const capResum = capFranjaHtml({ hora: FRANGES[0] ? FRANGES[0].hora : "7.35", tipus: FRANGES[0] ? FRANGES[0].tipus : "Entrada" }, "");
   /* v4.40: Resum torna a mostrar sempre l'estat de tot el grup — el filtre
      per nen (v4.29) es va traslladar del tot a la pestanya «Per nen», que
      ja tenia (i conserva) la seva pròpia variable nenSel. */
@@ -3407,7 +3334,7 @@ async function pintaResum(){
     let det = "";
     if (conds) det += "<div>🚗 " + conds + "</div>";
     if (noms) det += "<div>🙋 " + noms + "</div>";
-    det += "<button class='enllac' onclick=\"selDia('" + it.d + "')\">obre el dia →</button>";
+    det += "<button class='enllac' onclick=\"triaVistaCal('resum')\">obre el dia →</button>";
     return "<details class='r-det'><summary class='r-fila'><span class='r-dia'>" + DIES_NOM[it.d] + "</span>" +
            "<span class='r-hora'>" + it.fr.hora + "</span><span class='r-txt'>" + txt + "</span>" +
            "<span class='mp " + cls + "'>" + pt + "</span><span class='r-fletxa'>▾</span></summary>" +
