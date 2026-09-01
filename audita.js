@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.39: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.39"') && !/versió 4\.38|versio_app: "4\.38"/.test(html));
+  T("v4.40: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.40"') && !/versió 4\.39|versio_app: "4\.39"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -692,9 +692,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.39» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.40» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.39"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.40"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -981,18 +981,14 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   w.triaTab("cal"); await tic(30); w.triaVistaCal("nen"); await tic(20);
   w.triaVistaCal("dia"); await tic(20);
 
-  console.log("6b2 · NOVETATS v4.29 (filtre per nen a Resum + vista Per assignar)");
+  console.log("6b2 · NOVETATS v4.40 (fora el filtre per nen de Resum) + v4.29 (vista Per assignar)");
   w.triaVistaCal("resum"); await tic(30);
-  T("v4.29: Resum duu el desplegable «Nen: Tots / …»", !!d.querySelector("#resum-nen") && cos().includes("Tots"));
-  const files29 = (cos().match(/r-fila/g) || []).length;
-  const opt29 = d.querySelector("#resum-nen option[value*='|']").value;
-  w.selNenResum(opt29); await tic(30);
-  T("v4.29: en triar un nen només surten els seus viatges",
-    (cos().match(/r-fila/g) || []).length <= files29 && cos().includes("Es mostren només els viatges de"));
-  w.triaVistaCal("dia"); await tic(20); w.triaVistaCal("resum"); await tic(30);
-  T("v4.29: la tria es recorda mentre l'app és oberta", d.querySelector("#resum-nen").value === opt29);
-  w.selNenResum(""); await tic(30);
-  T("v4.29: «Tots» torna la vista sencera", (cos().match(/r-fila/g) || []).length === files29);
+  T("v4.40: Resum ja NO té el desplegable «Nen:» — mostra sempre tot el grup",
+    !d.querySelector("#resum-nen") && !cos().includes("Es mostren només els viatges de"));
+  w.triaVistaCal("nen"); await tic(20);
+  T("v4.40: «Per nen» conserva el seu propi desplegable (variable independent, no compartida amb Resum)",
+    cos().includes("selNenCanvia(this.value)"));
+  w.triaVistaCal("resum"); await tic(30);
   // vista «Per assignar»: es recompta amb balanc/portaValids (la mateixa font que la pantalla)
   T("v4.29: la pestanya nova hi és", cos().includes("Per assignar"));
   w.triaVistaCal("assignar"); await tic(20);
