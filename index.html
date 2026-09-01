@@ -381,7 +381,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.41";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.42";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1585,9 +1585,8 @@ function pantallaApp(){
   document.body.classList.add("dins");
   setTimeout(pintaPeuStats, 0);
   const f = lameva();
-  if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols", "ajuda"].includes(tabAct)) tabAct = "graella";
+  if (!["perfil", "graella", "cotxe", "cal", "avisos", "descarrega", "families", "rols", "estad", "ajuda"].includes(tabAct)) tabAct = "graella";
   if (tabAct === "rols" && !(esAdmin && doc.adminFam && f.id === doc.adminFam)) tabAct = "graella";
-  if (tabAct === "estad" && !esAdmin) tabAct = "graella";
   if (!perfilComplet(f) && !esAdmin && !esStaff && !esProgenitor) tabAct = "perfil";
   $("#pantalla").innerHTML =
     "<div class='salut'><button class='hamb' onclick='obreMenu()'>\u2630</button><span>Hola, <b>" + esc(f.nom) + "</b>" + " <span class='rolet" + (esProgenitor ? " prog" : "") + "'>\u00b7 " + (esProgenitor ? "adjunt" : f.rol === "admin" ? "admin" : f.rol === "staff" ? "staff" : "usuari") + "</span>" + "</span>" + ((esAdmin || esStaff) ? "<button class='enllac' onclick='canviaFam()'>canvia</button>" : "") + "</div>" +
@@ -1621,7 +1620,8 @@ function pintaMenu(){
     it("descarrega", "\ud83d\udda8\ufe0f", "Descarrega") +
     it("families", "👥", "Famílies") +
     ((esAdmin && doc.adminFam && f.id === doc.adminFam) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee1\ufe0f Admin</button>" : (esStaff && perfil && f.id === perfil.family_id) ? "<button class='c-item' onclick=\"tancaMenu(); obreAdmin();\">\ud83d\udee0\ufe0f Staff</button>" : "") +
-    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") + it("estad", "\ud83d\udcca", "Estad\u00edstiques") : "") +
+    (esAdmin && doc.adminFam && f.id === doc.adminFam ? it("rols", "\ud83d\udee1\ufe0f", "Rols") : "") +
+    it("estad", "\ud83d\udcca", "Estad\u00edstiques") +
     it("ajuda", "❓", "Ajuda") +
     "<button class='c-item' onclick=\"tancaMenu(); tancaSessio();\">🚪 Tanca sessió</button>" +
     "<div class='c-sep'></div>" +
@@ -2602,10 +2602,12 @@ async function descarregaAvisosCsv(){
 /* v4.18: Estadístiques per a l'admin — la barra de cada família és EXACTAMENT
    la «Trajectes coberts per tu» que aquella família veu a El teu cotxe
    (statsCoberturaFam, la mateixa funció), ordenades de menys a més cobertura
-   per veure primer qui va endarrerit. RLS: cap consulta nova — les marques i
-   assignacions de tot el grup ja són llegibles per qualsevol membre. */
+   per veure primer qui va endarrerit. v4.42: visible per a tots els rols —
+   les barres per família ja eren públiques (surten a Calendaris); no hi ha
+   res sensible (ni correus ni comptes). RLS: cap consulta nova — les
+   marques i assignacions de tot el grup ja són llegibles per qualsevol
+   membre (és exactament el que carrega Calendaris). */
 function pintaEstadistiques(){
-  if (!esAdmin){ triaTab("graella"); return; }
   const st = statsCobertura();
   const files = famOrd().map(f2 => Object.assign({ f: f2 }, statsCoberturaFam(f2)))
     .sort((a, b) => (a.tot ? a.cob / a.tot : 2) - (b.tot ? b.cob / b.tot : 2));

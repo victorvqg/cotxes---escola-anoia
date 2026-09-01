@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.41: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.41"') && !/versió 4\.40|versio_app: "4\.40"/.test(html));
+  T("v4.42: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.42"') && !/versió 4\.41|versio_app: "4\.41"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -692,9 +692,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.41» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.42» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.41"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.42"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1900,9 +1900,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   })());
   T("v4.18: cada família amb la seva línia d'estat de pendents", cos().includes("als seus viatges"));
   await surtIentra("grau@test.cat", "grau123");
-  T("v4.18: fora de l'admin no hi ha Estadístiques al menú", !d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
+  T("v4.42: un usuari normal TAMBÉ té «Estadístiques» al menú (abans només l'admin)",
+    d.querySelector("#calaix").innerHTML.includes("Estadístiques"));
   w.triaTab("estad"); await tic();
-  T("…i la pestanya el retorna a la Graella", cos().includes("Toca una casella"));
+  T("v4.42: … i hi entra de debò, amb el mateix contingut (barra del grup + barres per família)",
+    cos().includes("Trajectes coberts del grup") && (cos().match(/barra-cob/g) || []).length >= w.doc.families.length + 1);
+  T("v4.42: cap dada de comptes ni correus a Estadístiques (només barres)",
+    !cos().includes("@") && !cos().includes("titular") && !cos().includes("Comptes"));
   await surtIentra("admin@test.cat", "admin123");
 
   console.log("10q · NOVETATS v4.26 (progenitor només lectura decidit pel servidor)");
