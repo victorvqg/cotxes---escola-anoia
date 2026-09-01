@@ -383,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.52";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.53";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -2115,7 +2115,7 @@ function tancaAdmin(){ if (famId && lameva()) pantallaApp(); else pantallaTria()
 function pantallaAdmin(){
   document.body.classList.add("dins");
   setTimeout(pintaPeuStats, 0);
-  if (esAdmin){ setTimeout(carregaCodis, 0); setTimeout(carregaCodiCreacio, 0); }
+  if (esAdmin){ setTimeout(carregaCodis, 0); }
   let cos;
   if (esAdmin){
     cos = "<p class='lead'>\ud83d\udee1\ufe0f Ets l'administrador del grup <b>" + esc(doc.grupNom || "") + "</b>. El teu rol ve de la base de dades: ja no hi ha codis secrets que activar.</p>" +
@@ -2123,9 +2123,7 @@ function pantallaAdmin(){
       "<div class='fila' style='align-items:center;gap:8px'><div class='nomgran' style='letter-spacing:.14em;flex:1;text-align:center'>" + esc(grupActiu ? grupActiu.invite_code : "\u2014") + "</div><button class='boto sec' onclick='copiaTextCodiGrup(this)'>Copia el codi</button></div>" +
       "<div id='codis-box'><p class='hint'>Carregant\u2026</p></div>" +
       "<p class='hint'>Rols: a la pestanya \u00abFam\u00edlies\u00bb tens \u00abedita\u00bb a cada fam\u00edlia, i a \u00abRols\u00bb (men\u00fa \u2630) alternes usuari \u2194 staff.</p>" +
-      "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Codi de creaci\u00f3 de grup<span class='p-sub'>cal per crear un grup NOU. No \u00e9s dins l'app: viu a Supabase i nom\u00e9s el veus tu</span></span></div>" +
-      "<div id='codicreacio-box'><p class='hint'>Carregant\u2026</p></div>" +
-      "<div class='p-fila' style='margin-top:8px'><span class='p-lab'>Importa les dades antigues<span class='p-sub'>enganxa el contingut del vell <b>dades.json</b> (del repo privat de GitHub) per passar les fam\u00edlies, els nens, les marques i les assignacions a Supabase. Les fam\u00edlies que ja existeixin pel mateix nom es respecten.</span></span></div>" +
+      "<div class='p-fila' style='margin-top:14px'><span class='p-lab'>Importa les dades antigues<span class='p-sub'>enganxa el contingut del vell <b>dades.json</b> (del repo privat de GitHub) per passar les fam\u00edlies, els nens, les marques i les assignacions a Supabase. Les fam\u00edlies que ja existeixin pel mateix nom es respecten.</span></span></div>" +
       "<textarea class='input' id='imp-json' rows='5' placeholder='{\"families\":[…]}' style='font-family:monospace;font-size:13px'></textarea>" +
       "<div class='fila' style='margin-top:8px'><button class='boto' onclick='importaDades()'>Importa les dades</button></div>" +
       "<div id='imp-estat' class='hint' style='margin-top:6px'></div>" +
@@ -2162,29 +2160,6 @@ function copiaCodiAmbAvis(c, btn){
 }
 function copiaTextCodiGrup(btn){ copiaCodiAmbAvis(grupActiu ? grupActiu.invite_code : "", btn); }
 function copiaTextCodiFam(btn){ const f = lameva(); copiaCodiAmbAvis(f && f.codiFam ? f.codiFam : "", btn); }
-async function carregaCodiCreacio(){
-  const box = $("#codicreacio-box"); if (!box || !esAdmin) return;
-  const r = await sb.rpc("codi_creacio_grup");
-  if (r.error){
-    box.innerHTML = "<p class='hint'>No s'ha pogut llegir: " + esc(msgNeta(r.error)) + "<br>Si diu que la funci\u00f3 no existeix, encara no has executat el <b>supabase-v41.sql</b>.</p>";
-    return;
-  }
-  box.innerHTML =
-    "<div class='fila' style='align-items:center;gap:8px'><input class='input' id='cc-codi' value=\"" + esc(String(r.data || "")) + "\" maxlength='40' style='text-transform:uppercase'>" +
-    "<button class='boto' onclick='desaCodiCreacio()'>Desa</button></div>" +
-    "<p class='hint' style='margin-top:4px'>M\u00ednim 4 car\u00e0cters. Qui el tingui podr\u00e0 crear un grup nou i ser-ne l'administrador.</p>";
-}
-async function desaCodiCreacio(){
-  if (!esAdmin) return;
-  const v = $("#cc-codi") ? $("#cc-codi").value.trim() : "";
-  if (v.length < 4){ avis("El codi de creaci\u00f3 ha de tenir com a m\u00ednim 4 car\u00e0cters."); return; }
-  estat("Desant\u2026");
-  const r = await sb.rpc("set_codi_creacio_grup", { p_codi: v });
-  if (r.error){ estat("Error", true); avis("No s'ha pogut desar: " + esc(msgNeta(r.error))); return; }
-  estat("Desat \u2713", "ok");
-  avis("\u2713 Codi de creaci\u00f3 actualitzat.", true);
-  carregaCodiCreacio();
-}
 async function carregaCodis(){
   const box = $("#codis-box"); if (!box || !esAdmin) return;
   const r = await sb.rpc("codis_families");
