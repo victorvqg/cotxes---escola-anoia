@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.51: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.51"') && !/versió 4\.50|versio_app: "4\.50"/.test(html));
+  T("v4.52: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.52"') && !/versió 4\.51|versio_app: "4\.51"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -703,9 +703,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.51» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.52» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.51"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.52"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1331,6 +1331,32 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("…i el directori ja NO penja a sota de la pantalla principal", !pant().includes("<details class='conf'><summary>"));
   T("v4.51: les places lliures del cotxe fan servir 💺, no 🪑 (coherent amb el peu d'estadístiques)",
     cos().includes("💺 Places lliures al cotxe") && !cos().includes("🪑"));
+
+  console.log("NOVETATS v4.52 (Famílies del grup es refresca en obrir la pestanya)");
+  {
+    // simula que UN ALTRE compte ha creat una família (insert directe a la BD,
+    // sense passar per doc.families d'aquesta sessió — com faria un altre dispositiu)
+    const gid = famDB("Vila Puig").group_id;
+    const insRes = await fakeSupabaseClient().from("families").insert({ group_id: gid, name: "Nova Provatures", cognom1: "Nova", role: "usuari" }).select("id");
+    T("v4.52: (comprovació) ja és a la BD però encara no al doc.families en memòria d'aquesta sessió",
+      !insRes.error && !w.doc.families.some(x2 => x2.nom === "Nova Provatures"));
+    w.triaTab("perfil"); await tic();
+    w.triaTab("families"); await tic(20);
+    T("v4.52: en (re)obrir Famílies, la llista es refresca sola i ja hi surt la família nova",
+      cos().includes("Nova Provatures") && w.doc.families.some(x2 => x2.nom === "Nova Provatures"));
+    // amb canvis locals sense desar, el refresc NO ha de trepitjar-los
+    const gid2 = famDB("Vila Puig").group_id;
+    await fakeSupabaseClient().from("families").insert({ group_id: gid2, name: "Altra Provatures", cognom1: "Altra", role: "usuari" });
+    w.triaTab("perfil"); await tic();
+    w.canviaPlaces(1); await tic();   // deixa un canvi local sense desar (dirty=true)
+    w.triaTab("families"); await tic(20);
+    T("v4.52: amb canvis sense desar, el refresc s'ajorna (no es trepitgen)",
+      !cos().includes("Altra Provatures"));
+    w.triaTab("perfil"); await tic(); w.canviaPlaces(-1); await w.desa(); await tic(30);
+    // neteja
+    DB.families = DB.families.filter(x2 => x2.name !== "Nova Provatures" && x2.name !== "Altra Provatures");
+    await w.sbGet(); await tic(10);
+  }
   w.triaTab("perfil"); await tic();
   T("sense canvis no hi ha botó Desa dins del perfil", !cos().includes("Desa els canvis"));
   w.canviaPlaces(1); await tic();

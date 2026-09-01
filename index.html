@@ -383,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.51";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.52";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -1677,7 +1677,7 @@ function triaTab(t){
   else if (t === "cotxe") pintaCotxe();
   else if (t === "avisos") pintaAvisos();
   else if (t === "descarrega") pintaDescarrega();
-  else if (t === "families") pintaFamilies();
+  else if (t === "families") refrescaFamilies();
   else if (t === "rols") pintaRols();
   else if (t === "estad") pintaEstadistiques();
   else if (t === "ajuda") pintaAjuda();
@@ -1738,6 +1738,16 @@ function pintaFamilies(){
   $("#tab-cos").innerHTML =
     "<div class='targeta'><div class='p-fila'><span class='p-lab'>Les famílies del grup «" + esc(doc.grupNom || "") + "» (" + doc.families.length + ")<span class='p-sub'><b>" + nOk + "</b> " + (nOk === 1 ? "completa" : "completes") + " · <b>" + nPend + "</b> " + (nPend === 1 ? "pendent" : "pendents") + ((esAdmin || esStaff) && !esProgenitor ? " · amb «edita» hi entres a corregir" : "") + "</span></span></div>" +
     (dirHtml || "<p class='hint'>Encara no hi ha cap família.</p>") + "</div>";
+}
+/* v4.52: doc.families viu en memòria i només es refrescava en carregar l'app o
+   en desar — una família creada per un altre compte no hi apareixia fins
+   recarregar la pàgina. Es repinta amb el que ja hi ha (resposta instantània)
+   i, si no hi ha canvis locals sense desar (que no s'han de trepitjar), es
+   torna a demanar a Supabase i es repinta amb l'estat real. */
+function refrescaFamilies(){
+  pintaFamilies();
+  if (dirty) return;
+  sbGet().then(() => { if (tabAct === "families" && !dirty) pintaFamilies(); }).catch(() => {});
 }
 
 function canviaFam(){
