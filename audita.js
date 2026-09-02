@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.57: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.57"') && !/versió 4\.56|versio_app: "4\.56"/.test(html));
+  T("v4.58: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.58"') && !/versió 4\.57|versio_app: "4\.57"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -652,7 +652,25 @@ function rpc(nom, p){
           child_name: "", action: "família donada de baixa", detail: msgGrup, actor_name: meuNom, created_at: new Date().toISOString(), numero: proxNumeroAvis(x2.id) });
       });
     }
-    DB.profiles.forEach(x => { if (x.family_id === f.id){ x.family_id = null; x.status = "pendent"; } });
+    // v4.58: un ADMIN esborrant la família D'ALTRI s'emporta TAMBÉ els
+    // comptes vinculats (perfil I l'usuari sencer); l'autoesborrat («Surt
+    // del grup», mevaFamId() === f.id) es queda igual que sempre: desvincula.
+    if (mevaFamId() !== f.id){
+      DB.profiles.filter(x => x.family_id === f.id).slice().forEach(pr => {
+        const uid = pr.id;
+        DB.notification_reads = DB.notification_reads.filter(x2 => x2.user_id !== uid);
+        DB.join_requests = DB.join_requests.filter(x2 => x2.user_id !== uid);
+        DB.weekly_marks.forEach(m2 => { if (m2.updated_by === uid) m2.updated_by = null; });
+        DB.assignments.forEach(a2 => { if (a2.updated_by === uid) a2.updated_by = null; });
+        DB.activity_log.forEach(l2 => { if (l2.actor_id === uid) l2.actor_id = null; });
+        DB.families.forEach(x2 => { if (x2.owner_id === uid) x2.owner_id = null; });
+        logBD(f.group_id, "baixa compte", mevaFamId(), ((DB.users[uid] || {}).email || "") + " esborrat amb la família " + f.name);
+        DB.profiles = DB.profiles.filter(x2 => x2.id !== uid);
+        delete DB.users[uid];
+      });
+    } else {
+      DB.profiles.forEach(x => { if (x.family_id === f.id){ x.family_id = null; x.status = "pendent"; } });
+    }
     logBD(f.group_id, "baixa família", mevaFamId(), f.name + " esborrada");
     DB.activity_log.forEach(x => { if (x.family_id === f.id && x.action !== "baixa família"){ x.actor_id = null; x.details = ""; } });
     DB.assignments = DB.assignments.filter(a => a.driver_family_id !== f.id && nensIds.indexOf(a.child_id) < 0);
@@ -717,9 +735,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.57» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.58» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.57"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.58"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1324,7 +1342,7 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   const r3 = await fakeSupabaseClient().rpc("claim_family", { p_family: famDB("Ajudada Extra").id, p_token: codiAjudada() });
   T("i el servidor rebutja el tercer compte encara que ho intenti per codi", !!r3.error && r3.error.message.includes("2 comptes"));
 
-  console.log("9 · BAIXA D'UNA FAMÍLIA (cascada + comptes desvinculats)");
+  console.log("9 · BAIXA D'UNA FAMÍLIA (cascada + comptes esborrats: l'ADMIN ho fa des d'una altra família)");
   await surtIentra("admin@test.cat", "admin123");
   w.adminEdita(famDB("Ajudada Extra").id); await tic(20);
   await w.esborraFam(); await tic(20);
@@ -1334,10 +1352,13 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await w.esborraFam(); await tic(20);
   d.querySelector("#conf-si").click(); await tic(30);
   T("la família esborrada desapareix de la BD amb els seus fills", DB.families.length === 5 && !famDB("Ajudada Extra") && !DB.children.some(c => c.name === "Pau"));
-  T("els comptes de la família queden desvinculats", DB.profiles.filter(p => ["c@test.cat", "d2@test.cat"].includes(p.email)).every(p => p.family_id === null && p.status === "pendent"));
+  T("v4.58: aquest RPC el crida l'ADMIN sobre una família que NO és la seva (adminEdita) — encara que sigui pel botó de sempre («Surt del grup»), és el mateix cas que el panell nou: els comptes DESAPAREIXEN de debò, no només es desvinculen",
+    !DB.profiles.some(p => ["c@test.cat", "d2@test.cat"].includes(p.email)) &&
+    !Object.values(DB.users).some(u => ["c@test.cat", "d2@test.cat"].includes(u.email)));
   T("l'admin torna a casa seva", pant().includes("Hola") && pant().includes("Vila Puig"));
   await surtIentra("c@test.cat", "ccc123");
-  T("l'usuari desvinculat torna a la porta del grup", pant().includes("codi d") || pant().includes("Crea el grup"));
+  T("v4.58: el compte esborrat ja NO pot tornar a entrar (credencials invàlides, no un simple «sense família»)",
+    pant().includes("Correu o contrasenya incorrectes") && !pant().includes("Hola"));
 
   console.log("10 · REGISTRE D'ACTIVITÀ (admin el llegeix, la resta no)");
   await surtIentra("admin@test.cat", "admin123");
@@ -1586,7 +1607,11 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("la Graella porta el nom del grup al títol", (d.querySelector("#cap-titol") || { innerHTML: "" }).innerHTML.includes("EA 25/26"));
   w.triaTab("perfil"); await tic();
   T("al Perfil ja NO hi ha el curs de família duplicat (només curs per nen)", !cos().includes('onchange="triaCurs(this.value)"'));
-  await surtIentra("c@test.cat", "ccc123");   // compte desvinculat de la secció 9
+  // v4.58: c@test.cat ja NO serveix (la secció 9 el va esborrar de debò, no
+  // desvincular) — un compte nou, sense família, fa exactament el mateix paper.
+  afegeixUsuari("recl@test.cat", "recl123");
+  await surtIentra("recl@test.cat", "recl123");
+  await acceptaConsentiment();
   await uneixAmbCodi(CODI);
   d.querySelector("#sel-fam").value = famDB("Vila Puig").id;
   w.selFamCanvia(); await tic();
@@ -1986,46 +2011,56 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.13: l'esborrat queda al registre d'activitat ('baixa compte')",
     DB.activity_log.some(l => l.action === "baixa compte"));
 
-  console.log("10l2 · NOVETATS v4.57 (Esborra una família — panell d'admin)");
+  console.log("10l2 · NOVETATS v4.58 (Esborra una família — també esborra els comptes vinculats)");
   {
     // família sintètica i AÏLLADA (no la toca cap altra prova): es crea NOMÉS
     // per verificar la interfície nova i s'esborra ella mateixa en acabar.
+    // Amb un compte vinculat (titular), per comprovar que l'esborrat també
+    // se l'emporta a ELL, no només la família.
     const gid57 = famDB("Vila Puig").group_id;
     await fakeSupabaseClient().from("families").insert({ group_id: gid57, name: "Família Esborrable", cognom1: "Esborrable", role: "usuari" });
     const id57 = famDB("Família Esborrable").id;
     DB.children.push({ id: randomUUID(), family_id: id57, name: "Nen Esborrable", curs: "1r ESO" });
+    const uEsb = afegeixUsuari("esborrable@test.cat", "x");
+    DB.profiles.push({ id: uEsb.id, email: uEsb.email, family_id: id57, requested_group: null, status: "aprovat", consent_at: new Date().toISOString(), created_at: new Date().toISOString() });
+    famDB("Família Esborrable").owner_id = uEsb.id;
     await w.sbGet(); await tic(10);
     w.obreAdmin(); await tic();
     const ebox = () => (d.querySelector("#esb-fam-box") || { innerHTML: "" }).innerHTML;
-    T("v4.57: el panell d'admin té l'apartat «Esborra una família», amb una fila desplegable per família",
+    T("v4.58: el panell d'admin té l'apartat «Esborra una família», amb una fila desplegable per família",
       pant().includes("Esborra una família") && ebox().includes("Família Esborrable") && ebox().includes("<details") && ebox().includes("Esborra aquesta família"));
     const rowAdmin57 = ebox().split("</details>").find(x2 => x2.includes("Vila Puig")) || "";
-    T("v4.57: la família de l'admin connectat té el botó desactivat, amb l'avís explicatiu",
+    T("v4.58: la família de l'admin connectat té el botó desactivat, amb l'avís explicatiu",
       rowAdmin57.includes("disabled") && rowAdmin57.includes("no es pot esborrar des d'aquí"));
     const rowEsb57 = ebox().split("</details>").find(x2 => x2.includes("Família Esborrable")) || "";
-    T("v4.57: … i la resta de famílies tenen el botó vermell actiu",
+    T("v4.58: … i la resta de famílies tenen el botó vermell actiu",
       rowEsb57.includes("Esborra aquesta família") && !rowEsb57.includes("disabled"));
     const fam57 = w.doc.families.find(x2 => x2.nom === "Família Esborrable");
-    w.esborraFamAdminUI(fam57.id); await tic(5);
+    await w.esborraFamAdminUI(fam57.id); await tic(5);
     const confTxt57 = () => (d.querySelector("#conf-box") || { textContent: "" }).textContent;
-    T("v4.57: el diàleg detalla EXACTAMENT què s'esborra (fills, graella, assignacions, avisos) i demana el nom exacte",
+    T("v4.58: el diàleg diu clarament que s'esborraran família, fills, graella, viatges I ELS COMPTES (amb el correu), i que no es pot desfer",
+      confTxt57().includes("S'esborraran la família, els fills, la graella, els viatges i els comptes") &&
+      confTxt57().includes("esborrable@test.cat") && confTxt57().includes("no es pot desfer"));
+    T("v4.58: … i el detall complet: fills, marques, assignacions (amb l'efecte a les places) i que el compte ja no hi podrà entrar",
       confTxt57().includes("Nen Esborrable") && confTxt57().includes("marques de la seva graella") &&
       confTxt57().includes("demana plaça") && confTxt57().includes("plaça lliure") &&
-      confTxt57().includes("nom EXACTE") && d.querySelector("#conf-si").disabled);
-    T("v4.57: … i deixa clar que els comptes NO s'esborren des d'aquí (queden sense família)",
-      confTxt57().includes("no s'esborren aquí") && confTxt57().includes("sense família"));
+      confTxt57().includes("ja no hi podran entrar") && confTxt57().includes("nom EXACTE") && d.querySelector("#conf-si").disabled);
     w.verificaNomEsbFam("nom equivocat");
-    T("v4.57: amb el nom equivocat el botó de confirmar segueix desactivat", d.querySelector("#conf-si").disabled);
+    T("v4.58: amb el nom equivocat el botó de confirmar segueix desactivat", d.querySelector("#conf-si").disabled);
     w.verificaNomEsbFam("Família Esborrable");
-    T("v4.57: amb el nom EXACTE el botó s'activa", !d.querySelector("#conf-si").disabled);
+    T("v4.58: amb el nom EXACTE el botó s'activa", !d.querySelector("#conf-si").disabled);
     d.querySelector("#conf-si").click(); await tic(30);
-    T("v4.57: s'esborra de debò — família i fill desapareixen, i l'avís de l'app ho confirma",
+    T("v4.58: s'esborra de debò — família, fill I EL COMPTE (profiles i auth.users) desapareixen, i l'avís de l'app ho confirma",
       !DB.families.some(x2 => x2.id === id57) && !DB.children.some(c2 => c2.family_id === id57) &&
-      d.querySelector("#avis").textContent.includes("Família Esborrable esborrada"));
-    T("v4.57: … i la resta del grup rep l'avís general de baixa",
+      !DB.profiles.some(x2 => x2.id === uEsb.id) && !DB.users[uEsb.id] &&
+      d.querySelector("#avis").textContent.includes("Família Esborrable esborrada") &&
+      d.querySelector("#avis").textContent.includes("comptes vinculats"));
+    T("v4.58: … i la resta del grup rep l'avís general de baixa",
       DB.notifications.some(n2 => n2.family_id === famDB("Vila Puig").id &&
         (n2.message || "").includes("La família Família Esborrable s'ha donat de baixa") &&
         (n2.message || "").includes("places que ocupava tornen a estar lliures")));
+    T("v4.58: … i queda constància a l'activitat de quin compte s'ha esborrat",
+      DB.activity_log.some(l2 => l2.action === "baixa compte" && (l2.details || "").includes("esborrable@test.cat")));
     // esborraFamAdminDeDebò ja repinta pantallaAdmin(): el panell queda obert,
     // tal com el necessita «10m» just a continuació.
   }
