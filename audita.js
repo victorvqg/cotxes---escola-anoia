@@ -29,8 +29,8 @@ console.log("0 · CABLEJAT ESTÀTIC");
   const idsOrfes = [...idsRef].filter(i => !idsDef.has(i));
   T("tots els ids referenciats (" + idsRef.size + ") existeixen", idsOrfes.length === 0, idsOrfes.join(","));
   T("lema amb Montbui → Escola Anoia", html.includes("Montbui → Escola Anoia"));
-  T("v4.56: font única de la versió (const VERSIO), sense números escrits a mà repetits",
-    html.includes('const VERSIO = "4.56"') && !/versió 4\.55|versio_app: "4\.55"/.test(html));
+  T("v4.57: font única de la versió (const VERSIO), sense números escrits a mà repetits",
+    html.includes('const VERSIO = "4.57"') && !/versió 4\.56|versio_app: "4\.56"/.test(html));
   T("ja no queda res del backend GitHub", !html.includes("api.github.com") && !html.includes("github_pat") && !html.includes("ghGet") && !html.includes("ghPut"));
   T("Google fora del tot (ni botó, ni text, ni funció)", !html.includes("Google") && !html.includes("fesGoogle") && !html.includes("GOOGLE_OAUTH"));
   // v3.2: l'SQL ha d'incloure el codi de família, el bloqueig staff→admin i els límits
@@ -618,6 +618,10 @@ function rpc(nom, p){
     if (!(mevaFamId() === f.id || socAdmin())) return err("No tens permís per esborrar aquesta família");
     if (f.role === "admin" && mevaFamId() === f.id && DB.families.some(x => x.group_id === f.group_id && x.id !== f.id))
       return err("Ets l'administrador: transfereix el rol o esborra primer la resta de famílies");
+    // v4.57 (SQL v54): un admin només pot esborrar famílies DEL SEU GRUP — el
+    // camí d'autoesborrat (la família és la seva pròpia) no canvia.
+    if (socAdmin() && mevaFamId() !== f.id && f.group_id !== grupMeu())
+      return err("Aquesta família no pertany al teu grup");
     const HORA_M = { e8: "7.35", e9: "8.35", r13: "13.00", e15: "14.35", r17: "17.00" };
     const DIA_M = { dl: "Dilluns", dt: "Dimarts", dc: "Dimecres", dj: "Dijous", dv: "Divendres" };
     const nensIds = DB.children.filter(c => c.family_id === f.id).map(c => c.id);
@@ -638,6 +642,16 @@ function rpc(nom, p){
       DB.notifications.push({ id: randomUUID(), family_id: cDriver.id, message: msg, family_name: cDriver.name,
         child_name: cNen.name, action: "es queda sense cotxe", detail: msg, actor_name: f.name, created_at: new Date().toISOString(), numero: proxNumeroAvis(cDriver.id) });
     });
+    // v4.57 (SQL v54): avís GENERAL a la resta del grup — no només qui hi
+    // tenia relació directa (els casos c-1/c-2 de dalt)
+    {
+      const meuNom = (famPerId(mevaFamId()) || {}).name || "";
+      const msgGrup = "La família " + f.name + " s'ha donat de baixa; les places que ocupava tornen a estar lliures.";
+      DB.families.filter(x => x.group_id === f.group_id && x.id !== f.id).forEach(x2 => {
+        DB.notifications.push({ id: randomUUID(), family_id: x2.id, message: msgGrup, family_name: f.name,
+          child_name: "", action: "família donada de baixa", detail: msgGrup, actor_name: meuNom, created_at: new Date().toISOString(), numero: proxNumeroAvis(x2.id) });
+      });
+    }
     DB.profiles.forEach(x => { if (x.family_id === f.id){ x.family_id = null; x.status = "pendent"; } });
     logBD(f.group_id, "baixa família", mevaFamId(), f.name + " esborrada");
     DB.activity_log.forEach(x => { if (x.family_id === f.id && x.action !== "baixa família"){ x.actor_id = null; x.details = ""; } });
@@ -703,9 +717,9 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   await tic(30);
 
   console.log("0b · PEU: crèdit i versió (v4.35)");
-  T("el crèdit «creat per Víctor Quintana · versió 4.56» surt sota el peu, ABANS de cap login",
+  T("el crèdit «creat per Víctor Quintana · versió 4.57» surt sota el peu, ABANS de cap login",
     (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("creat per Víctor Quintana") &&
-    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.56"));
+    (d.querySelector("#peu-credit") || { textContent: "" }).textContent.includes("versió 4.57"));
   T("…i és una línia PRÒPIA, després de #peu-stats dins el mateix peu",
     !!d.querySelector("footer.credit #peu-stats + #peu-credit"));
 
@@ -1972,6 +1986,50 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
   T("v4.13: l'esborrat queda al registre d'activitat ('baixa compte')",
     DB.activity_log.some(l => l.action === "baixa compte"));
 
+  console.log("10l2 · NOVETATS v4.57 (Esborra una família — panell d'admin)");
+  {
+    // família sintètica i AÏLLADA (no la toca cap altra prova): es crea NOMÉS
+    // per verificar la interfície nova i s'esborra ella mateixa en acabar.
+    const gid57 = famDB("Vila Puig").group_id;
+    await fakeSupabaseClient().from("families").insert({ group_id: gid57, name: "Família Esborrable", cognom1: "Esborrable", role: "usuari" });
+    const id57 = famDB("Família Esborrable").id;
+    DB.children.push({ id: randomUUID(), family_id: id57, name: "Nen Esborrable", curs: "1r ESO" });
+    await w.sbGet(); await tic(10);
+    w.obreAdmin(); await tic();
+    const ebox = () => (d.querySelector("#esb-fam-box") || { innerHTML: "" }).innerHTML;
+    T("v4.57: el panell d'admin té l'apartat «Esborra una família», amb una fila desplegable per família",
+      pant().includes("Esborra una família") && ebox().includes("Família Esborrable") && ebox().includes("<details") && ebox().includes("Esborra aquesta família"));
+    const rowAdmin57 = ebox().split("</details>").find(x2 => x2.includes("Vila Puig")) || "";
+    T("v4.57: la família de l'admin connectat té el botó desactivat, amb l'avís explicatiu",
+      rowAdmin57.includes("disabled") && rowAdmin57.includes("no es pot esborrar des d'aquí"));
+    const rowEsb57 = ebox().split("</details>").find(x2 => x2.includes("Família Esborrable")) || "";
+    T("v4.57: … i la resta de famílies tenen el botó vermell actiu",
+      rowEsb57.includes("Esborra aquesta família") && !rowEsb57.includes("disabled"));
+    const fam57 = w.doc.families.find(x2 => x2.nom === "Família Esborrable");
+    w.esborraFamAdminUI(fam57.id); await tic(5);
+    const confTxt57 = () => (d.querySelector("#conf-box") || { textContent: "" }).textContent;
+    T("v4.57: el diàleg detalla EXACTAMENT què s'esborra (fills, graella, assignacions, avisos) i demana el nom exacte",
+      confTxt57().includes("Nen Esborrable") && confTxt57().includes("marques de la seva graella") &&
+      confTxt57().includes("demana plaça") && confTxt57().includes("plaça lliure") &&
+      confTxt57().includes("nom EXACTE") && d.querySelector("#conf-si").disabled);
+    T("v4.57: … i deixa clar que els comptes NO s'esborren des d'aquí (queden sense família)",
+      confTxt57().includes("no s'esborren aquí") && confTxt57().includes("sense família"));
+    w.verificaNomEsbFam("nom equivocat");
+    T("v4.57: amb el nom equivocat el botó de confirmar segueix desactivat", d.querySelector("#conf-si").disabled);
+    w.verificaNomEsbFam("Família Esborrable");
+    T("v4.57: amb el nom EXACTE el botó s'activa", !d.querySelector("#conf-si").disabled);
+    d.querySelector("#conf-si").click(); await tic(30);
+    T("v4.57: s'esborra de debò — família i fill desapareixen, i l'avís de l'app ho confirma",
+      !DB.families.some(x2 => x2.id === id57) && !DB.children.some(c2 => c2.family_id === id57) &&
+      d.querySelector("#avis").textContent.includes("Família Esborrable esborrada"));
+    T("v4.57: … i la resta del grup rep l'avís general de baixa",
+      DB.notifications.some(n2 => n2.family_id === famDB("Vila Puig").id &&
+        (n2.message || "").includes("La família Família Esborrable s'ha donat de baixa") &&
+        (n2.message || "").includes("places que ocupava tornen a estar lliures")));
+    // esborraFamAdminDeDebò ja repinta pantallaAdmin(): el panell queda obert,
+    // tal com el necessita «10m» just a continuació.
+  }
+
   console.log("10m · NOVETATS v4.16 (fila neta amb alta/últim accés + esborrat múltiple)");
   await w.mostraComptes(); await tic(10);
   const rowAdm16 = () => (cb13().split("</details>").find(x => x.includes("admin@test.cat")) || "");
@@ -2146,12 +2204,23 @@ const afegeixUsuari = (email, pass) => { const u = { id: randomUUID(), email: em
     DB.assignments.push({ id: randomUUID(), group_id: cVilaP.group_id, driver_family_id: cVilaP.id, child_id: idArlet, slot: "e9", day: "dv", updated_by: null });     // Vila Puig porta l'Arlet (fill de Grau)
     const rSurtC = await fakeSupabaseClient().rpc("esborra_familia", { p_family: cGrau.id });
     T("v4.38 · cas (c): l'esborrat de la família funciona igual que abans", !rSurtC.error && !famDB("Grau"));
+    T("v4.57: esborrar la família treu els seus fills, les marques de graella i TOTES les assignacions — com a conductor i com a passatger — i allibera les places dels cotxes",
+      !DB.children.some(c2 => c2.family_id === cGrau.id) &&
+      !DB.weekly_marks.some(m2 => m2.family_id === cGrau.id) &&
+      !DB.assignments.some(a2 => a2.driver_family_id === cGrau.id) &&
+      !DB.assignments.some(a2 => a2.child_id === idJan() && a2.slot === "e8" && a2.day === "dv") &&
+      !DB.assignments.some(a2 => a2.child_id === idArlet));
     T("v4.38 · cas (c-1): el passatger (Janot) rep l'avís que el conductor ha marxat del grup",
       DB.notifications.some(n2 => n2.family_id === cVilaP.id && (n2.message || "").includes("Janot") &&
         (n2.message || "").includes("ha marxat del grup") && (n2.message || "").includes("Cal buscar-li plaça") && (n2.message || "").includes("Divendres 7.35")));
     T("v4.38 · cas (c-2): el conductor (Vila Puig) sap que l'Arlet ja no forma part de Grau",
       DB.notifications.some(n2 => n2.family_id === cVilaP.id && (n2.message || "").includes("Arlet") &&
         (n2.message || "").includes("ja no forma part de la família Grau") && (n2.message || "").includes("seient")));
+    T("v4.57: TOTA la resta del grup rep l'avís general de baixa (no només qui hi tenia relació directa)",
+      DB.families.filter(x2 => x2.group_id === cVilaP.group_id).every(x2 =>
+        DB.notifications.some(n2 => n2.family_id === x2.id &&
+          (n2.message || "").includes("La família Grau s'ha donat de baixa") &&
+          (n2.message || "").includes("places que ocupava tornen a estar lliures"))));
   }
 
   console.log("10s · NOVETATS v4.43 (Ajuda sense índex, pestanyes plegables natives)");

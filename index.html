@@ -383,7 +383,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpiZmpyZ2Rkc3l3cG13YWJ2YnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MDA1NzksImV4cCI6MjEwMzQ3NjU3OX0.ltCfa1PSZW8txoWd9OKyfuoeKfQE4xgYndv6z71QKYs"  // Supabase → Project Settings → API → anon public (comença per eyJ…). És pública per disseny; la seguretat la fa RLS.
 };
 
-const VERSIO = "4.56";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
+const VERSIO = "4.57";   // v4.35: font única — el peu i la còpia de seguretat la llegeixen d'aquí
 const DIES = ["dl","dt","dc","dj","dv"];
 const CURSOS = ["1r ESO", "2n ESO", "3r ESO", "4t ESO"];
 const DIES_LBL = {dl:"Dl",dt:"Dt",dc:"Dc",dj:"Dj",dv:"Dv"};
@@ -2149,7 +2149,9 @@ function pantallaAdmin(){
       "<div id='comptes-box' style='margin-top:8px'></div>" +
       "<div class='p-fila' style='margin-top:16px'><span class='p-lab'>Activitat del grup<span class='p-sub'>registre de qui ha fet qu\u00e8; nom\u00e9s el veus tu</span></span></div>" +
       "<div class='fila'><button class='boto sec' onclick='mostraLogs()'>Mostra els logs</button><button class='boto sec' onclick='copiaSeguretat()'>\ud83d\udcbe C\u00f2pia de seguretat (JSON)</button></div>" +
-      "<div id='logs-box' style='margin-top:8px'></div>";
+      "<div id='logs-box' style='margin-top:8px'></div>" +
+      "<div class='p-fila' style='margin-top:16px'><span class='p-lab'>Esborra una fam\u00edlia<span class='p-sub'>treu la fam\u00edlia sencera del grup: fills, graella i assignacions als cotxes. Els comptes (titular i adjunt) NO s'esborren aqu\u00ed \u2014 es queden sense fam\u00edlia. No es pot desfer</span></span></div>" +
+      "<div id='esb-fam-box'>" + esborraFamiliesHtml() + "</div>";
   } else if (esStaff){
     cos = "<p class='lead'>\ud83d\udee0\ufe0f Ets <b>staff</b> del grup: pots entrar a les fam\u00edlies (\u00abedita\u00bb a la pestanya \u00abFam\u00edlies\u00bb) i corregir-les. No pots crear-ne ni tocar la fam\u00edlia de l'administrador.</p>";
   } else {
@@ -2839,6 +2841,60 @@ async function esborraFamDeDebò(f){
   estat("Desat ✓", "ok");
   if (!perfil.family_id){ famId = ""; pantallaGrup(); }
   else { famId = perfil.family_id; await sbGet(); pantallaApp(); }
+}
+
+/* ── Admin: esborrar QUALSEVOL família del grup (v4.57) ──
+   Mateix RPC que «Surt del grup» (esborra_familia), reutilitzat: esborra
+   en cadena els fills, la graella i les assignacions (ON DELETE CASCADE a
+   l'esquema), desvincula els comptes (NO els esborra) i avisa el grup. */
+function esborraFamiliesHtml(){
+  if (!doc || !doc.families) return "";
+  return famOrd().map(x => {
+    const fix = doc.adminFam ? x.id === doc.adminFam : x.rol === "admin";
+    return "<details class='conf fam-det'><summary><b>" + esc(x.nom) + "</b>" +
+      ((x.nens || []).length ? " <span class='hint'>· " + esc(x.nens.map(n => n.nom).join(", ")) + "</span>" : "") + "</summary>" +
+      "<div style='padding:4px 2px 8px;text-align:right'>" +
+      "<button class='boto sec' style='color:#97301F'" +
+      (fix ? " disabled" : " onclick=\"esborraFamAdminUI('" + x.id + "')\"") + ">Esborra aquesta família</button>" +
+      (fix ? "<div class='hint'>La família de l'administrador connectat no es pot esborrar des d'aquí.</div>" : "") +
+      "</div></details>";
+  }).join("");
+}
+var nomEsbFamEsperat = null;
+function verificaNomEsbFam(v){ const b = $("#conf-si"); if (b) b.disabled = String(v || "").trim() !== nomEsbFamEsperat; }
+function esborraFamAdminUI(id){
+  if (!esAdmin) return;
+  const f = doc.families.find(x => x.id === id); if (!f) return;
+  const fix = doc.adminFam ? f.id === doc.adminFam : f.rol === "admin";
+  if (fix) return;
+  nomEsbFamEsperat = f.nom;
+  const fills = (f.nens || []).map(n => n.nom).join(", ");
+  mostraConfirm({
+    titol: "🗑️ Esborrar la família " + esc(f.nom) + "?",
+    text: "S'esborrarà TOT, a l'instant, i no es pot desfer:" +
+      "<ul style='margin:6px 0 0 18px;padding:0'>" +
+      "<li>La família i les seves dades (cognoms, conductor, telèfon, places).</li>" +
+      "<li>" + (fills ? "Els seus fills: <b>" + esc(fills) + "</b>." : "Els seus fills (ara mateix no en té cap).") + "</li>" +
+      "<li>Totes les marques de la seva graella.</li>" +
+      "<li>Totes les seves assignacions als cotxes: si conduïa, els nens que hi pujaven tornen a «demana plaça»; si algun fill seu pujava al cotxe d'una altra família, hi deixa la plaça lliure.</li>" +
+      "<li>Els avisos de la família.</li>" +
+      "</ul>" +
+      "<p class='hint' style='margin:8px 0 0'>Els comptes (titular i adjunt) d'aquesta família <b>no s'esborren aquí</b>: es queden «sense família», recuperables amb el codi. Per esborrar un compte, fes-ho des de «Comptes registrats».</p>" +
+      "Per confirmar-ho, escriu el nom EXACTE de la família:" +
+      "<input class='input' id='esb-fam-nom' style='margin-top:6px' autocomplete='off' placeholder='" + esc(f.nom) + "' oninput='verificaNomEsbFam(this.value)'>",
+    ok: "Esborra aquesta família", cancel: "Cancel·la",
+    alOk: () => esborraFamAdminDeDebò(f)
+  });
+  const b = $("#conf-si"); if (b) b.disabled = true;
+}
+async function esborraFamAdminDeDebò(f){
+  estat("Esborrant…");
+  const r = await sb.rpc("esborra_familia", { p_family: f.id });
+  if (r.error){ estat("Error", true); avis("No s'ha pogut esborrar: " + esc(msgNeta(r.error))); return; }
+  estat("Desat ✓", "ok");
+  avis("🗑️ <b>Família " + esc(f.nom) + " esborrada.</b> Els fills, la graella i les assignacions han desaparegut; les places que ocupava als cotxes tornen a estar lliures. Els comptes vinculats es queden sense família.", true);
+  await sbGet();
+  pantallaAdmin();
 }
 async function tancaSessio(senseDretes){
   if (!senseDretes && dirty && !confirm("Tens canvis sense desar. Vols sortir igualment?")) return;
